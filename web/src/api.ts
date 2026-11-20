@@ -27,7 +27,7 @@ export const api = {
   put: <T>(url: string, body: unknown = {}) => call<T>('PUT', url, body),
 };
 
-export interface Me { userId: number; username: string; displayName: string; mustChangePassword: boolean; superAdmin: boolean; canManageAccounts: boolean; canCreateChallenges: boolean }
+export interface Me { userId: number; username: string; displayName: string; photoFileId: number | null; mustChangePassword: boolean; superAdmin: boolean; canManageAccounts: boolean; canCreateChallenges: boolean }
 export type Phase = 'DRAFT' | 'UPCOMING' | 'ACTIVE' | 'FINISHED' | 'ARCHIVED';
 export interface ChallengeListItem {
   challengeId: number; slug: string; name: string; category: string; status: string; timeZone: string; startsOn: string; endsOn: string;

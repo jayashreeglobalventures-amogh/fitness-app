@@ -23,15 +23,15 @@ export function classify(d: DayInfo): DayClass {
   }
 }
 
-interface Facts { ctx: ChallengeContext; people: (ParticipantRow & { displayName: string; days: DayInfo[] })[]; out: EngineOutput }
+interface Facts { ctx: ChallengeContext; people: (ParticipantRow & { displayName: string; photoFileId: number | null; days: DayInfo[] })[]; out: EngineOutput }
 
 async function facts(db: Queryable, challengeId: number, now: Date): Promise<Facts> {
   const ctx = await challengeContext(db, challengeId, now);
-  const { rows } = await db.query(`SELECT p.*, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ORDER BY p.participant_id`, [challengeId]);
+  const { rows } = await db.query(`SELECT p.*, u.display_name, pr.photo_file_id FROM participants p JOIN users u USING (user_id) LEFT JOIN user_profiles pr ON pr.user_id = p.user_id WHERE p.challenge_id = $1 ORDER BY p.participant_id`, [challengeId]);
   const people = [];
   for (const r of rows) {
     const p: ParticipantRow = { participantId: Number(r.participant_id), challengeId, userId: Number(r.user_id), status: r.status, joinedOn: r.joined_on, leftOn: r.left_on };
-    people.push({ ...p, displayName: String(r.display_name), days: await participantDays(db, ctx, p, now) });
+    people.push({ ...p, displayName: String(r.display_name), photoFileId: r.photo_file_id ? Number(r.photo_file_id) : null, days: await participantDays(db, ctx, p, now) });
   }
   const { rows: b } = await db.query(
     `SELECT s.bonus_submission_id, s.participant_id, a.weekend_key, s.decided_at FROM bonus_submissions s JOIN bonus_activities a USING (activity_id)
@@ -98,6 +98,7 @@ const RULE_LABEL: Record<string, string> = {
 export interface Standing {
   rank: number; tied: boolean; participantId: number; displayName: string; status: string; points: number; adherencePct: number | null;
   successfulDays: number; longestStreak: number; currentStreak: number; finalScoreOn: string | null; eligible: boolean; me?: boolean;
+  photoFileId?: number | null; // shown only if the viewer may see it (checked when the image is requested)
 }
 
 /** Ranking per the challenge's leaderboard settings; identical rows share a rank and are flagged as tied. */
@@ -139,7 +140,7 @@ export async function leaderboard(db: Queryable, userId: number, challengeId: nu
     const eligible = !['DISQUALIFIED', 'REMOVED', 'WITHDRAWN'].includes(p.status) && s.adherencePct !== null && s.adherencePct >= cfg.prizes.qualificationAdherencePct;
     return { participantId: p.participantId, displayName: p.displayName, status: p.status, points: t ? Number(t.points) : 0, adherencePct: s.adherencePct,
       successfulDays: s.achieved, longestStreak: st.longestStreak, currentStreak: st.currentStreak, finalScoreOn: t?.last_change ?? null, eligible,
-      me: me.rows[0] ? Number(me.rows[0].participant_id) === p.participantId : false };
+      me: me.rows[0] ? Number(me.rows[0].participant_id) === p.participantId : false, photoFileId: p.photoFileId };
   });
   return {
     standings: rank(rows, cfg.leaderboard.ranking), ranking: cfg.leaderboard.ranking, qualificationAdherencePct: cfg.prizes.qualificationAdherencePct,

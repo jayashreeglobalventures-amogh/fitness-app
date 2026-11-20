@@ -76,3 +76,31 @@ export async function upload<T>(url: string, fields: Record<string, string>, fil
   }
   return json.data as T;
 }
+
+/** A round profile picture; falls back to initials if there's no photo or the viewer may not see it. */
+export function Avatar({ fileId, name, size = 32 }: { fileId?: number | null; name: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  const initials = name.split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
+  const style = { width: size, height: size, borderRadius: '50%', flex: 'none' as const };
+  if (fileId && !failed) return <img src={`/api/files/${fileId}`} alt="" style={{ ...style, objectFit: 'cover' }} onError={() => setFailed(true)} />;
+  return <span aria-hidden="true" style={{ ...style, display: 'inline-grid', placeItems: 'center', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: size * 0.38, fontWeight: 800, color: 'var(--muted)' }}>{initials}</span>;
+}
+
+/**
+ * Prepares a photo for upload in the browser: square crop from the centre, at most `size` px, JPEG.
+ * Works for camera and gallery photos on iPhone and Android (Safari hands HEIC over as JPEG).
+ */
+export async function squarePhoto(file: File, size = 512): Promise<File> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error('That file is not a photo this browser can open.')); i.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const out = Math.min(size, side);
+    const canvas = document.createElement('canvas');
+    canvas.width = out; canvas.height = out;
+    canvas.getContext('2d')!.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+    if (!blob) throw new Error('Could not prepare the photo.');
+    return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+  } finally { URL.revokeObjectURL(url); }
+}

@@ -1,9 +1,9 @@
 // Provisional leaderboard: ranking per the challenge's settings, ties flagged, prize eligibility (adherence).
 import { api } from '../api';
-import { day, ErrorBox, Loading, useLoad } from '../ui';
+import { Avatar, day, ErrorBox, Loading, useLoad } from '../ui';
 import type { ChallengeView } from './Challenge';
 
-interface Standing { rank: number; tied: boolean; participantId: number; displayName: string; status: string; points: number; adherencePct: number | null; successfulDays: number; longestStreak: number; currentStreak: number; eligible: boolean; me: boolean }
+interface Standing { rank: number; tied: boolean; participantId: number; displayName: string; photoFileId?: number | null; status: string; points: number; adherencePct: number | null; successfulDays: number; longestStreak: number; currentStreak: number; eligible: boolean; me: boolean }
 interface Board { standings: Standing[]; ranking: string[]; qualificationAdherencePct: number; team: { currentStreak: number; longestStreak: number; breaks: { day: string; previousStreak: number; responsible: number[]; restartOn: string }[] }; asOf: string }
 const KEY: Record<string, string> = { POINTS: 'points', ADHERENCE: 'adherence', SUCCESSFUL_DAYS: 'successful days', LONGEST_PERSONAL_STREAK: 'longest streak', EARLIEST_FINAL_SCORE: 'who got there first' };
 
@@ -24,7 +24,7 @@ export function LeaderboardSection({ v }: { v: ChallengeView }) {
         <tbody>{d.standings.map((s) => (
           <tr key={s.participantId} style={s.me ? { background: 'color-mix(in srgb, var(--accent) 10%, transparent)' } : undefined}>
             <td><b>{s.rank}</b>{s.tied && <div className="muted small">tie</div>}</td>
-            <td>{s.displayName}{s.me && <span className="muted small"> (you)</span>}
+            <td><span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}><Avatar fileId={s.photoFileId} name={s.displayName} size={28} /><span>{s.displayName}{s.me && <span className="muted small"> (you)</span>}</span></span>
               <div>{s.eligible ? <span className="badge ok">on track for prizes</span> : <span className="badge">below {d.qualificationAdherencePct}%</span>}
                 {s.status !== 'ACTIVE' && <span className="badge warn" style={{ marginLeft: 4 }}>{s.status.toLowerCase()}</span>}</div></td>
             <td><b>{s.points}</b></td>

@@ -52,4 +52,17 @@ describe('notifications', () => {
     expect(await ids(ca)).not.toContain('payments');
     expect(await ids(asha)).not.toContain('reviews');
   });
+
+  it('opening Notifications marks them seen (badge = unseen); a new item to review makes it new again', async () => {
+    const list = async (c: Client) => (await c.get('/api/me/notifications')).body.data as { seenKey: string; seen: boolean; id: string }[];
+    const before = await list(ca);
+    expect(before.some((n) => !n.seen)).toBe(true);
+    expect((await ca.post('/api/me/notifications/seen', { keys: before.map((n) => n.seenKey) })).status).toBe(200);
+    expect((await list(ca)).every((n) => n.seen)).toBe(true);
+    // Another screenshot to review: that item's count changes, so it is new again.
+    await ben.upload(`/api/challenges/${id}/submissions`, { clientRef: 'ben-day-one' }, png('ben-1'));
+    const after = await list(ca);
+    expect(after.find((n) => n.id.startsWith('reviews:'))).toMatchObject({ seen: false });
+    expect(after.filter((n) => !n.seen)).toHaveLength(1);
+  });
 });

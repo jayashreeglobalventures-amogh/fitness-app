@@ -17,6 +17,10 @@ export interface Notice {
   link: string;
   challengeId: number | null;
   count?: number;
+  /** Identifies this notification as it is now (a new count makes it new again). */
+  seenKey?: string;
+  /** Already seen by this person (opening Notifications marks everything listed as seen). */
+  seen?: boolean;
 }
 
 export async function myNotifications(db: Queryable, userId: number, now: Date): Promise<Notice[]> {
@@ -113,5 +117,18 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     if (w.bonuses && can('bonus.manage')) out.push({ id: `bonus:${cid}`, kind: 'action', title: `${c.name}: weekend bonuses to approve`, body: `${w.bonuses} waiting.`, link: `/challenges/${cid}/bonus`, challengeId: cid, count: w.bonuses });
   }
   const order = { action: 0, warning: 1, info: 2 } as const;
-  return out.sort((a, b) => order[a.kind] - order[b.kind]);
+  for (const n of out) n.seenKey = `${n.id}|${n.count ?? ''}`.slice(0, 200);
+  const seen = new Set((await db.query(`SELECT seen_key FROM notification_seen WHERE user_id = $1`, [userId])).rows.map((r) => r.seen_key as string));
+  for (const n of out) n.seen = seen.has(n.seenKey!);
+  return out.sort((a, b) => Number(a.seen) - Number(b.seen) || order[a.kind] - order[b.kind]);
+}
+
+/** Marks notifications as seen (the Alerts badge counts only the unseen ones). */
+export async function markSeen(db: Queryable, userId: number, keysRaw: unknown, now: Date): Promise<void> {
+  const keys = Array.isArray(keysRaw) ? [...new Set(keysRaw.map(String).filter((k) => k.length > 0 && k.length <= 200))].slice(0, 200) : [];
+  for (const k of keys) {
+    await db.query(`INSERT INTO notification_seen (user_id, seen_key, seen_at) VALUES ($1,$2,$3) ON CONFLICT (user_id, seen_key) DO UPDATE SET seen_at = EXCLUDED.seen_at`, [userId, k, now]);
+  }
+  // Forget very old ones (their notifications are long gone).
+  await db.query(`DELETE FROM notification_seen WHERE user_id = $1 AND seen_at < $2::timestamptz - interval '90 days'`, [userId, now]);
 }

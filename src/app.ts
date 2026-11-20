@@ -21,7 +21,7 @@ import * as submissions from './modules/checkin/submissions.js';
 import { readerName } from './modules/verification/select.js';
 import * as bonus from './modules/scoring/bonus.js';
 import { breakdown, leaderboard } from './modules/scoring/ledger.js';
-import { myNotifications } from './modules/notifications/notifications.js';
+import { markSeen, myNotifications } from './modules/notifications/notifications.js';
 import * as finance from './modules/finance/finance.js';
 import * as settlement from './modules/settlement/settlement.js';
 import * as challenges from './modules/challenges/challenges.js';
@@ -168,13 +168,20 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   // Who am I: enough for the app shell (name, whether a password change is due, which admin areas to show).
   app.get('/api/me', authed(async ({ tx, user }) => {
     const access = await accessFor(tx, user.userId, null);
-    return { ...user, superAdmin: access.platformRoles.includes('SUPER_ADMIN'), canManageAccounts: await canManageAccounts(tx, user.userId),
+    const photo = (await tx.query(`SELECT photo_file_id FROM user_profiles WHERE user_id = $1`, [user.userId])).rows[0]?.photo_file_id ?? null;
+    return { ...user, photoFileId: photo ? Number(photo) : null, superAdmin: access.platformRoles.includes('SUPER_ADMIN'), canManageAccounts: await canManageAccounts(tx, user.userId),
       canCreateChallenges: access.permissions.has('challenge.create') };
   }, { allowTempPassword: true }));
 
   // ---------- Profile ----------
   app.get('/api/me/profile', authed(({ tx, user }) => profile.getOwnProfile(tx, user.userId)));
   app.put('/api/me/profile', authed(({ tx, user, now, req }) => profile.updateOwnProfile(tx, user.userId, body(req) as never, now)));
+  app.post('/api/me/photo', authed(async (c) => {
+    const { file } = await form(c.req);
+    if (!file) throw new AppError('VALIDATION', 'Choose a photo.');
+    return profile.setPhoto(c.tx, config.mediaDir, c.user.userId, file, c.now);
+  }));
+  app.post('/api/me/photo/remove', authed(({ tx, user, now }) => profile.setPhoto(tx, config.mediaDir, user.userId, null, now)));
 
   // ---------- Accounts (admin) ----------
   const requireAccounts = async (c: Ctx) => { if (!(await canManageAccounts(c.tx, c.user.userId))) throw new AppError('FORBIDDEN', 'You do not have permission to manage accounts.'); };
@@ -213,6 +220,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/participants/:participantId/status', authed((c) => roster.changeStatus(c.tx, c.user.userId, id((c.req.params as { participantId: string }).participantId), body(c.req) as never, c.now)));
   const iid = (c: Ctx) => id((c.req.params as { invitationId: string }).invitationId);
   app.get('/api/me/notifications', authed(({ tx, user, now }) => myNotifications(tx, user.userId, now)));
+  app.post('/api/me/notifications/seen', authed(({ tx, user, now, req }) => markSeen(tx, user.userId, body(req).keys, now)));
   app.get('/api/me/invitations', authed(({ tx, user, now }) => roster.myInvitations(tx, user.userId, now)));
   app.post('/api/invitations/:invitationId/accept', authed((c) => roster.accept(c.tx, c.user.userId, iid(c), body(c.req) as never, c.now)));
   app.post('/api/invitations/:invitationId/decline', authed((c) => roster.decline(c.tx, c.user.userId, iid(c), c.now)));

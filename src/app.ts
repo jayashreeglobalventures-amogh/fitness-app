@@ -19,6 +19,8 @@ import { adminOverview, participantCalendar } from './modules/checkin/overview.j
 import * as restdays from './modules/checkin/restdays.js';
 import * as submissions from './modules/checkin/submissions.js';
 import { readerName } from './modules/verification/select.js';
+import * as bonus from './modules/scoring/bonus.js';
+import { breakdown, leaderboard } from './modules/scoring/ledger.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -285,6 +287,21 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/exemptions/:requestId/vote', authed((c) => exemptions.vote(c.tx, c.user.userId, xid(c), body(c.req).vote, c.now)));
   app.post('/api/exemptions/:requestId/decide', authed((c) => exemptions.decide(c.tx, c.user.userId, xid(c), body(c.req) as never, c.now)));
   app.post('/api/exemptions/:requestId/withdraw', authed((c) => exemptions.withdraw(c.tx, c.user.userId, xid(c), c.now)));
+
+  // ---------- Points, leaderboard, weekend bonus ----------
+  app.get('/api/challenges/:challengeId/leaderboard', authed((c) => leaderboard(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/participants/:participantId/points', authed((c) => breakdown(c.tx, c.user.userId, pid(c), c.now)));
+  const aid = (c: Ctx) => id((c.req.params as { activityId: string }).activityId);
+  const bsid = (c: Ctx) => id((c.req.params as { bonusSubmissionId: string }).bonusSubmissionId);
+  app.get('/api/challenges/:challengeId/bonuses', authed((c) => bonus.listBonuses(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/challenges/:challengeId/bonuses', authed((c) => bonus.createActivity(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
+  app.post('/api/bonuses/:activityId/cancel', authed((c) => bonus.cancelActivity(c.tx, c.user.userId, aid(c), body(c.req).reason, c.now)));
+  app.post('/api/bonuses/:activityId/submissions', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    return bonus.submitBonus(c.tx, config.mediaDir, c.user.userId, aid(c), { note: fields.note, image: file }, c.now);
+  }));
+  app.post('/api/bonus-submissions/:bonusSubmissionId/decide', authed((c) => bonus.decideBonus(c.tx, c.user.userId, bsid(c), body(c.req) as never, c.now)));
+  app.post('/api/bonus-submissions/:bonusSubmissionId/withdraw', authed((c) => bonus.withdrawBonus(c.tx, c.user.userId, bsid(c), c.now)));
 
   // ---------- The React app ----------
   const dir = webDir ?? WEB_DIST;

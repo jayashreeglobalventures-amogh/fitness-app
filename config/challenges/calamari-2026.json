@@ -16,32 +16,100 @@
     "invitationValidDays": 14,
     "lockRosterAtStart": true
   },
-  "activity": { "metric": "steps", "label": "Steps", "unit": "steps", "dailyTarget": 7000 },
-  "periods": { "weekStartsOn": "SUNDAY" },
+  "activity": {
+    "metric": "steps",
+    "label": "Steps",
+    "unit": "steps",
+    "dailyTarget": 7000
+  },
+  "periods": {
+    "weekStartsOn": "SUNDAY"
+  },
   "submission": {
     "evidence": "SCREENSHOT",
     "instructions": "The screenshot must clearly show the date and your total steps for that day. Submit it in the app before midnight (IST). WhatsApp is not a submission channel.",
     "deadline": "END_OF_DAY"
   },
-  "verification": { "mode": "AI_ASSISTED", "autoApproveMinConfidence": 0.9 },
-  "restDays": { "enabled": true, "perPeriod": 1, "maxTotal": 6, "declareBefore": "10:00" },
-  "exemptions": { "enabled": true, "voting": null },
+  "verification": {
+    "mode": "AI_ASSISTED",
+    "autoApproveMinConfidence": 0.9
+  },
+  "restDays": {
+    "enabled": true,
+    "perPeriod": 1,
+    "maxTotal": 6,
+    "declareBefore": "10:00"
+  },
+  "exemptions": {
+    "enabled": true,
+    "voting": null
+  },
   "scoring": {
     "dailySuccess": 10,
-    "personalStreak": { "milestones": [7, 14, 21, 28, 35], "points": 20 },
-    "teamStreak": { "enabled": true, "everyDays": 8, "points": 10 },
-    "comeback": { "enabled": true, "missedDays": 2, "recoveryDays": 3, "points": 10, "maxAwards": 3 },
-    "weekendBonus": { "enabled": true, "points": 10, "maxPerWeekend": 1 },
+    "personalStreak": {
+      "milestones": [
+        7,
+        14,
+        21,
+        28,
+        35
+      ],
+      "points": 20,
+      "repeatAfterBreak": true
+    },
+    "teamStreak": {
+      "enabled": true,
+      "everyDays": 8,
+      "points": 10
+    },
+    "comeback": {
+      "enabled": true,
+      "missedDays": 2,
+      "missRun": "AT_LEAST",
+      "recoveryDays": 3,
+      "points": 10,
+      "maxAwards": 3
+    },
+    "weekendBonus": {
+      "enabled": true,
+      "points": 10,
+      "maxPerWeekend": 1,
+      "weekend": "SAT_NEXT_SUN"
+    },
     "penalties": {
-      "consecutiveMisses": { "enabled": true, "days": 2, "points": -15 },
-      "teamStreakBreak": { "enabled": true, "points": -15 }
+      "missedDay": {
+        "enabled": true,
+        "points": -15
+      },
+      "consecutiveMisses": {
+        "enabled": false,
+        "days": 2,
+        "repeat": "EVERY_MISS_FROM_NTH",
+        "points": -15
+      },
+      "teamStreakBreak": {
+        "enabled": false,
+        "when": "EVERY_MISS",
+        "points": -15
+      }
     }
   },
   "finance": {
     "enabled": true,
     "currency": "INR",
-    "contribution": { "total": 100000, "mainPool": 40000, "finePool": 60000 },
-    "periodOverrides": [ { "periodNo": 6, "total": 71400, "mainPool": 28600, "finePool": 42800 } ],
+    "contribution": {
+      "total": 100000,
+      "mainPool": 40000,
+      "finePool": 60000
+    },
+    "periodOverrides": [
+      {
+        "periodNo": 6,
+        "total": 71400,
+        "mainPool": 28600,
+        "finePool": 42800
+      }
+    ],
     "finePerMissedDay": 10000,
     "dueWeekday": "SUNDAY",
     "paymentInstructions": "Pay your weekly contribution every Sunday by UPI (scan the QR in the app), then enter the UPI reference (UTR) in the app. A Finance Admin confirms it."
@@ -54,5 +122,13 @@
     "distribution": null,
     "payoutDate": "2027-01-01"
   },
-  "leaderboard": { "ranking": ["POINTS", "ADHERENCE", "SUCCESSFUL_DAYS", "LONGEST_PERSONAL_STREAK", "EARLIEST_FINAL_SCORE"] }
+  "leaderboard": {
+    "ranking": [
+      "POINTS",
+      "ADHERENCE",
+      "SUCCESSFUL_DAYS",
+      "LONGEST_PERSONAL_STREAK",
+      "EARLIEST_FINAL_SCORE"
+    ]
+  }
 }

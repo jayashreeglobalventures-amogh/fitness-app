@@ -33,6 +33,10 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       WHERE i.user_id = $1 AND i.status = 'INVITED' AND i.expires_at > $2 AND c.status = 'PUBLISHED'`, [userId, now]);
   for (const r of inv.rows) out.push({ id: `inv:${r.invitation_id}`, kind: 'action', title: `You're invited to ${r.name}`, body: 'Read the rules and accept to join.', link: `/challenges/${r.challenge_id}/overview`, challengeId: Number(r.challenge_id) });
 
+  // A finance-manager handover waiting for me to accept.
+  const ho = await db.query(`SELECT h.handover_id, c.name, c.challenge_id FROM finance_handovers h JOIN challenges c USING (challenge_id) WHERE h.to_user_id = $1 AND h.status = 'PENDING'`, [userId]);
+  for (const r of ho.rows) out.push({ id: `handover:${r.handover_id}`, kind: 'action', title: `${r.name}: you're being made finance manager`, body: 'Confirm the amount you received and that the accounts are settled.', link: `/finance-handover/${r.handover_id}`, challengeId: Number(r.challenge_id) });
+
   // Challenges I take part in or administer.
   const { rows: chs } = await db.query(
     `SELECT c.*, p.participant_id, p.status AS p_status, p.joined_on, p.left_on
@@ -93,6 +97,17 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       for (const e of check.errors) out.push({ id: `cfgerr:${cid}:${e.path}`, kind: 'warning', title: `${c.name} settings: needs fixing`, body: e.message, link: `/challenges/${cid}/settings`, challengeId: cid });
       for (const w of check.warnings) out.push({ id: `cfgwarn:${cid}:${w.path}`, kind: 'info', title: `${c.name} settings: heads-up`, body: w.message, link: `/challenges/${cid}/settings`, challengeId: cid });
     }
+    if (can('challenge.roles.manage')) {
+      const n = Number((await db.query(`SELECT count(*)::int AS n FROM challenge_roles WHERE challenge_id = $1 AND role = 'CHALLENGE_ADMIN'`, [cid])).rows[0].n);
+      if (n < 2) out.push({ id: `admins:${cid}`, kind: 'warning', title: `${c.name}: needs at least 2 admins`, body: `It has ${n}. Add admins so nothing depends on one person${c.status === 'DRAFT' ? ' (needed before publishing)' : ''}.`, link: `/challenges/${cid}/admins`, challengeId: cid });
+      const cfgF = (await latestVersion(db, cid)).config.finance.enabled;
+      const fm = await db.query(`SELECT 1 FROM challenge_roles WHERE challenge_id = $1 AND role = 'FINANCE_ADMIN'`, [cid]);
+      if (cfgF && !fm.rows[0]) out.push({ id: `nofm:${cid}`, kind: 'warning', title: `${c.name}: no finance manager`, body: 'Appoint one in the Admins tab.', link: `/challenges/${cid}/admins`, challengeId: cid });
+    }
+    if (can('finance.settings')) {
+      const ps = await db.query(`SELECT needs_update FROM payment_settings WHERE challenge_id = $1`, [cid]);
+      if (ps.rows[0]?.needs_update) out.push({ id: `paydetails:${cid}`, kind: 'action', title: `${c.name}: add your payment details`, body: 'You are the new finance manager: enter your UPI ID and QR code so participants can pay you.', link: `/challenges/${cid}/money`, challengeId: cid });
+    }
     if (c.status === 'DRAFT' && can('challenge.publish')) out.push({ id: `draft:${cid}`, kind: 'info', title: `${c.name} is a draft`, body: 'Check the settings, then publish it to start inviting people.', link: `/challenges/${cid}/overview`, challengeId: cid });
     if (c.status !== 'PUBLISHED') continue;
     const { rows: [w] } = await db.query(
@@ -103,12 +118,14 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
                  WHERE a.challenge_id = $1 AND s.status = 'PENDING' AND p.user_id <> $2)::int AS bonuses`, [cid, userId, now]);
     if (w.reviews && can('submissions.review')) out.push({ id: `reviews:${cid}`, kind: 'action', title: `${c.name}: screenshots to review`, body: `${w.reviews} waiting for a decision.`, link: `/challenges/${cid}/review`, challengeId: cid, count: w.reviews });
     if (w.exemptions && can('exemptions.review')) out.push({ id: `exadmin:${cid}`, kind: 'action', title: `${c.name}: exemption requests need an admin`, body: `${w.exemptions} waiting.`, link: `/challenges/${cid}/exemptions`, challengeId: cid, count: w.exemptions });
-    if (can('payments.verify') || can('settlement.approve')) {
+    if (can('payments.verify') || can('refunds.approve') || can('payments.countersign')) {
       const { rows: [m] } = await db.query(
         `SELECT (SELECT count(*) FROM payments x JOIN participants p USING (participant_id) WHERE x.challenge_id = $1 AND x.status = 'SUBMITTED' AND p.user_id <> $2)::int AS payments,
-                (SELECT count(*) FROM refund_proposals r JOIN participants p USING (participant_id) WHERE r.challenge_id = $1 AND r.status = 'PROPOSED' AND r.proposed_by <> $2 AND p.user_id <> $2)::int AS refunds`, [cid, userId]);
+                (SELECT count(*) FROM refund_proposals r JOIN participants p USING (participant_id) WHERE r.challenge_id = $1 AND r.status = 'PROPOSED' AND r.proposed_by <> $2 AND p.user_id <> $2)::int AS refunds,
+                (SELECT count(*) FROM payments x JOIN participants p USING (participant_id) WHERE x.challenge_id = $1 AND x.status = 'SUBMITTED' AND x.submitted_by <> p.user_id AND x.submitted_by <> $2 AND p.user_id <> $2)::int AS countersign`, [cid, userId]);
       if (m.payments && can('payments.verify')) out.push({ id: `payments:${cid}`, kind: 'action', title: `${c.name}: payments to confirm`, body: `${m.payments} UTR${m.payments === 1 ? '' : 's'} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.payments });
-      if (m.refunds && can('settlement.approve')) out.push({ id: `refunds:${cid}`, kind: 'action', title: `${c.name}: refunds to approve`, body: `${m.refunds} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.refunds });
+      if (m.countersign && can('payments.countersign') && !can('payments.verify')) out.push({ id: `countersign:${cid}`, kind: 'action', title: `${c.name}: payments recorded by another admin`, body: `${m.countersign} to confirm (two-person rule).`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.countersign });
+      if (m.refunds && can('refunds.approve')) out.push({ id: `refunds:${cid}`, kind: 'action', title: `${c.name}: refunds to approve`, body: `${m.refunds} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.refunds });
     }
     if (can('settlement.approve')) {
       const { rows: [d] } = await db.query(`SELECT settlement_id FROM settlements WHERE challenge_id = $1 AND status = 'DRAFT'`, [cid]);

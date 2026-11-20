@@ -69,6 +69,11 @@ NEWPW="$(openssl rand -hex 12)"
 api -d "{\"current\":\"$PW\",\"next\":\"$NEWPW\"}" "$BASE/api/auth/change-password" | grep -q '"success":true'
 "$DIR/cli.sh" create-challenge calamari-2026 config/challenges/calamari-2026.json owner
 api "$BASE/api/challenges" | grep -q '"name":"Calamari"'
+# A challenge needs at least 2 challenge admins before it can be published.
+for a in admin.one admin.two; do
+  UID_A="$(api -d "{\"username\":\"$a\",\"displayName\":\"$a\"}" "$BASE/api/admin/users" | sed -E 's/.*"userId":([0-9]+).*/\1/')"
+  api -d "{\"userId\":$UID_A,\"role\":\"CHALLENGE_ADMIN\"}" "$BASE/api/challenges/1/roles" | grep -q '"success":true'
+done
 api -X POST -d '{}' "$BASE/api/challenges/1/publish" | grep -q '"success":true'
 api -d '{"username":"priya","displayName":"Priya"}' "$BASE/api/admin/users" | grep -q '"tempPassword"'
 end

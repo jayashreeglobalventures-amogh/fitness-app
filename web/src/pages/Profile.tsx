@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../router';
-import { Avatar, ErrorBox, Field, Loading, squarePhoto, upload, useLoad } from '../ui';
+import { Avatar, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
+import { PhotoCropper } from '../PhotoCropper';
 
 type F = 'fullName' | 'mobile' | 'email' | 'birthDate' | 'gender' | 'location' | 'about';
 interface Profile { userId: number; username: string; displayName: string; fields: Record<F, string | null>; visibility: Record<F, string>; photoFileId: number | null; photoVisibility: string }
@@ -54,10 +55,11 @@ function PhotoCard({ p, onChanged }: { p: Profile; onChanged: (p: Profile) => vo
   const input = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const pick = async (f: File | null) => {
-    if (!f) return;
-    setBusy(true); setError(null);
-    try { onChanged(await upload<Profile>('/api/me/photo', {}, await squarePhoto(f))); } catch (e) { setError(e); } finally { setBusy(false); if (input.current) input.current.value = ''; }
+  const [editing, setEditing] = useState<File | null>(null);
+  const pick = (f: File | null) => { if (f) setEditing(f); if (input.current) input.current.value = ''; };
+  const save = async (f: File) => {
+    setEditing(null); setBusy(true); setError(null);
+    try { onChanged(await upload<Profile>('/api/me/photo', {}, f)); } catch (e) { setError(e); } finally { setBusy(false); }
   };
   const remove = async () => { setBusy(true); setError(null); try { onChanged(await api.post<Profile>('/api/me/photo/remove')); } catch (e) { setError(e); } finally { setBusy(false); } };
   const setVis = async (v: string) => { setError(null); try { onChanged(await api.put<Profile>('/api/me/profile', { photoVisibility: v })); } catch (e) { setError(e); } };
@@ -66,7 +68,8 @@ function PhotoCard({ p, onChanged }: { p: Profile; onChanged: (p: Profile) => vo
       <div className="row" style={{ alignItems: 'center', gap: 16 }}>
         <Avatar key={p.photoFileId ?? 0} fileId={p.photoFileId} name={p.displayName} size={88} />
         <div className="stack" style={{ flex: 1, minWidth: 180 }}>
-          <input ref={input} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0] ?? null)} />
+          <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+          {editing && <PhotoCropper file={editing} onCancel={() => setEditing(null)} onDone={(f) => void save(f)} />}
           <div className="row">
             <button className="btn primary small" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : p.photoFileId ? 'Change photo' : 'Add a photo'}</button>
             {p.photoFileId && <button className="btn ghost small" disabled={busy} onClick={remove}>Remove</button>}
@@ -75,7 +78,7 @@ function PhotoCard({ p, onChanged }: { p: Profile; onChanged: (p: Profile) => vo
             {Object.entries(VIS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
         </div>
       </div>
-      <p className="muted small" style={{ margin: 0 }}>Take one with the camera or choose from your gallery. It's cropped to a square.</p>
+      <p className="muted small" style={{ margin: 0 }}>Take one with the camera or choose from your gallery, then position and zoom it.</p>
       <ErrorBox error={error} />
     </div>
   );

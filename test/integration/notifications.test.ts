@@ -30,7 +30,7 @@ describe('notifications', () => {
   });
 
   it('participants get invitations, then today\'s check-in until they upload', async () => {
-    await sa.post(`/api/challenges/${id}/publish`);
+    await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
     const r = await ca.post(`/api/challenges/${id}/invitations`, { userIds: [asha.userId, ben.userId] });
     expect(await ids(asha)).toEqual(['inv']);
     await asha.post(`/api/invitations/${r.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true });

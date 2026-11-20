@@ -44,7 +44,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
     { key: 'results', label: 'Results', show: (isParticipant || isAdmin) && live && (isAdmin || v.phase === 'FINISHED') },
     { key: 'review', label: 'Review', show: can('submissions.review') && live },
     { key: 'bonus', label: 'Bonus', show: (isParticipant || can('bonus.manage')) && live && v.current.config.scoring.weekendBonus.enabled },
-    { key: 'money', label: 'Money', show: live && (v.upcoming ?? v.current).config.finance.enabled && (isParticipant || can('finance.view') || can('finance.settings')) },
+    { key: 'money', label: 'Money', show: live && (v.upcoming ?? v.current).config.finance.enabled && (isParticipant || can('finance.view') || can('finance.settings') || can('refunds.approve')) },
     { key: 'exemptions', label: 'Exemptions', show: (isParticipant || can('exemptions.review')) && live && (v.current.config.exemptions.enabled || can('exemptions.review')) },
     { key: 'overview', label: 'Rules', show: true },
     { key: 'demo', label: 'Demo', show: true },

@@ -29,7 +29,7 @@ beforeAll(async () => {
   id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).body.data.challengeId;
   await sa.post(`/api/challenges/${id}/roles`, { userId: ca.userId, role: 'CHALLENGE_ADMIN' });
   await sa.post(`/api/challenges/${id}/roles`, { userId: fa.userId, role: 'FINANCE_ADMIN' });
-  await sa.post(`/api/challenges/${id}/publish`);
+  await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
   for (const c of [asha, ben]) {
     const r = await ca.post(`/api/challenges/${id}/invitations`, { userIds: [c.userId] });
     pid[c.username] = (await c.post(`/api/invitations/${r.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true })).body.data.participantId;
@@ -117,10 +117,13 @@ describe('contributions, payments and fines (Calamari)', () => {
     expect((await mine(ben)).refundDue).toBe(500); // ₹600 - one ₹100 fine
   });
 
-  it('a Finance Admin can record a payment on someone\'s behalf (with where it came from)', async () => {
+  it('a Finance Admin can record a payment on someone\'s behalf; another admin must confirm it (two-person rule)', async () => {
     const r = await fa.post(`/api/participants/${pid.ben}/payments`, { periodNo: 1, amount: 1000, method: 'CASH', paidOn: '2026-11-28', reason: 'Paid cash to the organiser' });
     expect(r.status).toBe(200);
-    expect((await fa.post(`/api/payments/${r.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
+    const self = await fa.post(`/api/payments/${r.body.data.paymentId}/decide`, { confirm: true });
+    expect(self.status).toBe(403);
+    expect(self.body.message).toContain('another admin');
+    expect((await ca.post(`/api/payments/${r.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
     expect((await mine(ben)).weeks[0].status).toBe('PAID');
   });
 
@@ -153,9 +156,13 @@ describe('contributions, payments and fines (Calamari)', () => {
     } finally { await c.query('ROLLBACK').catch(() => undefined); c.release(); }
   });
 
-  it('participants see only their own money (plus pool totals); the Challenge Admin has no finance view', async () => {
+  it('participants see only their own money (plus pool totals); a Challenge Admin sees the finance view (to approve requests) but can\'t confirm reported payments', async () => {
     expect((await asha.get(`/api/challenges/${id}/finance`)).status).toBe(403);
-    expect((await ca.get(`/api/challenges/${id}/finance`)).status).toBe(403);
+    const caView = await ca.get(`/api/challenges/${id}/finance`);
+    expect(caView.status).toBe(200);
+    expect(caView.body.data).toMatchObject({ canConfirm: false, canApproveRefund: true });
+    const rep = await asha.post(`/api/challenges/${id}/payments`, { periodNo: 2, amount: 1000, utr: 'ASHAWEEK2001', paidOn: '2026-11-29' });
+    expect((await ca.post(`/api/payments/${rep.body.data.paymentId}/decide`, { confirm: true })).status).toBe(403);
     const m = await mine(asha);
     expect(Object.keys(m)).toEqual(expect.arrayContaining(['weeks', 'owed', 'refundDue', 'payments', 'pools']));
     expect(JSON.stringify(m)).not.toContain('ben');

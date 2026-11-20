@@ -65,8 +65,12 @@ describe('challenge lifecycle (Calamari created through configuration, not code)
     expect(Object.keys(rows[0].after)).toEqual(['basics']);
   });
 
-  it('only a Super Admin publishes', async () => {
+  it('only a Super Admin publishes, and only with at least 2 challenge admins', async () => {
     expect((await ca.post(`/api/challenges/${id}/publish`)).status).toBe(403);
+    const one = await sa.post(`/api/challenges/${id}/publish`);
+    expect(one.status).toBe(409);
+    expect(one.body.message).toContain('at least 2 challenge admins');
+    await h.ensureAdmins(ca, id); // a Challenge Admin can appoint another admin
     expect((await sa.post(`/api/challenges/${id}/publish`)).status).toBe(200);
     expect((await sa.post(`/api/challenges/${id}/publish`)).status).toBe(409);
   });

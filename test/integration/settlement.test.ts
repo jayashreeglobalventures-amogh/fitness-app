@@ -29,7 +29,7 @@ beforeAll(async () => {
   id = (await sa.post('/api/challenges', { slug: 'one-week', config: cfg })).body.data.challengeId;
   await sa.post(`/api/challenges/${id}/roles`, { userId: ca.userId, role: 'CHALLENGE_ADMIN' });
   await sa.post(`/api/challenges/${id}/roles`, { userId: fa.userId, role: 'FINANCE_ADMIN' });
-  await sa.post(`/api/challenges/${id}/publish`);
+  await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
   for (const c of [asha, ben, chitra, dev]) {
     const r = await ca.post(`/api/challenges/${id}/invitations`, { userIds: [c.userId] });
     pid[c.username] = (await c.post(`/api/invitations/${r.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true })).body.data.participantId;

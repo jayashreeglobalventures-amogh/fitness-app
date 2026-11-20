@@ -9,6 +9,7 @@ import { HomePage } from './pages/Home';
 import { ChangePasswordPage, LoginPage } from './pages/Login';
 import { ProfilePage } from './pages/Profile';
 import { NotificationsPage, useNoticeCount } from './pages/Notifications';
+import { HandoverPage } from './pages/Handover';
 import { navigate, usePath } from './router';
 import { Avatar } from './ui';
 
@@ -74,6 +75,8 @@ function route(path: string, me: Me, refresh: () => void): ReactNode {
   const m = /^\/challenges\/(\d+)(?:\/(\w+))?$/.exec(path);
   if (m) return <ChallengePage me={me} id={Number(m[1])} section={m[2] ?? 'default'} />;
   if (path === '/notifications') return <NotificationsPage />;
+  const ho = /^\/finance-handover\/(\d+)$/.exec(path);
+  if (ho) return <HandoverPage id={Number(ho[1])} />;
   if (path === '/profile') return <ProfilePage onChanged={refresh} />;
   if (path === '/profile/password') return <ChangePasswordPage onDone={() => navigate('/profile')} />;
   if (path === '/admin/users' && me.canManageAccounts) return <AccountsPage me={me} />;

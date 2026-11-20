@@ -27,7 +27,7 @@ const rulesVersion = async (c: Client) => (await c.get(`/api/challenges/${id}`))
 describe('invitations and roster (Calamari: invitation-only)', () => {
   it('no invitations before publishing; Finance Admin cannot manage the roster', async () => {
     expect((await ca.post(`/api/challenges/${id}/invitations`, { userIds: [p1.userId] })).status).toBe(409);
-    await sa.post(`/api/challenges/${id}/publish`);
+    await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
     expect((await fa.post(`/api/challenges/${id}/invitations`, { userIds: [p1.userId] })).status).toBe(403);
     expect((await p2.post(`/api/challenges/${id}/invitations`, { userIds: [p1.userId] })).status).toBe(403);
   });

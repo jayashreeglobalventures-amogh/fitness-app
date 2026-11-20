@@ -34,7 +34,7 @@ beforeAll(async () => {
   [asha, ben, cara] = [await h.user('asha'), await h.user('ben'), await h.user('cara')];
   id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).body.data.challengeId;
   await sa.post(`/api/challenges/${id}/roles`, { userId: ca.userId, role: 'CHALLENGE_ADMIN' });
-  await sa.post(`/api/challenges/${id}/publish`);
+  await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
   for (const c of [asha, ben, cara]) {
     const r = await ca.post(`/api/challenges/${id}/invitations`, { userIds: [c.userId] });
     pid[c.username] = (await c.post(`/api/invitations/${r.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true })).body.data.participantId;

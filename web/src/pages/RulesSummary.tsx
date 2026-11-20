@@ -36,10 +36,13 @@ export function RulesSummary({ c, periods }: { c: ChallengeConfig; periods?: { p
         <li>Daily goal reached: {pts(s.dailySuccess)}.</li>
         {s.personalStreak.milestones.length > 0 && <li>Personal streak of {s.personalStreak.milestones.join(', ')} days: {pts(s.personalStreak.points)} each.</li>}
         {s.teamStreak.enabled && <li>Every {s.teamStreak.everyDays}th day in a row that everyone succeeds: {pts(s.teamStreak.points)}.</li>}
-        {s.comeback.enabled && <li>Comeback ({s.comeback.missedDays} missed days, then {s.comeback.recoveryDays} successful days): {pts(s.comeback.points)}, at most {s.comeback.maxAwards} times.</li>}
-        {s.weekendBonus.enabled && <li>Optional weekend bonus activity: {pts(s.weekendBonus.points)}, at most {s.weekendBonus.maxPerWeekend} per weekend. It does not replace the daily goal.</li>}
-        {s.penalties.consecutiveMisses.enabled && <li>{s.penalties.consecutiveMisses.days} missed days in a row: {pts(s.penalties.consecutiveMisses.points)}.</li>}
-        {s.penalties.teamStreakBreak.enabled && <li>Breaking the team streak: {pts(s.penalties.teamStreakBreak.points)} (only for whoever missed).</li>}
+        {s.personalStreak.milestones.length > 0 && s.personalStreak.repeatAfterBreak && <li>A new streak after a break earns the milestones again.</li>}
+        {s.comeback.enabled && <li>Comeback ({s.comeback.missRun === 'AT_LEAST' ? `${s.comeback.missedDays} or more` : `exactly ${s.comeback.missedDays}`} missed days in a row, then {s.comeback.recoveryDays} successful days): {pts(s.comeback.points)}, at most {s.comeback.maxAwards} times.</li>}
+        {s.weekendBonus.enabled && <li>Optional weekend bonus activity ({s.weekendBonus.weekend === 'SAT_NEXT_SUN' ? 'Saturday + Sunday' : 'Sunday or Saturday of the week'}): {pts(s.weekendBonus.points)}, at most {s.weekendBonus.maxPerWeekend} per weekend. It does not replace the daily goal.</li>}
+        {s.penalties.missedDay.enabled && <li>Every missed day (no evidence, below target or rejected): {pts(s.penalties.missedDay.points)}.</li>}
+        {s.penalties.consecutiveMisses.enabled && <li>{s.penalties.consecutiveMisses.days} missed days in a row: {pts(s.penalties.consecutiveMisses.points)} ({s.penalties.consecutiveMisses.repeat === 'ONCE_PER_RUN' ? 'once per run' : s.penalties.consecutiveMisses.repeat === 'EVERY_NTH' ? `every ${s.penalties.consecutiveMisses.days} misses` : 'on every further miss'}).</li>}
+        {s.penalties.teamStreakBreak.enabled && <li>Breaking the team streak: {pts(s.penalties.teamStreakBreak.points)} (only for whoever missed{s.penalties.teamStreakBreak.when === 'EVERY_MISS' ? ', on every miss' : ''}).</li>}
+        {s.teamStreak.enabled && <li>Rest days and approved exemptions count as successful team days.</li>}
       </ul>
       {f.enabled && (<>
         <h3>Money</h3>

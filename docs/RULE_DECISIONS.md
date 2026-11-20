@@ -19,9 +19,27 @@ change any of them. **Open** items are not implemented until the owner decides (
 | Corrections for days before the app is live | Admin records the evidence/rest day with its original time (must be before that day's midnight / is flagged if after 10:00) and a reason; evidence goes through the normal check. |
 | Adherence (shown now, provisional) | achieved ÷ (achieved + missed), over days that have happened; rest and excused days are left out; pending days don't count yet. |
 
-## Still open (need the owner's ruling before scoring / money)
+## Phase 3 scoring - owner rulings (20 Nov 2026), in Calamari's settings
 
-From the assessment §11: **5** withdrawal refunds, **11** top-three when someone is under 80 %, **16** team-break penalty when the
-streak is already 0, **17** repeated two-miss penalty on longer runs, **18** comeback after 3+ misses, **20** weekend
-definition, **21** where unused fine money goes, **22** Calamari's exemption voting numbers (now set in *Settings →
-Exemptions*), **23** late payments. Also: what a **suspended** participant's days count as (today they still count).
+| Topic | Ruling | Setting |
+|---|---|---|
+| Missed eligible day (no evidence, below target, rejected) | **−15 in total per missed day**; penalties never stack (Mon, Tue, Wed missed = −45) | `penalties.missedDay` on; `consecutiveMisses` and `teamStreakBreak` off |
+| Team streak break | Every miss counts, even when the team streak is already 0 - covered by the −15 per missed day; each break is still **recorded** (date, previous streak, who missed, restart day) | `penalties.teamStreakBreak.when = EVERY_MISS` (kept off, see above) |
+| Comeback | **2 or more** misses in a row, then 3 successful days → +10, at most 3 | `comeback.missRun = AT_LEAST` |
+| Weekend bonus | Weekend = **Saturday + the following Sunday**; 22 Nov is a one-day weekend | `weekendBonus.weekend = SAT_NEXT_SUN` |
+
+Defaults applied where nothing was said (change in Settings if needed):
+
+| Topic | Default |
+|---|---|
+| Personal streak milestones after a break | A new streak earns 7/14/21/28/35 again (`personalStreak.repeatAfterBreak = true`) |
+| Team streak bonus recipients | Everyone taking part that day, including whoever was on a rest day or excused |
+| Undecided days | Sequences (streaks, comebacks, team streak) stop at the first day that is still pending (review, exemption vote, or not over yet) and continue once it is decided; daily points don't wait |
+| Corrections | A changed decision appends a reversal (and a new award) to the points ledger - never an edit |
+| Leaderboard | Provisional; prize eligibility = adherence ≥ 80 % and not withdrawn/removed/disqualified |
+
+## Still open (need the owner's ruling before money / settlement)
+
+From the assessment §11: **5** withdrawal refunds, **11** top-three when someone is under 80 %, **21** where unused fine
+money goes, **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*), **23** late payments. Also: what a
+**suspended** participant's days count as (today they still count).

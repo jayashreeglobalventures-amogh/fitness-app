@@ -19,9 +19,14 @@ export function blankConfig(name: string, startDate: string, endDate: string): C
     restDays: { enabled: false, perPeriod: 0, maxTotal: 0, declareBefore: '10:00' },
     exemptions: { enabled: false, voting: null },
     scoring: {
-      dailySuccess: 10, personalStreak: { milestones: [], points: 0 }, teamStreak: { enabled: false, everyDays: 7, points: 0 },
-      comeback: { enabled: false, missedDays: 2, recoveryDays: 3, points: 0, maxAwards: 0 }, weekendBonus: { enabled: false, points: 0, maxPerWeekend: 0 },
-      penalties: { consecutiveMisses: { enabled: false, days: 2, points: 0 }, teamStreakBreak: { enabled: false, points: 0 } },
+      dailySuccess: 10, personalStreak: { milestones: [], points: 0, repeatAfterBreak: true }, teamStreak: { enabled: false, everyDays: 7, points: 0 },
+      comeback: { enabled: false, missedDays: 2, missRun: 'AT_LEAST', recoveryDays: 3, points: 0, maxAwards: 0 },
+      weekendBonus: { enabled: false, points: 0, maxPerWeekend: 0, weekend: 'SAT_NEXT_SUN' },
+      penalties: {
+        missedDay: { enabled: false, points: 0 },
+        consecutiveMisses: { enabled: false, days: 2, repeat: 'ONCE_PER_RUN', points: 0 },
+        teamStreakBreak: { enabled: false, when: 'RUNNING_STREAK_ONLY', points: 0 },
+      },
     },
     finance: { enabled: false, currency: 'INR', contribution: { total: 0, mainPool: 0, finePool: 0 }, periodOverrides: [], finePerMissedDay: 0, dueWeekday: 'SUNDAY', paymentInstructions: '' },
     prizes: { qualificationAdherencePct: 80, qualificationPoolPct: null, topThreePct: null, topThreeSplitPct: null, distribution: null, payoutDate: null },

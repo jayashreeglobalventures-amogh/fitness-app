@@ -10,6 +10,7 @@ All commands run on the VPS as `deploy-fitness` in the environment's directory
 | First Super Admin | `./cli.sh create-super-admin <username> "<name>"` |
 | Create a challenge from a settings file | `./cli.sh create-challenge <slug> config/challenges/<file>.json <admin username>` |
 | Check a settings file | `./cli.sh validate-config config/challenges/<file>.json` |
+| Apply a settings file as new rules (audited, versioned) | `./cli.sh apply-config <slug> config/challenges/<file>.json <admin username> "<reason>" [first day, after the start]` |
 | Screenshot reading on/off | `./set-key.sh anthropic` (paste the key; empty = off) |
 | Backup now | `./backup.sh` (nightly at 03:15 IST anyway) |
 | Restore test now | `./restore-test.sh` (Sundays 04:15 IST anyway) |

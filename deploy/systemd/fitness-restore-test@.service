@@ -1,0 +1,6 @@
+[Unit]
+Description=Fitness app weekly restore test (%i)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'FIT_DIR=/opt/fitness-%i; [ "%i" = production ] && FIT_DIR=/opt/fitness; export FIT_DIR; exec "$FIT_DIR/restore-test.sh"'

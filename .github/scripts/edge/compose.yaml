@@ -1,0 +1,13 @@
+# CI stand-in for the VPS's shared Caddy edge (the real one belongs to the Rent stack and is not in this repo).
+name: edge
+services:
+  caddy:
+    image: caddy:2.11.4-alpine
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+    networks: [edge]
+networks:
+  edge:
+    external: true

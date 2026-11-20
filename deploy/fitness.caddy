@@ -1,0 +1,14 @@
+# Fitness app site for the shared Caddy (/opt/edge/sites/). Rendered per environment by bootstrap-fitness.sh
+# (__DOMAIN__, __ALIAS__) and placed only after `caddy validate`. Automatic HTTPS; HTTP redirects to HTTPS.
+# Screenshots arrive as multipart uploads of at most 10 MB.
+__DOMAIN__ {
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+	reverse_proxy __ALIAS__:3000
+}

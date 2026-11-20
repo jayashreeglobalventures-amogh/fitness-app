@@ -1,0 +1,81 @@
+# Fitness app stack for ONE environment on the shared VPS (docs/VPS_DEPLOYMENT.md).
+#   staging:     /opt/fitness-staging/compose.yaml   project "fitness-staging"   https://fitness-test.amogh.systems
+#   production:  /opt/fitness/compose.yaml           project "fitness"           https://fitness.amogh.systems
+# Copied there by the deploy gate, never edited on the server. Secrets: <dir>/.env (600, deploy-fitness).
+# The compose project name keeps everything separate per environment and from the IMS and Rent stacks: its own
+# database, volumes and internal network. Only the shared Caddy (edge network) reaches the app, through a
+# per-environment alias. PostgreSQL publishes no port.
+x-image: &image ghcr.io/jayashreeglobalventures-amogh/fitness-app:${IMAGE_TAG:?IMAGE_TAG must be set}
+
+services:
+  fit-db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      POSTGRES_DB: fitness
+      FIT_OWNER_PASSWORD: ${FIT_OWNER_PASSWORD:?}
+      FIT_APP_PASSWORD: ${FIT_APP_PASSWORD:?}
+      TZ: UTC
+    command: ["postgres", "-c", "shared_buffers=96MB", "-c", "work_mem=4MB", "-c", "max_connections=30"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    mem_limit: 384m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d fitness"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  fit-migrate:
+    image: *image
+    command: ["node", "dist/src/db/migrate.js"]
+    environment:
+      MIGRATE_DATABASE_URL: postgres://fit_owner:${FIT_OWNER_PASSWORD}@fit-db:5432/fitness
+    networks: [internal]
+    mem_limit: 256m
+    restart: "no"
+    profiles: ["tools"]
+    depends_on:
+      fit-db: { condition: service_healthy }
+
+  fit-app:
+    image: *image
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      DATABASE_URL: postgres://fit_app:${FIT_APP_PASSWORD}@fit-db:5432/fitness
+      PUBLIC_ORIGIN: https://${FIT_DOMAIN:?}
+      MEDIA_DIR: /media
+      TRUST_PROXY: "true"
+      BACKUP_STATUS_FILE: /status/backup
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Screenshot reading with Claude; empty = every screenshot goes to manual review.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      FITNESS_SCHEDULER_ENABLED: ${FITNESS_SCHEDULER_ENABLED:-true}
+    volumes:
+      - media:/media
+      - ./status:/status:ro
+    networks:
+      internal: {}
+      edge:
+        aliases: ["${FIT_APP_ALIAS:?}"]  # fit-app-staging / fit-app-production: what Caddy proxies to
+    mem_limit: 384m
+    cpus: 1.0
+    restart: unless-stopped
+    depends_on:
+      fit-db: { condition: service_healthy }
+
+networks:
+  internal:
+    internal: true
+  edge:
+    external: true
+
+volumes:
+  pgdata:
+  media:

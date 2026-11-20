@@ -1,0 +1,9 @@
+[Unit]
+Description=Fitness app weekly restore test, Sundays 04:15 IST (%i)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:15:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

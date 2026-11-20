@@ -1,0 +1,103 @@
+# Deploy to the VPS through the restricted deploy-fitness key (fitness-ssh-gate).
+#   staging:    automatically after a successful build of main (when vars.FIT_STAGING_ENABLED == 'true'), or manually.
+#   production: ONLY manually (Actions -> deploy -> Run workflow -> production). Give an older SHA to roll back.
+# Secrets: VPS_HOST, VPS_FIT_SSH_KEY (deploy-fitness private key), VPS_KNOWN_HOSTS (pinned host key line)
+# Variables: FIT_STAGING_ENABLED ('true' once staging is bootstrapped), FIT_STAGING_DOMAIN, FIT_PRODUCTION_DOMAIN
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [build]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "staging or production"
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
+      sha:
+        description: "Commit SHA to deploy (empty = latest main)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: deploy-${{ inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && vars.FIT_STAGING_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.environment || 'staging' }}
+    env:
+      TARGET: ${{ inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Resolve SHA
+        id: sha
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          REF="${INPUT_SHA:-${RUN_SHA:-origin/main}}"
+          [[ "$REF" =~ ^[0-9a-fA-F]{7,40}$ || "$REF" == origin/main ]] || { echo "::error::invalid sha"; exit 1; }
+          SHA="$(git rev-parse --verify "$REF^{commit}")"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Deploying $SHA to $TARGET: $(git log -1 --format=%s "$SHA")"
+
+      - name: "Guard: on main, CI green, image exists"
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "::error::$SHA is not on main"; exit 1; }
+          for i in $(seq 1 50); do
+            OK=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&status=success&per_page=1" --jq '.total_count')
+            [[ "$OK" -gt 0 ]] && break
+            BAD=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$SHA&status=failure&per_page=1" --jq '.total_count')
+            [[ "$BAD" -gt 0 ]] && { echo "::error::ci failed for $SHA"; exit 1; }
+            echo "waiting for ci on $SHA ($i/50)"; sleep 30
+          done
+          [[ "$OK" -gt 0 ]] || { echo "::error::no successful ci run for $SHA"; exit 1; }
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin >/dev/null
+          docker manifest inspect "ghcr.io/jayashreeglobalventures-amogh/fitness-app:$SHA" >/dev/null \
+            || { echo "::error::image for $SHA not found (did the build workflow finish?)"; exit 1; }
+
+      - name: Deploy over SSH (restricted key -> fitness-ssh-gate)
+        env:
+          SHA: ${{ steps.sha.outputs.sha }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_FIT_SSH_KEY: ${{ secrets.VPS_FIT_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_FIT_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          SSH="ssh -i $HOME/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes deploy-fitness@$VPS_HOST"
+          # The scripts deployed are the ones from the SAME commit (a rollback uses the old scripts too)
+          git archive --format=tar.gz "$SHA" deploy | $SSH "deploy $TARGET $SHA"
+          $SSH "status $TARGET"
+
+      - name: Public health check
+        env:
+          DOMAIN: ${{ (inputs.environment || 'staging') == 'production' && vars.FIT_PRODUCTION_DOMAIN || vars.FIT_STAGING_DOMAIN }}
+        run: curl -fsS "https://$DOMAIN/healthz"
+
+      - name: Remove key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -16,6 +16,7 @@ import { accessFor, requirePermission } from '../identity/permissions.js';
 import { ReaderError, type Reading, type ScreenshotReader } from '../verification/reader.js';
 import { currentReader } from '../verification/select.js';
 import { canSeeBonusFile } from '../scoring/bonus.js';
+import { canSeeFinanceFile } from '../finance/finance.js';
 import { challengeContext, participantById, participantOf, participatesOn, type ParticipantRow } from './days.js';
 
 export const MAX_AI_ATTEMPTS = 3;
@@ -301,6 +302,7 @@ export async function canSeeFile(db: Queryable, userId: number, fileId: number):
     if (access.permissions.has(u.perm)) return out;
   }
   if (await canSeeBonusFile(db, userId, fileId)) return out;
+  if (await canSeeFinanceFile(db, userId, fileId)) return out;
   return null;
 }
 

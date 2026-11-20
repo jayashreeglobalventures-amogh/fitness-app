@@ -5,6 +5,9 @@ import { daysBetween, endOfDay, localDay } from '../../core/dates.js';
 import { latestVersion } from '../challenges/challenges.js';
 import { validateConfig } from '../challenges/config.js';
 import { accessFor } from '../identity/permissions.js';
+import { addDays, computePeriods } from '../../core/dates.js';
+import { contributionFor } from '../challenges/config.js';
+import { dueOn } from '../finance/finance.js';
 
 export interface Notice {
   id: string;                    // stable, for "seen" state in the app
@@ -57,6 +60,26 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       for (const v of votes.rows) out.push({ id: `vote:${v.request_id}`, kind: 'action', title: `${c.name}: vote on ${v.display_name}'s exemption`, body: 'Your vote is needed before voting closes.', link: `/challenges/${cid}/exemptions`, challengeId: cid });
     }
 
+    // As a participant: contributions due or overdue (money only; it never affects points).
+    if (c.participant_id && c.status === 'PUBLISHED') {
+      const cfg = (await latestVersion(db, cid)).config;
+      if (cfg.finance.enabled) {
+        const periods = computePeriods(c.starts_on, c.ends_on, cfg.periods.weekStartsOn);
+        const { rows: pays } = await db.query(`SELECT period_no, status, amount_paise FROM payments WHERE participant_id = $1 AND status IN ('SUBMITTED','CONFIRMED')`, [c.participant_id]);
+        for (const per of periods) {
+          if (daysBetween(c.joined_on, per.endsOn) < 0 || (c.left_on && daysBetween(per.startsOn, c.left_on) < 0)) continue;
+          const due = dueOn(per, cfg.finance.dueWeekday);
+          if (daysBetween(due, today) < 0) continue;
+          const amount = contributionFor(cfg, per.periodNo).total;
+          const reported = pays.filter((x) => x.period_no === per.periodNo).reduce((a, x) => a + Number(x.amount_paise), 0);
+          if (reported >= amount) continue;
+          const overdue = daysBetween(addDays(due, cfg.finance.graceDays + 1), today) >= 0;
+          out.push({ id: `pay:${cid}:${per.periodNo}`, kind: overdue ? 'warning' : 'action', title: `${c.name}: week ${per.periodNo} contribution ${overdue ? 'overdue' : 'due'}`,
+            body: `₹${((amount - reported) / 100).toLocaleString('en-IN')} — pay by UPI, then enter the UTR in the app.`, link: `/challenges/${cid}/money`, challengeId: cid });
+        }
+      }
+    }
+
     // As an admin: what waits for me (only what my role may do).
     const access = await accessFor(db, userId, cid);
     const can = (p: string) => access.permissions.has(p as never);
@@ -76,6 +99,13 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
                  WHERE a.challenge_id = $1 AND s.status = 'PENDING' AND p.user_id <> $2)::int AS bonuses`, [cid, userId, now]);
     if (w.reviews && can('submissions.review')) out.push({ id: `reviews:${cid}`, kind: 'action', title: `${c.name}: screenshots to review`, body: `${w.reviews} waiting for a decision.`, link: `/challenges/${cid}/review`, challengeId: cid, count: w.reviews });
     if (w.exemptions && can('exemptions.review')) out.push({ id: `exadmin:${cid}`, kind: 'action', title: `${c.name}: exemption requests need an admin`, body: `${w.exemptions} waiting.`, link: `/challenges/${cid}/exemptions`, challengeId: cid, count: w.exemptions });
+    if (can('payments.verify') || can('settlement.approve')) {
+      const { rows: [m] } = await db.query(
+        `SELECT (SELECT count(*) FROM payments x JOIN participants p USING (participant_id) WHERE x.challenge_id = $1 AND x.status = 'SUBMITTED' AND p.user_id <> $2)::int AS payments,
+                (SELECT count(*) FROM refund_proposals r JOIN participants p USING (participant_id) WHERE r.challenge_id = $1 AND r.status = 'PROPOSED' AND r.proposed_by <> $2 AND p.user_id <> $2)::int AS refunds`, [cid, userId]);
+      if (m.payments && can('payments.verify')) out.push({ id: `payments:${cid}`, kind: 'action', title: `${c.name}: payments to confirm`, body: `${m.payments} UTR${m.payments === 1 ? '' : 's'} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.payments });
+      if (m.refunds && can('settlement.approve')) out.push({ id: `refunds:${cid}`, kind: 'action', title: `${c.name}: refunds to approve`, body: `${m.refunds} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.refunds });
+    }
     if (w.bonuses && can('bonus.manage')) out.push({ id: `bonus:${cid}`, kind: 'action', title: `${c.name}: weekend bonuses to approve`, body: `${w.bonuses} waiting.`, link: `/challenges/${cid}/bonus`, challengeId: cid, count: w.bonuses });
   }
   const order = { action: 0, warning: 1, info: 2 } as const;

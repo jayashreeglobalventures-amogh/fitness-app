@@ -22,6 +22,7 @@ import { readerName } from './modules/verification/select.js';
 import * as bonus from './modules/scoring/bonus.js';
 import { breakdown, leaderboard } from './modules/scoring/ledger.js';
 import { myNotifications } from './modules/notifications/notifications.js';
+import * as finance from './modules/finance/finance.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -304,6 +305,29 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   }));
   app.post('/api/bonus-submissions/:bonusSubmissionId/decide', authed((c) => bonus.decideBonus(c.tx, c.user.userId, bsid(c), body(c.req) as never, c.now)));
   app.post('/api/bonus-submissions/:bonusSubmissionId/withdraw', authed((c) => bonus.withdrawBonus(c.tx, c.user.userId, bsid(c), c.now)));
+
+  // ---------- Money ----------
+  app.get('/api/challenges/:challengeId/payment-settings', authed((c) => finance.paymentSettings(c.tx, c.user.userId, cid(c))));
+  app.post('/api/challenges/:challengeId/payment-settings', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    await finance.setPaymentSettings(c.tx, config.mediaDir, c.user.userId, cid(c), { upiId: fields.upiId, payeeName: fields.payeeName, removeQr: fields.removeQr, qr: file }, c.now);
+  }));
+  app.get('/api/challenges/:challengeId/my-money', authed((c) => finance.myMoney(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/challenges/:challengeId/finance', authed((c) => finance.financeOverview(c.tx, c.user.userId, cid(c), c.now)));
+  const payFields = (f: Record<string, string>, proof: Buffer | null) => ({ periodNo: f.periodNo, amount: f.amount, utr: f.utr, paidOn: f.paidOn, note: f.note, method: f.method, reason: f.reason, proof });
+  app.post('/api/challenges/:challengeId/payments', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    return finance.submitPayment(c.tx, config.mediaDir, c.user.userId, cid(c), payFields(fields, file), c.now);
+  }));
+  app.post('/api/participants/:participantId/payments', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    return finance.recordPayment(c.tx, config.mediaDir, c.user.userId, pid(c), payFields(fields, file), c.now);
+  }));
+  const payId = (c: Ctx) => id((c.req.params as { paymentId: string }).paymentId);
+  app.post('/api/payments/:paymentId/decide', authed((c) => finance.decidePayment(c.tx, c.user.userId, payId(c), body(c.req) as never, c.now)));
+  app.post('/api/payments/:paymentId/withdraw', authed((c) => finance.withdrawPayment(c.tx, c.user.userId, payId(c), c.now)));
+  app.post('/api/participants/:participantId/refunds', authed((c) => finance.proposeRefund(c.tx, c.user.userId, pid(c), body(c.req) as never, c.now)));
+  app.post('/api/refunds/:refundId/decide', authed((c) => finance.decideRefund(c.tx, c.user.userId, id((c.req.params as { refundId: string }).refundId), body(c.req) as never, c.now)));
 
   // ---------- The React app ----------
   const dir = webDir ?? WEB_DIST;

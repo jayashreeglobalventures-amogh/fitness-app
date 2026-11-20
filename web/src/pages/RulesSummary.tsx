@@ -52,7 +52,9 @@ export function RulesSummary({ c, periods }: { c: ChallengeConfig; periods?: { p
             const p = periods?.find((x) => x.periodNo === o.periodNo);
             return <li key={o.periodNo}>Week {o.periodNo}{p ? ` (${day(p.startsOn)} – ${day(p.endsOn)})` : ''}: {rupees(o.total)} ({rupees(o.mainPool)} + {rupees(o.finePool)}).</li>;
           })}
-          <li>Each missed day takes {rupees(f.finePerMissedDay)} from your fine pool (never more than what's in it). Fines and unused fine-pool money go to the prize pool.</li>
+          <li>Each missed day takes {rupees(f.finePerMissedDay)} from your fine pool (never more than what's in it) and moves it to the prize pool. Rest days and approved exemptions cost nothing.</li>
+          <li>Money left in your fine pool at the end of each week {f.unusedFinePool === 'REFUND' ? 'is refunded to you (paid out at the end of the challenge)' : f.unusedFinePool === 'PRIZE_POOL' ? 'goes to the prize pool' : 'goes to a separate year-end pool'}.</li>
+          <li>A contribution not paid within {f.graceDays} day{f.graceDays === 1 ? '' : 's'} of the due day is shown as overdue. Payments never affect your points.</li>
           {f.paymentInstructions && <li>{f.paymentInstructions}</li>}
         </ul>
       </>)}

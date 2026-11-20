@@ -176,6 +176,8 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
             <Rupees ctx={money} p={['finance', 'contribution', 'finePool']} label="…to the fine pool (₹)" />
             <Rupees ctx={money} p={['finance', 'finePerMissedDay']} label="Fine per missed day (₹)" />
             <Select ctx={money} p={['finance', 'dueWeekday']} label="Due every" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))} />
+            <Num ctx={money} p={['finance', 'graceDays']} label="Grace days before 'overdue'" />
+            <Select ctx={money} p={['finance', 'unusedFinePool']} label="Fine-pool money left at the end of a week" options={{ REFUND: 'Refunded to the participant', PRIZE_POOL: 'Goes to the prize pool', YEAR_END_POOL: 'Goes to a separate year-end pool' }} />
           </div>
           <h3 style={{ marginTop: 8 }}>Weeks with a different amount</h3>
           {c.finance.periodOverrides.map((o, i) => {
@@ -195,7 +197,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
           })}
           {canMoney && <button className="btn small" onClick={() => upd(['finance', 'periodOverrides'])([...c.finance.periodOverrides, { periodNo: 1, ...c.finance.contribution }])}>Add a week with a different amount</button>}
           <Area ctx={money} p={['finance', 'paymentInstructions']} label="Payment instructions" />
-          <p className="muted small">The UPI QR code is uploaded by the Finance Admin (coming with payments in a later update).</p>
+          <p className="muted small">The UPI ID and QR code are set by the Finance Admin in the challenge's Money tab.</p>
         </>)}
       </Section>
 

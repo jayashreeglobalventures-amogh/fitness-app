@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, computePeriods, endOfDay, localDay, weekdayOf, zonedInstant } from '../../src/core/dates.js';
+import { addDays, computePeriods, endOfDay, localDay, parseInstant, weekdayOf, zonedInstant } from '../../src/core/dates.js';
 
 describe('calendar days in a time zone', () => {
   it('22 Nov 2026 is a Sunday and 31 Dec 2026 a Thursday (PRD 6)', () => {
@@ -52,5 +52,15 @@ describe('weekly periods', () => {
 
   it('a one-day challenge has one period', () => {
     expect(computePeriods('2026-11-25', '2026-11-25', 'SUNDAY')).toEqual([{ periodNo: 1, startsOn: '2026-11-25', endsOn: '2026-11-25', days: 1 }]);
+  });
+});
+
+describe('parseInstant', () => {
+  it('reads a local wall-clock time in the challenge time zone, or an ISO time as given', () => {
+    expect(parseInstant('2026-11-23T21:00', 'Asia/Kolkata')?.toISOString()).toBe('2026-11-23T15:30:00.000Z');
+    expect(parseInstant('2026-11-23T21:00:00+05:30', 'Asia/Kolkata')?.toISOString()).toBe('2026-11-23T15:30:00.000Z');
+    expect(parseInstant('2026-11-23T21:00', 'America/New_York')?.toISOString()).toBe('2026-11-24T02:00:00.000Z');
+    expect(parseInstant('yesterday', 'Asia/Kolkata')).toBeNull();
+    expect(parseInstant('2026-02-30T10:00', 'Asia/Kolkata')).toBeNull();
   });
 });

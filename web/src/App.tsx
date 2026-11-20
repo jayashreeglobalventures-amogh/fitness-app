@@ -65,7 +65,7 @@ function route(path: string, me: Me, refresh: () => void): ReactNode {
   if (path === '/challenges') return <ChallengesPage me={me} />;
   if (path === '/challenges/new' && me.canCreateChallenges) return <ChallengeNewPage />;
   const m = /^\/challenges\/(\d+)(?:\/(\w+))?$/.exec(path);
-  if (m) return <ChallengePage me={me} id={Number(m[1])} section={m[2] ?? 'overview'} />;
+  if (m) return <ChallengePage me={me} id={Number(m[1])} section={m[2] ?? 'default'} />;
   if (path === '/profile') return <ProfilePage onChanged={refresh} />;
   if (path === '/profile/password') return <ChangePasswordPage onDone={() => navigate('/profile')} />;
   if (path === '/admin/users' && me.canManageAccounts) return <AccountsPage me={me} />;

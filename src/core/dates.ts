@@ -64,3 +64,16 @@ export function computePeriods(startDate: string, endDate: string, weekStartsOn:
   }
   return out;
 }
+
+/**
+ * Parses an instant given either with an offset/Z (ISO) or as a local wall-clock time 'YYYY-MM-DDTHH:MM' that is
+ * then read in `timeZone`. Returns null when invalid.
+ */
+export function parseInstant(raw: unknown, timeZone: string): Date | null {
+  const s = String(raw ?? '').trim();
+  const local = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})$/.exec(s);
+  if (local) return isValidDate(local[1]!) && TIME_RE.test(local[2]!) ? zonedInstant(local[1]!, local[2]!, timeZone) : null;
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}

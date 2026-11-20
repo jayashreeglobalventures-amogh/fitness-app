@@ -3,7 +3,7 @@
 // success. No retroactive declaration by the participant - only an audited admin correction.
 import { writeAudit } from '../../core/audit.js';
 import { lockChallenge, type Queryable } from '../../core/db.js';
-import { daysBetween, isValidDate } from '../../core/dates.js';
+import { daysBetween, isValidDate, parseInstant } from '../../core/dates.js';
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
 import { challengeContext, participantById, participantOf, participatesOn, periodOf, restCutoff, type ChallengeContext, type ParticipantRow } from './days.js';
@@ -72,8 +72,8 @@ export async function adminDeclare(db: Queryable, actorUserId: number, participa
   const periodNo = await checkAllowed(db, ctx, p, day);
   const reason = String(input.reason ?? '').trim();
   if (reason.length < 5) throw validation('Give a reason (at least 5 characters).');
-  const declaredAt = input.declaredAt ? new Date(String(input.declaredAt)) : now;
-  if (Number.isNaN(declaredAt.getTime()) || declaredAt > now) throw validation('The original declaration time must be a valid time, not in the future.');
+  const declaredAt = input.declaredAt ? parseInstant(input.declaredAt, ctx.ch.timeZone) : now;
+  if (!declaredAt || declaredAt > now) throw validation('The original declaration time must be a valid time, not in the future.');
   const afterCutoff = declaredAt >= restCutoff(ctx.cfgOn(day), day);
   const { rows } = await db.query(
     `INSERT INTO rest_days (challenge_id, participant_id, day, period_no, declared_at, source, declared_by, reason, created_at) VALUES ($1,$2,$3,$4,$5,'ADMIN_CORRECTION',$6,$7,$8) RETURNING rest_day_id`,

@@ -9,7 +9,7 @@
 import type pg from 'pg';
 import { writeAudit } from '../../core/audit.js';
 import { lockChallenge, withTx, type Queryable } from '../../core/db.js';
-import { daysBetween, endOfDay, isValidDate, localDay } from '../../core/dates.js';
+import { daysBetween, endOfDay, isValidDate, localDay, parseInstant } from '../../core/dates.js';
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
 import { readImage, storeImage } from '../../core/media.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
@@ -111,8 +111,8 @@ export async function recordCorrection(db: Queryable, mediaDir: string, actorUse
   const day = String(input.day ?? '');
   if (!isValidDate(day) || daysBetween(ctx.ch.startsOn, day) < 0 || daysBetween(day, ctx.today) < 0) throw validation('Choose a challenge day up to today.');
   if (!participatesOn(p0, day)) throw validation('The participant was not taking part on that day.');
-  const receivedAt = new Date(String(input.receivedAt ?? ''));
-  if (Number.isNaN(receivedAt.getTime())) throw validation('Enter the original date and time the evidence was sent.');
+  const receivedAt = parseInstant(input.receivedAt, ctx.ch.timeZone);
+  if (!receivedAt) throw validation('Enter the original date and time the evidence was sent.');
   if (receivedAt > now) throw validation('The original time can\'t be in the future.');
   if (localDay(receivedAt, ctx.ch.timeZone) !== day) throw validation(`The original time must be on ${day} (${ctx.ch.timeZone}): evidence counts only for the day it was sent, before midnight.`);
   const reason = String(input.reason ?? '').trim();

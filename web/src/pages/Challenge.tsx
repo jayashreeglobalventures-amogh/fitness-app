@@ -5,6 +5,10 @@ import { api, type Me, type Phase } from '../api';
 import { navigate } from '../router';
 import { day, ErrorBox, Loading, PHASE_LABEL, useLoad, Warnings } from '../ui';
 import { AdminsSection } from './ChallengeAdmins';
+import { CheckInSection } from './CheckIn';
+import { ExemptionsSection } from './Exemptions';
+import { ReviewSection } from './Review';
+import { TeamSection } from './Team';
 import { RosterSection } from './Roster';
 import { RulesSummary } from './RulesSummary';
 import { SettingsSection } from './Settings';
@@ -15,7 +19,7 @@ export interface ChallengeView {
   current: { versionNo: number; effectiveFrom: string; config: ChallengeConfig };
   upcoming: { versionNo: number; effectiveFrom: string; config: ChallengeConfig } | null;
   versions?: { versionNo: number; effectiveFrom: string; reason: string | null; createdAt: string; config: ChallengeConfig }[];
-  myRoles: string[]; myPermissions: string[]; check?: ConfigCheck;
+  myRoles: string[]; myPermissions: string[]; check?: ConfigCheck; participantStatus?: string | null;
 }
 
 export function ChallengePage({ me, id, section }: { me: Me; id: number; section: string }) {
@@ -26,13 +30,20 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
   if (!v) return <ErrorBox error={view.error} />;
   const can = (p: string) => v.myPermissions.includes(p);
   const isAdmin = can('challenge.view_admin');
+  const isParticipant = !!v.participantStatus;
+  const live = v.status === 'PUBLISHED';
   const sections = [
-    { key: 'overview', label: 'Overview', show: true },
+    { key: 'today', label: 'Today', show: isParticipant && live },
+    { key: 'team', label: 'Team', show: isAdmin && live },
+    { key: 'review', label: 'Review', show: can('submissions.review') && live },
+    { key: 'exemptions', label: 'Exemptions', show: (isParticipant || can('exemptions.review')) && live && (v.current.config.exemptions.enabled || can('exemptions.review')) },
+    { key: 'overview', label: 'Rules', show: true },
     { key: 'settings', label: 'Settings', show: isAdmin },
     { key: 'roster', label: 'Roster', show: isAdmin },
     { key: 'admins', label: 'Admins', show: isAdmin },
   ].filter((s) => s.show);
-  const active = sections.some((s) => s.key === section) ? section : 'overview';
+  const fallback = sections[0]!.key;
+  const active = section === 'default' ? fallback : sections.some((s) => s.key === section) ? section : fallback;
   const invitation = invites.data?.find((i) => i.challengeId === id);
 
   return (
@@ -45,9 +56,13 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       <p className="muted small">{day(v.startsOn)} – {day(v.endsOn)} · {v.timeZone}</p>
       {sections.length > 1 && (
         <div className="subnav" role="tablist">
-          {sections.map((s) => <button key={s.key} aria-current={s.key === active} onClick={() => navigate(`/challenges/${id}${s.key === 'overview' ? '' : `/${s.key}`}`)}>{s.label}</button>)}
+          {sections.map((s) => <button key={s.key} aria-current={s.key === active} onClick={() => navigate(`/challenges/${id}/${s.key}`)}>{s.label}</button>)}
         </div>
       )}
+      {active === 'today' && <CheckInSection v={v} />}
+      {active === 'team' && <TeamSection v={v} me={me} />}
+      {active === 'review' && <ReviewSection v={v} />}
+      {active === 'exemptions' && <ExemptionsSection v={v} />}
       {active === 'overview' && <Overview v={v} invitationId={invitation?.invitationId ?? null} onChanged={() => { view.reload(); invites.reload(); }} />}
       {active === 'settings' && <SettingsSection v={v} me={me} onSaved={view.reload} />}
       {active === 'roster' && <RosterSection v={v} me={me} />}

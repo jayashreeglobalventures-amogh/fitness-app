@@ -259,6 +259,7 @@ export async function viewChallenge(db: Queryable, userId: number, challengeId: 
     ...ch, phase: phaseOf(ch, now), today,
     // The version a new participant accepts: always the latest (it may start later than today).
     acceptVersionNo: latest.versionNo,
+    participantStatus: (await db.query(`SELECT status FROM participants WHERE challenge_id = $1 AND user_id = $2`, [challengeId, userId])).rows[0]?.status ?? null,
     current: { versionNo: current.versionNo, effectiveFrom: current.effectiveFrom, config: current.config },
     upcoming: latest.versionNo !== current.versionNo ? { versionNo: latest.versionNo, effectiveFrom: latest.effectiveFrom, config: latest.config } : null,
     versions: isAdmin ? all : undefined,

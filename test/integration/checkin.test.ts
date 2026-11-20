@@ -162,7 +162,7 @@ describe('daily evidence', () => {
     expect(late.status).toBe(400);
     expect((await priya.upload(url, { clientRef: 'corr-self-1', day: '2026-11-23', receivedAt: '2026-11-23T21:00:00+05:30', reason: 'Sent on WhatsApp' }, png('x'))).status).toBe(403);
     nextReading = reads({ date: '2026-11-23', value: 9100 });
-    const ok = await ca.upload(url, { clientRef: 'corr-priya-23-b', day: '2026-11-23', receivedAt: '2026-11-23T21:00:00+05:30', reason: 'Sent on WhatsApp before the app was live' }, png('priya-23'));
+    const ok = await ca.upload(url, { clientRef: 'corr-priya-23-b', day: '2026-11-23', receivedAt: '2026-11-23T21:00', reason: 'Sent on WhatsApp before the app was live' }, png('priya-23'));
     expect(ok.status).toBe(200);
     await h.settle();
     expect(await day(priya, '2026-11-23')).toMatchObject({ status: 'ACHIEVED', submission: { receivedAt: '2026-11-23T15:30:00.000Z' } });

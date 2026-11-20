@@ -42,3 +42,37 @@ const fmtDay = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short'
 export const day = (d: string | null | undefined) => (d ? fmtDay.format(new Date(`${d}T00:00:00Z`)) : '—');
 export const rupees = (paise: number) => `₹${(paise / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 export const PHASE_LABEL: Record<string, string> = { DRAFT: 'Draft', UPCOMING: 'Starts soon', ACTIVE: 'Live', FINISHED: 'Finished', ARCHIVED: 'Archived' };
+
+/** Day statuses: label + badge style (PRD 17 daily states). */
+export const DAY_STATUS: Record<string, { label: string; tone: string }> = {
+  NOT_PARTICIPATING: { label: 'Not taking part', tone: '' },
+  UPCOMING: { label: 'Upcoming', tone: '' },
+  NOT_SUBMITTED: { label: 'Not submitted', tone: 'warn' },
+  SUBMITTED: { label: 'Submitted', tone: 'info' },
+  PENDING_VERIFICATION: { label: 'Pending verification', tone: 'info' },
+  ACHIEVED: { label: 'Target achieved', tone: 'ok' },
+  TARGET_MISSED: { label: 'Target missed', tone: 'danger' },
+  REJECTED: { label: 'Rejected', tone: 'danger' },
+  MISSED_DEADLINE: { label: 'Missed deadline', tone: 'danger' },
+  EXCUSED: { label: 'Excused', tone: 'info' },
+  REST: { label: 'Rest day', tone: '' },
+};
+export function StatusBadge({ status }: { status: string }) {
+  const s = DAY_STATUS[status] ?? { label: status, tone: '' };
+  return <span className={`badge ${s.tone}`}>{s.label}</span>;
+}
+export const time = (iso: string, tz = 'Asia/Kolkata') => new Date(iso).toLocaleString('en-IN', { timeZone: tz, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+export const newRef = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '');
+
+/** multipart POST (uploads). */
+export async function upload<T>(url: string, fields: Record<string, string>, file?: File | null): Promise<T> {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(fields)) fd.append(k, v);
+  if (file) fd.append('file', file);
+  const res = await fetch(url, { method: 'POST', body: fd, credentials: 'same-origin' });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json.success === false) {
+    throw new ApiError(res.status, json.errorCode ?? 'ERROR', json.message ?? `Upload failed (${res.status}).`, json.details);
+  }
+  return json.data as T;
+}

@@ -7,7 +7,7 @@ import { lockChallenge, type Queryable } from '../../core/db.js';
 import { daysBetween, isValidDate, localDay } from '../../core/dates.js';
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
 import { accessFor, requirePermission, type ChallengeRole } from '../identity/permissions.js';
-import { changedSections, FINANCIAL_SECTIONS, validateConfig, type ChallengeConfig, type ConfigIssue } from './config.js';
+import { changedSections, FINANCIAL_SECTIONS, normalizeConfig, validateConfig, type ChallengeConfig, type ConfigIssue } from './config.js';
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}$/;
 
@@ -33,7 +33,7 @@ export async function getChallenge(db: Queryable, challengeId: number, forUpdate
 export async function versions(db: Queryable, challengeId: number): Promise<ChallengeVersion[]> {
   const { rows } = await db.query(
     `SELECT version_no, effective_from, config, reason, created_at FROM challenge_versions WHERE challenge_id = $1 ORDER BY version_no`, [challengeId]);
-  return rows.map((r) => ({ versionNo: r.version_no, effectiveFrom: r.effective_from, config: r.config, reason: r.reason, createdAt: r.created_at.toISOString() }));
+  return rows.map((r) => ({ versionNo: r.version_no, effectiveFrom: r.effective_from, config: normalizeConfig(r.config), reason: r.reason, createdAt: r.created_at.toISOString() }));
 }
 
 export async function latestVersion(db: Queryable, challengeId: number): Promise<ChallengeVersion> {
@@ -64,7 +64,7 @@ export async function createChallenge(db: Queryable, actorUserId: number, slugRa
   if (!SLUG_RE.test(slug)) throw validation('Short name (slug): 2–63 characters, a–z, 0–9 and hyphens, starting with a letter or digit.');
   const check = validateConfig(config);
   if (!check.ok) invalid(check.errors);
-  const c = config as ChallengeConfig;
+  const c = normalizeConfig(config) as ChallengeConfig;
   const dup = await db.query(`SELECT 1 FROM challenges WHERE slug = $1`, [slug]);
   if (dup.rows.length) throw conflict(`A challenge with the short name "${slug}" already exists.`);
   const { rows } = await db.query(
@@ -95,7 +95,7 @@ export async function updateConfig(db: Queryable, actorUserId: number, challenge
   if (ch.status === 'ARCHIVED') throw conflict('An archived challenge can\'t be changed.');
   const check = validateConfig(input.config);
   if (!check.ok) invalid(check.errors);
-  const next = input.config as ChallengeConfig;
+  const next = normalizeConfig(input.config) as ChallengeConfig;
   const cur = await latestVersion(db, challengeId);
   const changed = changedSections(cur.config, next);
   if (!changed.length) return { versionNo: cur.versionNo, warnings: check.warnings };

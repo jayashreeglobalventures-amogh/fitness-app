@@ -132,12 +132,14 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
           <IntList ctx={ctx} p={['scoring', 'personalStreak', 'milestones']} label="Personal streak milestones (days)" hint="e.g. 7, 14, 21" />
           <Num ctx={ctx} p={['scoring', 'personalStreak', 'points']} label="Points per streak milestone" />
         </div>
+        <Check ctx={ctx} p={['scoring', 'personalStreak', 'repeatAfterBreak']} label="A new streak after a break earns the milestones again" />
         <Toggle ctx={ctx} p={['scoring', 'teamStreak', 'enabled']} label="Team streak bonus">
           <Num ctx={ctx} p={['scoring', 'teamStreak', 'everyDays']} label="Every N successful team days" />
           <Num ctx={ctx} p={['scoring', 'teamStreak', 'points']} label="Points" />
         </Toggle>
         <Toggle ctx={ctx} p={['scoring', 'comeback', 'enabled']} label="Comeback bonus">
           <Num ctx={ctx} p={['scoring', 'comeback', 'missedDays']} label="After this many missed days in a row" />
+          <Select ctx={ctx} p={['scoring', 'comeback', 'missRun']} label="Missed days in a row" options={{ AT_LEAST: 'That many or more', EXACTLY: 'Exactly that many' }} />
           <Num ctx={ctx} p={['scoring', 'comeback', 'recoveryDays']} label="…then this many successful days" />
           <Num ctx={ctx} p={['scoring', 'comeback', 'points']} label="Points" />
           <Num ctx={ctx} p={['scoring', 'comeback', 'maxAwards']} label="At most (times)" />
@@ -145,14 +147,21 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <Toggle ctx={ctx} p={['scoring', 'weekendBonus', 'enabled']} label="Weekend bonus activity">
           <Num ctx={ctx} p={['scoring', 'weekendBonus', 'points']} label="Points" />
           <Num ctx={ctx} p={['scoring', 'weekendBonus', 'maxPerWeekend']} label="At most per weekend" />
+          <Select ctx={ctx} p={['scoring', 'weekendBonus', 'weekend']} label="A weekend is" options={{ SAT_NEXT_SUN: 'Saturday + the next Sunday', SUN_SAT_SAME_WEEK: 'Sunday + Saturday of the same week' }} />
+        </Toggle>
+        <Toggle ctx={ctx} p={['scoring', 'penalties', 'missedDay', 'enabled']} label="Penalty for every missed day">
+          <Num ctx={ctx} p={['scoring', 'penalties', 'missedDay', 'points']} label="Points (negative)" />
         </Toggle>
         <Toggle ctx={ctx} p={['scoring', 'penalties', 'consecutiveMisses', 'enabled']} label="Penalty for missed days in a row">
           <Num ctx={ctx} p={['scoring', 'penalties', 'consecutiveMisses', 'days']} label="Missed days in a row" />
+          <Select ctx={ctx} p={['scoring', 'penalties', 'consecutiveMisses', 'repeat']} label="Charged" options={{ ONCE_PER_RUN: 'Once per run', EVERY_NTH: 'Every time the run grows by that many', EVERY_MISS_FROM_NTH: 'On every miss from then on' }} />
           <Num ctx={ctx} p={['scoring', 'penalties', 'consecutiveMisses', 'points']} label="Points (negative)" />
         </Toggle>
         <Toggle ctx={ctx} p={['scoring', 'penalties', 'teamStreakBreak', 'enabled']} label="Penalty for breaking the team streak">
+          <Select ctx={ctx} p={['scoring', 'penalties', 'teamStreakBreak', 'when']} label="Charged" options={{ RUNNING_STREAK_ONLY: 'Only when a running team streak ends', EVERY_MISS: 'On every miss, even at 0' }} />
           <Num ctx={ctx} p={['scoring', 'penalties', 'teamStreakBreak', 'points']} label="Points (negative)" />
         </Toggle>
+        <p className="muted small">Penalties that are switched on add up on the same missed day.</p>
       </Section>
 
       <Section title="Money" locked={!canMoney}>

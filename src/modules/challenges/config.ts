@@ -81,19 +81,45 @@ export const ChallengeConfigSchema = Type.Object({
   }, { additionalProperties: false }),
   scoring: Type.Object({
     dailySuccess: Points,
-    personalStreak: Type.Object({ milestones: Type.Array(Type.Integer({ minimum: 1, maximum: 366 }), { maxItems: 50 }), points: Points }, { additionalProperties: false }),
+    personalStreak: Type.Object({
+      milestones: Type.Array(Type.Integer({ minimum: 1, maximum: 366 }), { maxItems: 50 }),
+      points: Points,
+      // true: a new streak after a break earns the milestones again; false: each milestone once per challenge.
+      repeatAfterBreak: Type.Boolean(),
+    }, { additionalProperties: false }),
     teamStreak: Type.Object({ enabled: Type.Boolean(), everyDays: Type.Integer({ minimum: 1, maximum: 366 }), points: Points }, { additionalProperties: false }),
     comeback: Type.Object({
       enabled: Type.Boolean(),
       missedDays: Type.Integer({ minimum: 1, maximum: 30 }),
+      // EXACTLY: only a run of exactly missedDays misses; AT_LEAST: missedDays or more.
+      missRun: Type.Union([Type.Literal('EXACTLY'), Type.Literal('AT_LEAST')]),
       recoveryDays: Type.Integer({ minimum: 1, maximum: 30 }),
       points: Points,
       maxAwards: Type.Integer({ minimum: 0, maximum: 100 }),
     }, { additionalProperties: false }),
-    weekendBonus: Type.Object({ enabled: Type.Boolean(), points: Points, maxPerWeekend: Type.Integer({ minimum: 0, maximum: 2 }) }, { additionalProperties: false }),
+    weekendBonus: Type.Object({
+      enabled: Type.Boolean(),
+      points: Points,
+      maxPerWeekend: Type.Integer({ minimum: 0, maximum: 2 }),
+      // SAT_NEXT_SUN: Saturday + the following Sunday; SUN_SAT_SAME_WEEK: the Sunday and Saturday of one week.
+      weekend: Type.Union([Type.Literal('SAT_NEXT_SUN'), Type.Literal('SUN_SAT_SAME_WEEK')]),
+    }, { additionalProperties: false }),
     penalties: Type.Object({
-      consecutiveMisses: Type.Object({ enabled: Type.Boolean(), days: Type.Integer({ minimum: 1, maximum: 30 }), points: Points }, { additionalProperties: false }),
-      teamStreakBreak: Type.Object({ enabled: Type.Boolean(), points: Points }, { additionalProperties: false }),
+      // Every missed eligible day (no evidence, below target, rejected).
+      missedDay: Type.Object({ enabled: Type.Boolean(), points: Points }, { additionalProperties: false }),
+      consecutiveMisses: Type.Object({
+        enabled: Type.Boolean(),
+        days: Type.Integer({ minimum: 1, maximum: 30 }),
+        // ONCE_PER_RUN: when a run reaches `days`; EVERY_NTH: at days, 2*days, ...; EVERY_MISS_FROM_NTH: every miss from `days` on.
+        repeat: Type.Union([Type.Literal('ONCE_PER_RUN'), Type.Literal('EVERY_NTH'), Type.Literal('EVERY_MISS_FROM_NTH')]),
+        points: Points,
+      }, { additionalProperties: false }),
+      teamStreakBreak: Type.Object({
+        enabled: Type.Boolean(),
+        // RUNNING_STREAK_ONLY: only when a team streak of at least 1 day ends; EVERY_MISS: every miss, even at 0.
+        when: Type.Union([Type.Literal('RUNNING_STREAK_ONLY'), Type.Literal('EVERY_MISS')]),
+        points: Points,
+      }, { additionalProperties: false }),
     }, { additionalProperties: false }),
   }, { additionalProperties: false }),
   finance: Type.Object({
@@ -128,7 +154,29 @@ export const FINANCIAL_SECTIONS = ['finance', 'prizes'] as const;
 export interface ConfigIssue { path: string; message: string }
 export interface ConfigCheck { ok: boolean; errors: ConfigIssue[]; warnings: ConfigIssue[]; periods: Period[] }
 
-export function validateConfig(input: unknown): ConfigCheck {
+/**
+ * Settings saved before a field existed get that field's PRD default when read, so older challenges keep working.
+ * (Calamari's own settings file states every value explicitly.)
+ */
+export function normalizeConfig<T>(input: T): T {
+  if (!input || typeof input !== 'object') return input;
+  const c = structuredClone(input) as Record<string, any>;
+  const s = c.scoring;
+  if (s && typeof s === 'object') {
+    if (s.personalStreak && s.personalStreak.repeatAfterBreak === undefined) s.personalStreak.repeatAfterBreak = true;
+    if (s.comeback && s.comeback.missRun === undefined) s.comeback.missRun = 'EXACTLY';
+    if (s.weekendBonus && s.weekendBonus.weekend === undefined) s.weekendBonus.weekend = 'SAT_NEXT_SUN';
+    if (s.penalties && typeof s.penalties === 'object') {
+      if (s.penalties.missedDay === undefined) s.penalties.missedDay = { enabled: false, points: 0 };
+      if (s.penalties.consecutiveMisses && s.penalties.consecutiveMisses.repeat === undefined) s.penalties.consecutiveMisses.repeat = 'ONCE_PER_RUN';
+      if (s.penalties.teamStreakBreak && s.penalties.teamStreakBreak.when === undefined) s.penalties.teamStreakBreak.when = 'RUNNING_STREAK_ONLY';
+    }
+  }
+  return c as T;
+}
+
+export function validateConfig(raw: unknown): ConfigCheck {
+  const input = normalizeConfig(raw);
   const errors: ConfigIssue[] = [];
   for (const e of Value.Errors(ChallengeConfigSchema, input)) {
     errors.push({ path: e.path || '/', message: e.message });
@@ -172,9 +220,12 @@ function semanticChecks(c: ChallengeConfig): ConfigCheck {
   for (const [path, v] of [['/scoring/dailySuccess', s.dailySuccess], ['/scoring/personalStreak/points', s.personalStreak.points], ['/scoring/teamStreak/points', s.teamStreak.points], ['/scoring/comeback/points', s.comeback.points], ['/scoring/weekendBonus/points', s.weekendBonus.points]] as const) {
     if (v < 0) err(path, 'Rewards must not be negative (use penalties for deductions).');
   }
-  for (const [path, v] of [['/scoring/penalties/consecutiveMisses/points', s.penalties.consecutiveMisses.points], ['/scoring/penalties/teamStreakBreak/points', s.penalties.teamStreakBreak.points]] as const) {
+  for (const [path, v] of [['/scoring/penalties/missedDay/points', s.penalties.missedDay.points], ['/scoring/penalties/consecutiveMisses/points', s.penalties.consecutiveMisses.points], ['/scoring/penalties/teamStreakBreak/points', s.penalties.teamStreakBreak.points]] as const) {
     if (v > 0) err(path, 'A penalty must be zero or negative.');
   }
+
+  const stacking = [s.penalties.missedDay.enabled, s.penalties.consecutiveMisses.enabled, s.penalties.teamStreakBreak.enabled].filter(Boolean).length;
+  if (stacking > 1) warn('/scoring/penalties', 'More than one penalty is on: they add up on the same missed day.');
 
   const f = c.finance;
   const split = (path: string, x: { total: number; mainPool: number; finePool: number }) => {

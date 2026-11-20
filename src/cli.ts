@@ -1,10 +1,13 @@
 // Server-side admin commands (run on the VPS through deploy/cli.sh, or locally with npm run cli).
 //   create-super-admin <username> "<display name>"   first account; prints a temporary password once
 //   create-challenge <slug> <config.json> <username>  creates a DRAFT challenge from a settings file, as that admin
+//   apply-config <slug> <config.json> <username> "<reason>" [YYYY-MM-DD]
+//                                                     saves a settings file as the challenge's new rules (audited, versioned;
+//                                                     after the start, give the first day the new rules apply)
 //   validate-config <config.json>                     checks a settings file without saving anything
 import { readFileSync } from 'node:fs';
 import { createPool, withTx } from './core/db.js';
-import { createChallenge } from './modules/challenges/challenges.js';
+import { createChallenge, updateConfig } from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { createSuperAdmin } from './modules/identity/users.js';
 
@@ -39,7 +42,21 @@ async function main(): Promise<number> {
       console.log(`Draft challenge ${r.challengeId} created.${r.warnings.length ? ' Warnings:\n- ' + r.warnings.map((w) => `${w.path}: ${w.message}`).join('\n- ') : ''}`);
       return 0;
     }
-    console.error('commands: create-super-admin, create-challenge, validate-config');
+    if (cmd === 'apply-config') {
+      const [slug, file, username, reason, effectiveFrom] = args;
+      if (!slug || !file || !username || !reason) { console.error('usage: apply-config <slug> <config.json> <admin username> "<reason>" [first day YYYY-MM-DD]'); return 2; }
+      const config = JSON.parse(readFileSync(file, 'utf8'));
+      const r = await withTx(pool, async (tx) => {
+        const u = (await tx.query(`SELECT user_id FROM users WHERE username = $1 AND status = 'ACTIVE'`, [username.toLowerCase()])).rows[0];
+        if (!u) throw new Error(`No active user "${username}"`);
+        const ch = (await tx.query(`SELECT challenge_id FROM challenges WHERE slug = $1`, [slug])).rows[0];
+        if (!ch) throw new Error(`No challenge "${slug}"`);
+        return updateConfig(tx, Number(u.user_id), Number(ch.challenge_id), { config, reason, effectiveFrom }, new Date());
+      });
+      console.log(`Rules saved as version ${r.versionNo}.${r.warnings.length ? ' Warnings:\n- ' + r.warnings.map((w) => `${w.path}: ${w.message}`).join('\n- ') : ''}`);
+      return 0;
+    }
+    console.error('commands: create-super-admin, create-challenge, apply-config, validate-config');
     return 2;
   } finally {
     await pool.end();

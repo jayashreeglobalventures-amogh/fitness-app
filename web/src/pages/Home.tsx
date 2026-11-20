@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { api, type ChallengeListItem, type Me } from '../api';
 import { navigate } from '../router';
 import { day, ErrorBox, Loading, PHASE_LABEL, useLoad } from '../ui';
@@ -7,6 +8,20 @@ const daysLeft = (endsOn: string) => {
   return Math.max(0, Math.ceil((end - Date.now()) / 86_400_000));
 };
 
+function InstallHint() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true;
+  const [hidden, setHidden] = useState(() => { try { return localStorage.getItem('fit:install-hint') === 'done'; } catch { return false; } });
+  if (!ios || standalone || hidden) return null;
+  const close = () => { try { localStorage.setItem('fit:install-hint', 'done'); } catch { /* private mode */ } setHidden(true); };
+  return (
+    <div className="alert">
+      <div className="spread"><b>Add Fitness to your Home Screen</b><button className="btn small ghost" onClick={close} aria-label="Dismiss">✕</button></div>
+      <p className="small" style={{ margin: '6px 0 0' }}>In Safari, tap the Share button, then “Add to Home Screen”. It then opens full-screen like an app.</p>
+    </div>
+  );
+}
+
 export function HomePage({ me }: { me: Me }) {
   const { data, error, loading } = useLoad(() => api.get<ChallengeListItem[]>('/api/challenges'), []);
   const invites = (data ?? []).filter((c) => c.openInvitationId);
@@ -14,6 +29,7 @@ export function HomePage({ me }: { me: Me }) {
   return (
     <>
       <h1>Hi, {me.displayName}</h1>
+      <InstallHint />
       <ErrorBox error={error} />
       {loading && <Loading />}
       {invites.map((c) => (
@@ -31,7 +47,7 @@ export function HomePage({ me }: { me: Me }) {
             <div className="stat"><span>{c.phase === 'UPCOMING' ? 'Starts' : 'Ends'}</span><b>{day(c.phase === 'UPCOMING' ? c.startsOn : c.endsOn)}</b></div>
             {c.phase === 'ACTIVE' && <div className="stat"><span>Days left</span><b>{daysLeft(c.endsOn)}</b></div>}
           </div>
-          <p className="muted small" style={{ marginTop: 10 }}>Daily check-ins, points and the leaderboard arrive in the next update.</p>
+          <p className="muted small" style={{ marginTop: 10 }}>Tap to check in, see your points and the leaderboard.</p>
         </div>
       ))}
       {!loading && !invites.length && !mine.length && (

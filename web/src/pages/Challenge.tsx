@@ -5,6 +5,8 @@ import { api, type Me, type Phase } from '../api';
 import { navigate } from '../router';
 import { day, ErrorBox, Loading, PHASE_LABEL, useLoad, Warnings } from '../ui';
 import { AdminsSection } from './ChallengeAdmins';
+import { BonusSection } from './Bonus';
+import { LeaderboardSection } from './Leaderboard';
 import { CheckInSection } from './CheckIn';
 import { ExemptionsSection } from './Exemptions';
 import { ReviewSection } from './Review';
@@ -35,7 +37,9 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
   const sections = [
     { key: 'today', label: 'Today', show: isParticipant && live },
     { key: 'team', label: 'Team', show: isAdmin && live },
+    { key: 'leaderboard', label: 'Leaderboard', show: (isParticipant || isAdmin) && live },
     { key: 'review', label: 'Review', show: can('submissions.review') && live },
+    { key: 'bonus', label: 'Bonus', show: (isParticipant || can('bonus.manage')) && live && v.current.config.scoring.weekendBonus.enabled },
     { key: 'exemptions', label: 'Exemptions', show: (isParticipant || can('exemptions.review')) && live && (v.current.config.exemptions.enabled || can('exemptions.review')) },
     { key: 'overview', label: 'Rules', show: true },
     { key: 'settings', label: 'Settings', show: isAdmin },
@@ -62,6 +66,8 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       {active === 'today' && <CheckInSection v={v} />}
       {active === 'team' && <TeamSection v={v} me={me} />}
       {active === 'review' && <ReviewSection v={v} />}
+      {active === 'leaderboard' && <LeaderboardSection v={v} />}
+      {active === 'bonus' && <BonusSection v={v} />}
       {active === 'exemptions' && <ExemptionsSection v={v} />}
       {active === 'overview' && <Overview v={v} invitationId={invitation?.invitationId ?? null} onChanged={() => { view.reload(); invites.reload(); }} />}
       {active === 'settings' && <SettingsSection v={v} me={me} onSaved={view.reload} />}

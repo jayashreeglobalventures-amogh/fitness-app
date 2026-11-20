@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad } from '../ui';
 import type { ChallengeView } from './Challenge';
+import { PointsCard, usePoints } from './Points';
 
 interface DayInfo {
   day: string; status: string; periodNo: number | null;
@@ -11,7 +12,7 @@ interface DayInfo {
   exemption: { requestId: number; status: string } | null;
 }
 interface Dashboard {
-  participant: { status: string; joinedOn: string };
+  participant: { participantId: number; status: string; joinedOn: string };
   today: (DayInfo & { target: number; unit: string; label: string; deadline: string; restCutoff: string }) | null;
   days: DayInfo[];
   summary: { achieved: number; missed: number; rest: number; excused: number; pending: number; adherencePct: number | null; restDaysUsed: number; restDaysThisPeriod: number; daysLeft: number };
@@ -36,6 +37,7 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
   const skew = d ? Date.parse(d.serverNow) - Date.now() : 0;
   const left = useCountdown(d?.today?.deadline, skew);
   const [selected, setSelected] = useState<string | null>(null);
+  const pts = usePoints(d?.participant.participantId);
 
   // While the AI is reading a fresh upload, refresh every few seconds (at most a minute).
   const polls = useRef(0);
@@ -57,6 +59,8 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
       {t && <TodayCard v={v} d={d} left={left} onChanged={() => { polls.current = 0; dash.reload(); }} />}
 
       <div className="stats" style={{ margin: '12px 0' }}>
+        <div className="stat"><span>Points</span><b>{pts.data?.total ?? '—'}</b></div>
+        <div className="stat"><span>Streak</span><b>{pts.data?.currentStreak ?? '—'}</b></div>
         <div className="stat"><span>Achieved</span><b>{s.achieved}</b></div>
         <div className="stat"><span>Missed</span><b>{s.missed}</b></div>
         <div className="stat"><span>Adherence</span><b>{s.adherencePct === null ? '—' : `${s.adherencePct}%`}</b></div>
@@ -64,7 +68,8 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
         {d.rules.restDays.enabled && <div className="stat"><span>Rest days</span><b>{s.restDaysUsed}/{d.rules.restDays.maxTotal}</b></div>}
         {s.excused > 0 && <div className="stat"><span>Excused</span><b>{s.excused}</b></div>}
       </div>
-      {s.pending > 0 && <p className="muted small">{s.pending} day{s.pending === 1 ? '' : 's'} waiting for verification. Points and the leaderboard arrive in the next update.</p>}
+      {s.pending > 0 && <p className="muted small">{s.pending} day{s.pending === 1 ? '' : 's'} waiting for verification; points for {s.pending === 1 ? 'it' : 'them'} follow the decision.</p>}
+      {d.participant.participantId && <PointsCard participantId={d.participant.participantId} />}
 
       <div className="card">
         <h3>Calendar</h3>

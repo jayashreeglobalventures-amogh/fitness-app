@@ -15,6 +15,7 @@ import { readImage, storeImage } from '../../core/media.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
 import { ReaderError, type Reading, type ScreenshotReader } from '../verification/reader.js';
 import { currentReader } from '../verification/select.js';
+import { canSeeBonusFile } from '../scoring/bonus.js';
 import { challengeContext, participantById, participantOf, participatesOn, type ParticipantRow } from './days.js';
 
 export const MAX_AI_ATTEMPTS = 3;
@@ -299,6 +300,7 @@ export async function canSeeFile(db: Queryable, userId: number, fileId: number):
     const access = await accessFor(db, userId, Number(u.challenge_id));
     if (access.permissions.has(u.perm)) return out;
   }
+  if (await canSeeBonusFile(db, userId, fileId)) return out;
   return null;
 }
 

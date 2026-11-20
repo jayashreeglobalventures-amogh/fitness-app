@@ -14,7 +14,7 @@ It is a separate application: its own repository, database, secrets, image and d
 |---|---|---|
 | 1 Foundation | Accounts (admin-created, temporary password), profile, roles, challenge settings (versioned), Calamari, invitations, roster, React app shell | **done** |
 | 2 Daily participation | Screenshot upload, AI-assisted reading (Claude Opus 5.5), review queue, appeals, rest days, exemptions + voting, dashboards, admin corrections | **done** — defaults in [docs/RULE_DECISIONS.md](docs/RULE_DECISIONS.md) |
-| 3 Scoring | Points, streaks, penalties, comebacks, weekend bonus, adherence | needs owner rulings (assessment §11) |
+| 3 Scoring | Points ledger, streaks, penalties, comebacks, weekend bonus, team streak history, provisional leaderboard; installable PWA (iPhone + Android) | **done** — rulings in [docs/RULE_DECISIONS.md](docs/RULE_DECISIONS.md) |
 | 4 Money | UPI QR, manual payment confirmation, ledger, fine pools, prize pool | |
 | 5 Leaderboard & settlement | Ranking, ties, prize eligibility, settlement approval | |
 | Deploy | Staging `fitness-test.amogh.systems`, production `fitness.amogh.systems` | after owner approval |
@@ -48,6 +48,7 @@ npm run build         # server (dist/src) + web (dist/web)
 npm run cli -- validate-config config/challenges/calamari-2026.json
 DATABASE_URL=... npm run cli -- create-super-admin <username> "<Display name>"
 DATABASE_URL=... npm run cli -- create-challenge calamari-2026 config/challenges/calamari-2026.json <admin username>
+DATABASE_URL=... npm run cli -- apply-config calamari-2026 config/challenges/calamari-2026.json <admin username> "<reason>" [first day]
 ```
 
 In the container: `node dist/src/cli.js <command>`; migrations: `node dist/src/db/migrate.js` (with `MIGRATE_DATABASE_URL`).
@@ -67,6 +68,7 @@ src/
     roster/    invitations, rules acceptance, roster lock, participant status
     checkin/   day statuses, submissions + review + appeals, rest days, exemptions + voting, admin overview
     verification/  screenshot readers behind one interface: ocr.ts (free, Tesseract), reader.ts (Claude), select.ts
+    scoring/   engine.ts (pure rules), ledger.ts (append-only points, reconcile, leaderboard), bonus.ts (weekend activities)
 web/           React + Vite app (tabs: Home, Challenges, Profile, People)
 config/challenges/  challenge settings files
 test/          unit + integration tests

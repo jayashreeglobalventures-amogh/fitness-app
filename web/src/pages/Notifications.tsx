@@ -1,7 +1,7 @@
 // Notifications: what needs your attention, worked out live by the server, each with a link to act on it.
 import { useEffect, useState } from 'react';
 import { api } from '../api';
-import { navigate } from '../router';
+import { goBack, navigate, previousPath } from '../router';
 import { ErrorBox, Loading, useLoad } from '../ui';
 
 export interface Notice { id: string; kind: 'action' | 'info' | 'warning'; title: string; body: string; link: string; challengeId: number | null; count?: number }
@@ -27,7 +27,8 @@ export function NotificationsPage() {
   if (l.loading && !l.data) return <Loading />;
   return (
     <>
-      <h1>Notifications</h1>
+      <button className="btn ghost small" onClick={() => goBack('/')}>← {previousPath()?.includes('/settings') ? 'Back to settings' : 'Back'}</button>
+      <h1 style={{ marginTop: 8 }}>Notifications</h1>
       <ErrorBox error={l.error} />
       {l.data?.length === 0 && <div className="card empty">You're all caught up. ✅</div>}
       {l.data?.map((n) => (

@@ -3,6 +3,7 @@ import { api } from '../api';
 import { navigate } from '../router';
 import { Avatar, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
 import { PhotoCropper } from '../PhotoCropper';
+import { PhoneNotifications } from '../PhoneNotifications';
 
 type F = 'fullName' | 'mobile' | 'email' | 'birthDate' | 'gender' | 'location' | 'about';
 interface Profile { userId: number; username: string; displayName: string; fields: Record<F, string | null>; visibility: Record<F, string>; photoFileId: number | null; photoVisibility: string }
@@ -31,6 +32,7 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
       <h1>My profile</h1>
       <p className="muted small">@{p.username} · Everything except your display name is private unless you choose otherwise.</p>
       <PhotoCard p={p} onChanged={(np) => { setP(np); onChanged(); }} />
+      <PhoneNotifications />
       <div className="card">
         <Field label="Display name (shown in challenges)"><input type="text" value={p.displayName} onChange={(e) => { setP({ ...p, displayName: e.target.value }); setSaved(false); }} maxLength={80} /></Field>
         {FIELDS.map((f) => (

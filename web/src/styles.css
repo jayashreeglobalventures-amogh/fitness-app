@@ -179,3 +179,15 @@ details.card[open] > summary { margin-bottom: 12px; }
 .comment .bubble { background: var(--surface-2); border-radius: 12px; padding: 6px 10px; display: inline-block; max-width: 100%; }
 button.link { background: none; border: 0; padding: 4px 0; color: var(--muted); font: inherit; font-weight: 700; cursor: pointer; }
 button.link:hover { color: var(--text); }
+
+/* Activity log */
+.log-row { border-bottom: 1px solid var(--border); }
+.log-row:last-child { border-bottom: 0; }
+.log-head { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 12px 14px; border: 0; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.log-head:hover { background: var(--surface-2); }
+.log-dot { flex: none; width: 8px; height: 8px; margin-top: 7px; border-radius: 50%; background: var(--accent); }
+.log-dot.bad { background: var(--danger); }
+.log-detail { padding: 0 14px 12px 32px; }
+.log-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.log-table th, .log-table td { text-align: left; padding: 4px 6px; border-top: 1px solid var(--border); overflow-wrap: anywhere; vertical-align: top; }
+.log-table th { color: var(--muted); font-weight: 700; }

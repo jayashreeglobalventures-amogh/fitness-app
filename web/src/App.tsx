@@ -11,6 +11,7 @@ import { ProfilePage } from './pages/Profile';
 import { NotificationsPage, useNoticeCount } from './pages/Notifications';
 import { HandoverPage } from './pages/Handover';
 import { CommunityPage } from './pages/Community';
+import { ActivityLogPage } from './pages/ActivityLog';
 import { navigate, usePath } from './router';
 import { Avatar } from './ui';
 
@@ -84,5 +85,6 @@ function route(path: string, me: Me, refresh: () => void): ReactNode {
   if (path === '/profile') return <ProfilePage onChanged={refresh} />;
   if (path === '/profile/password') return <ChangePasswordPage onDone={() => navigate('/profile')} />;
   if (path === '/admin/users' && me.canManageAccounts) return <AccountsPage me={me} />;
+  if (path === '/admin/activity' && me.superAdmin) return <ActivityLogPage />;
   return <div className="empty"><h1>Not found</h1><button className="btn" onClick={() => navigate('/')}>Go home</button></div>;
 }

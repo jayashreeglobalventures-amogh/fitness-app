@@ -64,14 +64,27 @@ export async function isLockedOut(db: Queryable, username: string, ip: string | 
 export async function login(db: pg.Pool, usernameRaw: unknown, password: unknown, meta: { ip: string | null; userAgent: string }, now: Date):
   Promise<{ token: string; user: SessionUser } | { error: 'INVALID' | 'LOCKED' }> {
   const username = normalizeUsername(usernameRaw).slice(0, 64);
-  if (await isLockedOut(db, username, meta.ip, now)) return { error: 'LOCKED' };
   const { rows } = await db.query(`SELECT * FROM users WHERE username = $1`, [username]);
   const u = rows[0];
+  // Activity log: failures against a real account are recorded against it; for unknown usernames nothing typed is
+  // kept (people sometimes type their password into the username box).
+  const audit = (action: string, reason?: string) => writeAudit(db, now, {
+    actorUserId: u ? Number(u.user_id) : null, action, entity: u ? 'USER' : 'USERNAME', entityId: u ? Number(u.user_id) : '(unknown)', reason, ip: meta.ip,
+  });
+  if (await isLockedOut(db, username, meta.ip, now)) {
+    await audit('SIGN_IN_BLOCKED', 'Too many failed attempts (locked for a while)');
+    return { error: 'LOCKED' };
+  }
   let good = false;
   if (u && u.status === 'ACTIVE') good = await verify(u.password_hash, String(password ?? ''));
   else await hashPassword(String(password ?? 'x')); // equalise timing for unknown/disabled users
   await db.query(`INSERT INTO login_attempts (username, ip, success, at) VALUES ($1, $2, $3, $4)`, [username, meta.ip, good, now]);
-  if (!good) return { error: (await isLockedOut(db, username, meta.ip, now)) ? 'LOCKED' : 'INVALID' };
+  if (!good) {
+    const locked = await isLockedOut(db, username, meta.ip, now);
+    await audit(locked ? 'SIGN_IN_LOCKED' : 'SIGN_IN_FAILED', !u ? 'Unknown username' : u.status !== 'ACTIVE' ? 'Account disabled' : 'Wrong password');
+    return { error: locked ? 'LOCKED' : 'INVALID' };
+  }
+  await audit('SIGNED_IN');
 
   const token = randomBytes(32).toString('base64url');
   const expires = new Date(now.getTime() + SESSION_IDLE_DAYS * 86_400_000);
@@ -98,7 +111,9 @@ export async function resolveSession(db: Queryable, token: string | undefined, n
 }
 
 export async function logout(db: Queryable, token: string | undefined, now: Date): Promise<void> {
-  if (token) await db.query(`UPDATE sessions SET revoked_at = $2 WHERE session_hash = $1 AND revoked_at IS NULL`, [tokenHash(token), now]);
+  if (!token) return;
+  const { rows } = await db.query(`UPDATE sessions SET revoked_at = $2 WHERE session_hash = $1 AND revoked_at IS NULL RETURNING user_id`, [tokenHash(token), now]);
+  if (rows[0]) await writeAudit(db, now, { actorUserId: Number(rows[0].user_id), action: 'SIGNED_OUT', entity: 'USER', entityId: Number(rows[0].user_id) });
 }
 
 async function revokeAll(db: Queryable, userId: number, now: Date, exceptToken?: string): Promise<void> {

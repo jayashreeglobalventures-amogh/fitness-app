@@ -1,6 +1,7 @@
 // People: admins create accounts (username + temporary password, shown once) and reset passwords.
 import { useState, type FormEvent } from 'react';
 import { api, type Me } from '../api';
+import { navigate } from '../router';
 import { ErrorBox, Field, Loading, useLoad } from '../ui';
 
 interface UserRow { userId: number; username: string; displayName: string; fullName: string | null; mobile: string | null; status: string; mustChangePassword: boolean; superAdmin: boolean; lastLoginAt: string | null }
@@ -32,7 +33,10 @@ export function AccountsPage({ me }: { me: Me }) {
 
   return (
     <>
-      <h1>People</h1>
+      <div className="spread">
+        <h1>People</h1>
+        {me.superAdmin && <button className="btn ghost small" onClick={() => navigate('/admin/activity')}>📜 Activity log</button>}
+      </div>
       {secret && (
         <div className="alert ok">
           <b>Share these sign-in details with the person</b> (shown only once):

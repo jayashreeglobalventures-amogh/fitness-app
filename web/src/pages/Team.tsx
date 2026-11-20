@@ -5,13 +5,18 @@ import { api, type Me } from '../api';
 import { day, ErrorBox, Field, Loading, newRef, StatusBadge, upload, useLoad } from '../ui';
 import { navigate } from '../router';
 import type { ChallengeView } from './Challenge';
+import { WhatsAppReminders } from './WhatsAppReminders';
 
 interface Person {
   participantId: number; userId: number; displayName: string; username: string; status: string;
   day: { status: string; submission: { finalValue: number | null } | null } | null;
   summary: { achieved: number; missed: number; rest: number; excused: number; pending: number; adherencePct: number | null; restDaysUsed: number };
+  mobile?: string | null; reminded?: { at: string; by: string } | null;
 }
-interface Overview { day: string; today: string; counts: Record<string, number>; people: Person[]; waiting: { reviews: number; exemptions_review: number; exemptions_voting: number; rest_today: number } }
+interface Overview {
+  day: string; today: string; counts: Record<string, number>; people: Person[]; waiting: { reviews: number; exemptions_review: number; exemptions_voting: number; rest_today: number };
+  canRemind: boolean; timeZone: string;
+}
 
 export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
   const [pick, setPick] = useState('');
@@ -36,6 +41,7 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
           {d.waiting.exemptions_review > 0 && <div>{d.waiting.exemptions_review} exemption request{d.waiting.exemptions_review === 1 ? '' : 's'} need an admin. <button className="btn small ghost" onClick={() => navigate(`/challenges/${v.challengeId}/exemptions`)}>Open</button></div>}
         </div>
       )}
+      {d.canRemind && d.day === d.today && <WhatsAppReminders challengeId={v.challengeId} name={v.name} day={d.day} people={d.people} timeZone={d.timeZone} onSent={o.reload} />}
       <div className="card table-wrap"><table>
         <thead><tr><th>Person</th><th>{d.day === d.today ? 'Today' : day(d.day)}</th><th>So far</th><th /></tr></thead>
         <tbody>{d.people.map((p) => (

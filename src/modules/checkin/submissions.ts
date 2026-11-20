@@ -13,7 +13,8 @@ import { daysBetween, endOfDay, isValidDate, localDay, parseInstant } from '../.
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
 import { readImage, storeImage } from '../../core/media.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
-import { currentReader, ReaderError, type Reading, type ScreenshotReader } from '../verification/reader.js';
+import { ReaderError, type Reading, type ScreenshotReader } from '../verification/reader.js';
+import { currentReader } from '../verification/select.js';
 import { challengeContext, participantById, participantOf, participatesOn, type ParticipantRow } from './days.js';
 
 export const MAX_AI_ATTEMPTS = 3;
@@ -167,7 +168,7 @@ export async function verifySubmission(pool: pg.Pool, mediaDir: string, submissi
       const attempts = Number(cur.ai_attempts) + 1;
       const giveUp = !failure.retryable || attempts >= MAX_AI_ATTEMPTS;
       await tx.query(`INSERT INTO verification_results (submission_id, method, provider, outcome, reason, created_at) VALUES ($1,'AI',$2,'ERROR',$3,$4)`,
-        [submissionId, reader ? 'anthropic' : null, failure.message + (giveUp ? ' Sent to manual review.' : ' Will retry.'), at]);
+        [submissionId, null, failure.message + (giveUp ? ' Sent to manual review.' : ' Will retry.'), at]);
       if (cur.status !== 'PENDING_AI') return cur.status;
       await tx.query(`UPDATE submissions SET ai_attempts = $2, status = $3, updated_at = $4 WHERE submission_id = $1`, [submissionId, attempts, giveUp ? 'PENDING_REVIEW' : 'PENDING_AI', at]);
       return giveUp ? 'PENDING_REVIEW' : 'PENDING_AI';

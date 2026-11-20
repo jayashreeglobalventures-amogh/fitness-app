@@ -1,5 +1,5 @@
 // Reading a step-count screenshot. The rest of the app depends only on the ScreenshotReader interface, so the
-// provider can change and tests use a fake. Without an API key there is no reader: everything goes to manual review.
+// provider can change and tests use a fake. Which reader is used: select.ts.
 // The AI only *reads*; it never decides anything negative (see pipeline.ts).
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -97,13 +97,3 @@ export function parseReading(j: Record<string, unknown>, model: string, provider
     model, provider,
   };
 }
-
-let override: ScreenshotReader | null | undefined;
-/** The configured reader: a test override, else Anthropic when ANTHROPIC_API_KEY is set, else none (manual review). */
-export function currentReader(): ScreenshotReader | null {
-  if (override !== undefined) return override;
-  const key = process.env.ANTHROPIC_API_KEY;
-  return key ? anthropicReader(key) : null;
-}
-/** Tests only. undefined = back to the environment. */
-export function setReaderForTests(r: ScreenshotReader | null | undefined): void { override = r; }

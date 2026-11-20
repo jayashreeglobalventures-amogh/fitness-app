@@ -53,7 +53,7 @@ end
 step "HTTPS through Caddy, HTTP -> HTTPS, security headers, the app is served"
 MIGS="$(node -e "console.log(require('./src/db/migrations/meta/_journal.json').entries.length)")"
 H="$(curl "${C[@]}" -D - "$BASE/healthz")"; echo "$H"
-grep -q '"status":"ok"' <<<"$H"; grep -q "\"migrations\":$MIGS" <<<"$H"; grep -q '"scheduler":"on"' <<<"$H"
+grep -q '"status":"ok"' <<<"$H"; grep -q "\"migrations\":$MIGS" <<<"$H"; grep -q '"scheduler":"on"' <<<"$H"; grep -q '"screenshotReading":"tesseract"' <<<"$H"
 grep -qi '^strict-transport-security: max-age=31536000' <<<"$H"
 P="$(curl "${C[@]}" -D - "$BASE/challenges")"
 grep -qi "^content-security-policy: default-src 'self'" <<<"$P"; grep -qi '^x-frame-options: DENY' <<<"$P"; grep -q '<div id="root">' <<<"$P"

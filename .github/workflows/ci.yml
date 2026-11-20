@@ -57,6 +57,17 @@ jobs:
           curl -fsS http://127.0.0.1:3000/healthz | grep '"status":"ok"'
           curl -fsS http://127.0.0.1:3000/ | grep -q '<div id="root">'
           docker run --rm fitness-app:ci node dist/src/cli.js validate-config config/challenges/calamari-2026.json
+      - name: Free screenshot reader works inside the production image (Tesseract, bundled language data, no network)
+        run: |
+          docker run --rm --network none -v "$PWD/test/fixtures:/fixtures:ro" fitness-app:ci node --input-type=module -e "
+            import { readFileSync } from 'node:fs';
+            import { ocrReader, shutdownOcr } from '/app/dist/src/modules/verification/ocr.js';
+            const r = await ocrReader().read(readFileSync('/fixtures/google-fit-like-8214-2026-11-22.png'), 'image/png',
+              { expectedDay: '2026-11-22', timeZone: 'Asia/Kolkata', metricLabel: 'Steps', unit: 'steps' });
+            console.log(JSON.stringify(r));
+            await shutdownOcr();
+            if (r.value !== 8214 || r.date !== '2026-11-22' || r.confidence < 0.9) process.exit(1);
+          "
       - name: Logs on failure
         if: failure()
         run: docker logs app || true

@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { ReaderError, setReaderForTests, type Reading, type ScreenshotReader } from '../../src/modules/verification/reader.js';
+import { ReaderError, type Reading, type ScreenshotReader } from '../../src/modules/verification/reader.js';
+import { setReaderForTests } from '../../src/modules/verification/select.js';
 import { calamariConfig, makeHarness, png, type Client, type Harness } from '../helpers/app.js';
 import { startPg, type TestPg } from '../helpers/pg.js';
 

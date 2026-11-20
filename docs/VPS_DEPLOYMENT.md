@@ -27,7 +27,8 @@ What is shared with the other apps, and how it's touched (by `bootstrap-fitness.
 - **The sshd `AllowUsers` line:** `deploy-fitness` is appended, validated with `sshd -t` and rolled back on failure.
 - **The Docker engine.**
 
-Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per environment at most (DB 384 MB, app 384 MB).
+Nothing of IMS or Rent is otherwise read or changed. Memory: about 900 MB per environment at most (DB 384 MB, app 512 MB;
+the app includes the free screenshot reader).
 
 ## One-time setup (you, per environment — start with staging)
 
@@ -62,8 +63,8 @@ Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per en
    ```
    The first prints a temporary password (changed at first sign-in). Calamari is created as a draft: check its
    Settings in the app, then Publish, create accounts (People) and invite.
-8. **Screenshot reading (optional):** `sudo -iu deploy-fitness /opt/fitness-staging/set-key.sh anthropic`, then paste
-   the key. It is stored only in that environment's `.env`. Without it every screenshot goes to manual review.
+8. **Screenshot reading:** works out of the box with the free on-server reader (Tesseract; no key, images never leave
+   the server). Optionally, for unusual layouts, add a paid Claude key: `sudo -iu deploy-fitness /opt/fitness-staging/set-key.sh anthropic`.
 
 Production is the same with `--env production --domain fitness.amogh.systems` and `/opt/fitness`, then
 Actions → deploy → production.

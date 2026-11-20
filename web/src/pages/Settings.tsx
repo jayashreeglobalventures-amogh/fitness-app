@@ -213,6 +213,14 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <Select ctx={money} p={['prizes', 'topThreeIneligible']} label="If a top-three person isn't eligible" options={{ NEXT_ELIGIBLE: 'The next eligible person moves up', TO_QUALIFICATION_POOL: 'That place\'s money joins the qualification pool' }} />
       </Section>
 
+      <Section title="Community">
+        <Check ctx={ctx} p={['community', 'enabled']} label="Community feed for this challenge (announcements, posts, comments, reactions)" />
+        {c.community.enabled && (<>
+          <Check ctx={ctx} p={['community', 'participantsCanPost']} label="Participants can post (otherwise only admins post; everyone can react and comment)" />
+          <Check ctx={ctx} p={['community', 'photos']} label="Photos allowed in posts" />
+        </>)}
+      </Section>
+
       <Section title="Leaderboard">
         <p className="muted small">Ranking order: ties are broken by the next item. A tie that remains is decided by an admin, with a recorded reason.</p>
         <Ranking ctx={ctx} />

@@ -35,6 +35,7 @@ export const PERMISSIONS = [
   'refunds.approve',           // approve a refund someone else proposed (two-person rule)
   'payments.countersign',      // confirm a payment another admin recorded on someone's behalf (two-person rule)
   'finance.manager.assign',    // appoint / change the challenge's finance manager (handover)
+  'community.moderate',        // remove posts/comments, handle reports, pin, mute
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -47,6 +48,7 @@ const CHALLENGE_ADMIN: Permission[] = [
   // Owner (21 Nov 2026): admins appoint other admins (no limit, at least 2), approve each other's money requests,
   // and are the only ones who can change the finance manager.
   'challenge.roles.manage', 'refunds.approve', 'payments.countersign', 'finance.manager.assign',
+  'community.moderate',
 ];
 const FINANCE_ADMIN: Permission[] = [
   'challenge.view_admin', 'finance.view', 'payments.verify', 'finance.reconcile', 'finance.settings', 'payouts.prepare', 'payouts.record', 'audit.view',

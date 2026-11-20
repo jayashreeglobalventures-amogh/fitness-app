@@ -88,6 +88,17 @@ Defaults applied where nothing was said:
 | Finance manager | **Exactly one** per challenge. The first is appointed directly; changing it is a **handover** started by an admin (checks: money held, payment reports and refunds still waiting; the admin confirms the money is being handed over). The **new manager confirms the exact amount received and that the accounts are settled**; only then does the role move. The old UPI ID / QR are hidden from participants until the new manager enters theirs |
 | Admin as finance manager | Allowed (owner, 21 Nov 2026). The handover checks still apply, and the two-person rule still covers their own money requests |
 
+## Community feed (Phase 6, 21 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Who sees it | Each challenge has its own feed, seen only by its participants and admins (Super Admins see all). Settings → Community: on/off, whether participants may post, whether photos are allowed |
+| Posting | Active participants post text and/or a photo; admins post **announcements**, which are pinned and show in everyone's Alerts for 7 days. Limits: 20 posts and 200 comments a day per person |
+| Achievements | Shared from the person's own streaks, comebacks and weekend bonuses; the text is generated from the points event, so steps, health data and money never appear |
+| Comments | One level of replies; people delete their own posts and comments (hidden, not erased) |
+| Reactions | 👍 ❤️ 🔥 👏 💪, tap again to take back |
+| Moderation | Challenge admins (not the finance manager) pin, remove with a recorded reason (audited), handle reports (remove or dismiss), and mute someone for 1–30 days (they can still read and react) |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

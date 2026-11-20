@@ -149,6 +149,11 @@ export const ChallengeConfigSchema = Type.Object({
     topThreeIneligible: Type.Union([Type.Literal('NEXT_ELIGIBLE'), Type.Literal('TO_QUALIFICATION_POOL')]),
     payoutDate: Nullable(Day),
   }, { additionalProperties: false }),
+  community: Type.Object({
+    enabled: Type.Boolean(),
+    participantsCanPost: Type.Boolean(),   // false: only admins post (announcements); everyone can still react and comment
+    photos: Type.Boolean(),
+  }, { additionalProperties: false }),
   leaderboard: Type.Object({
     ranking: Type.Array(Type.Union(RANKING_KEYS.map((k) => Type.Literal(k))), { minItems: 1, maxItems: RANKING_KEYS.length }),
   }, { additionalProperties: false }),
@@ -170,6 +175,7 @@ export function normalizeConfig<T>(input: T): T {
   if (!input || typeof input !== 'object') return input;
   const c = structuredClone(input) as Record<string, any>;
   if (c.prizes && typeof c.prizes === 'object' && c.prizes.topThreeIneligible === undefined) c.prizes.topThreeIneligible = 'NEXT_ELIGIBLE';
+  if (c.community === undefined && c.schemaVersion !== undefined) c.community = { enabled: true, participantsCanPost: true, photos: true };
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

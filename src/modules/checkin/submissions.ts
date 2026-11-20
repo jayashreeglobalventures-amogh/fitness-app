@@ -18,6 +18,7 @@ import { currentReader } from '../verification/select.js';
 import { canSeeBonusFile } from '../scoring/bonus.js';
 import { canSeeFinanceFile } from '../finance/finance.js';
 import { canSeeProfilePhoto } from '../profile/profile.js';
+import { canSeeCommunityPhoto } from '../community/community.js';
 import { challengeContext, participantById, participantOf, participatesOn, type ParticipantRow } from './days.js';
 
 export const MAX_AI_ATTEMPTS = 3;
@@ -305,6 +306,7 @@ export async function canSeeFile(db: Queryable, userId: number, fileId: number):
   if (await canSeeBonusFile(db, userId, fileId)) return out;
   if (await canSeeFinanceFile(db, userId, fileId)) return out;
   if (await canSeeProfilePhoto(db, userId, fileId)) return out;
+  if (await canSeeCommunityPhoto(db, userId, fileId)) return out;
   return null;
 }
 

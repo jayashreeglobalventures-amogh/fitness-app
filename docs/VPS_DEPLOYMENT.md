@@ -40,8 +40,10 @@ Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per en
    ```
    scp -i ~/.ssh/rent_admin -r deploy admin@<VPS IP>:/tmp/fitness-deploy
    ssh -i ~/.ssh/rent_admin admin@<VPS IP> \
-     sudo bash /tmp/fitness-deploy/bootstrap-fitness.sh --env staging --domain fitness-test.amogh.systems --deploy-key "$(cat ~/.ssh/fitness_deploy.pub)"
+     sudo bash /tmp/fitness-deploy/bootstrap-fitness.sh --env staging --domain fitness-test.amogh.systems --deploy-key "'$(cat ~/.ssh/fitness_deploy.pub)'"
    ```
+   Keep both kinds of quotes around the key: `ssh` sends the command to the server as one line, and without the inner
+   single quotes the server splits the key (it contains spaces) and the script stops with "unknown option".
    It creates `deploy-fitness`, `/opt/fitness-staging` with random secrets in `.env` (copy them into your password
    manager: `sudo cat /opt/fitness-staging/.env`) and the Caddy site.
 4. **Image access:** `sudo -iu deploy-fitness docker login ghcr.io -u <github user>` with a GitHub token that has

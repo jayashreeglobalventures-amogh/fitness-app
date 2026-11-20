@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time setup of ONE fitness environment on the shared VPS (docs/VPS_DEPLOYMENT.md). Run as root:
 #   sudo bash bootstrap-fitness.sh --env staging    --domain fitness-test.amogh.systems --deploy-key "ssh-ed25519 AAAA... deploy-fitness"
+# Over ssh, quote the key twice (it contains spaces): --deploy-key "'$(cat ~/.ssh/fitness_deploy.pub)'"
 #   sudo bash bootstrap-fitness.sh --env production --domain fitness.amogh.systems      --deploy-key "ssh-ed25519 AAAA... deploy-fitness"
 # Safe to re-run: every step checks first; secrets are never overwritten or printed.
 # Touches shared infrastructure ONLY by (a) adding deploy-fitness to the existing sshd AllowUsers line, validated

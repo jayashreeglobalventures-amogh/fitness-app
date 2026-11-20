@@ -3,7 +3,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import type { ChallengeConfig, ConfigCheck } from '../../../src/modules/challenges/config';
 import { api, type Issue, type Me } from '../api';
-import { ErrorBox, Field, Warnings, day } from '../ui';
+import { ErrorBox, Field, day } from '../ui';
+import { navigate } from '../router';
 import type { ChallengeView } from './Challenge';
 
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
@@ -52,6 +53,8 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
 
   return (
     <>
+      {saved && !dirty && <div className="alert ok">Saved{v.status === 'PUBLISHED' ? ` as rules version ${saved.versionNo}` : ''}.</div>}
+      <HeadsUp count={(saved?.warnings ?? check?.warnings ?? v.check?.warnings ?? []).length} />
       {!canEdit && <div className="alert">You can view these settings but not change them.</div>}
       {canEdit && !canMoney && <div className="alert">Money and prize settings can only be changed by a Super Admin.</div>}
       {v.status === 'PUBLISHED' && <div className="alert warn">This challenge is published. Saving creates a new rules version{started ? ' that applies from the day you choose (tomorrow at the earliest)' : ' that applies from the start'}; days already played keep their rules.</div>}
@@ -212,22 +215,23 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <Ranking ctx={ctx} />
       </Section>
 
-      {canEdit && (
-        <div className="card" style={{ position: 'sticky', bottom: 84 }}>
+      {canEdit && dirty && (
+        // Shown only while there are unsaved changes; it sits just above the bottom tabs.
+        <div className="savebar" role="region" aria-label="Unsaved changes">
           <ErrorBox error={error} />
           {check && !check.ok && !error && <ErrorBox error={{ message: 'Fix these before saving:', details: { errors: check.errors } }} />}
-          {saved && <div className="alert ok">Saved{v.status === 'PUBLISHED' ? ` as rules version ${saved.versionNo}` : ''}.</div>}
-          <Warnings items={saved?.warnings ?? check?.warnings} />
-          {v.status === 'PUBLISHED' && dirty && (
+          {v.status === 'PUBLISHED' && (
             <div className="grid2">
               <Field label="Reason for the change"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Shown in the audit history" /></Field>
               {started && <Field label="New rules apply from"><input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></Field>}
             </div>
           )}
-          <div className="row">
-            <button className="btn primary" disabled={busy || !dirty} onClick={save}>{busy ? 'Saving…' : 'Save settings'}</button>
-            <button className="btn" onClick={() => void validate()}>Check</button>
-            {dirty && <button className="btn ghost" onClick={() => { setC(structuredClone(base)); setCheck(v.check ?? null); setError(null); }}>Discard changes</button>}
+          <div className="spread">
+            <span className="muted small">Unsaved changes</span>
+            <div className="row">
+              <button className="btn ghost small" onClick={() => { setC(structuredClone(base)); setCheck(v.check ?? null); setError(null); }}>Discard</button>
+              <button className="btn primary small" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save settings'}</button>
+            </div>
           </div>
         </div>
       )}
@@ -332,5 +336,15 @@ function Ranking({ ctx }: { ctx: Ctx }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** One quiet line instead of a floating box: the details are in Notifications. */
+export function HeadsUp({ count }: { count: number }) {
+  if (!count) return null;
+  return (
+    <p className="small muted" style={{ margin: '0 0 12px' }}>
+      ⓘ {count} heads-up{count === 1 ? '' : 's'} about these settings (e.g. rules not decided yet). <a href="/notifications" onClick={(e) => { e.preventDefault(); navigate('/notifications'); }}>See notifications</a>
+    </p>
   );
 }

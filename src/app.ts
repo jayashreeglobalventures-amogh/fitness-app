@@ -338,7 +338,9 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     if (!f) throw new AppError('NOT_FOUND', 'Not found.');
     let bytes: Buffer;
     try { bytes = await readImage(config.mediaDir, f.storageKey); } catch { throw new AppError('NOT_FOUND', 'Not found.'); }
-    return reply.header('cache-control', 'private, max-age=3600').header('content-disposition', 'inline').type(f.mimeType).send(bytes);
+    // Community photos are never cached on the phone, so one a moderator removes disappears at once for everyone.
+    const cache = f.purpose === 'COMMUNITY_PHOTO' ? 'no-store' : 'private, max-age=3600';
+    return reply.header('cache-control', cache).header('content-disposition', 'inline').type(f.mimeType).send(bytes);
   });
 
   const rid = (c: Ctx) => id((c.req.params as { restDayId: string }).restDayId);

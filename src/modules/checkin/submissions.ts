@@ -291,10 +291,10 @@ export async function submissionDetail(db: Queryable, actorUserId: number, submi
 }
 
 /** Whether a user may see a stored file: its owner, or a reviewer of the challenge the file is evidence in. */
-export async function canSeeFile(db: Queryable, userId: number, fileId: number): Promise<{ storageKey: string; mimeType: string } | null> {
+export async function canSeeFile(db: Queryable, userId: number, fileId: number): Promise<{ storageKey: string; mimeType: string; purpose: string } | null> {
   const f = (await db.query(`SELECT * FROM files WHERE file_id = $1`, [fileId])).rows[0];
   if (!f) return null;
-  const out = { storageKey: String(f.storage_key), mimeType: String(f.mime_type) };
+  const out = { storageKey: String(f.storage_key), mimeType: String(f.mime_type), purpose: String(f.purpose) };
   if (Number(f.owner_user_id) === userId) return out;
   const uses = await db.query(
     `SELECT challenge_id, 'submissions.review' AS perm FROM submissions WHERE file_id = $1

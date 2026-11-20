@@ -7,7 +7,7 @@ import { Avatar, ErrorBox, Loading, time, upload, useLoad } from '../ui';
 
 interface Reaction { emoji: string; count: number; mine: boolean }
 interface Post {
-  postId: number; kind: 'ANNOUNCEMENT' | 'POST' | 'ACHIEVEMENT'; body: string; photoFileId: number | null; status: string; removedReason: string | null;
+  postId: number; kind: 'ANNOUNCEMENT' | 'POST' | 'ACHIEVEMENT'; body: string; photoFileId: number | null; status: string; removedReason: string | null; removedBy: string | null;
   pinned: boolean; createdAt: string; author: { userId: number; displayName: string; photoFileId: number | null }; mine: boolean; comments: number;
   reactions: Reaction[]; canDelete: boolean; canModerate: boolean;
 }
@@ -143,6 +143,7 @@ function PostCard({ p, feed, challengeId, onChanged }: { p: Post; feed: Feed; ch
   };
   const run = async (fn: () => Promise<unknown>) => { setError(null); try { await fn(); setAction(null); onChanged(); } catch (e) { setError(e); } };
   const removed = p.status === 'REMOVED';
+  if (removed) return <RemovedPost p={p} onDelete={() => run(() => api.post(`/api/posts/${p.postId}/delete`))} error={error} />;
   return (
     <article className={`card post${p.kind === 'ANNOUNCEMENT' ? ' announcement' : ''}${removed ? ' removed' : ''}`}>
       <header className="row" style={{ gap: 10, flexWrap: 'nowrap', alignItems: 'center' }}>
@@ -153,21 +154,49 @@ function PostCard({ p, feed, challengeId, onChanged }: { p: Post; feed: Feed; ch
         </div>
         <Menu p={p} feed={feed} onAction={setAction} onDelete={() => run(() => api.post(`/api/posts/${p.postId}/delete`))} onPin={() => run(() => api.post(`/api/posts/${p.postId}/pin`, { pinned: !p.pinned }))} />
       </header>
-      {removed && <div className="alert warn small" style={{ marginTop: 8 }}>Removed by a moderator: {p.removedReason}. Only moderators see this.</div>}
       {p.body && <p className="post-body">{p.body}</p>}
       {p.photoFileId && <img src={`/api/files/${p.photoFileId}`} alt="" className="post-photo" loading="lazy" />}
       <ErrorBox error={error} />
       {action && <ActionForm kind={action} target={p} challengeId={challengeId} onCancel={() => setAction(null)} onDone={() => { setAction(null); onChanged(); }} />}
-      {!removed && (
-        <footer className="row" style={{ gap: 6, marginTop: 10 }}>
+      <footer className="row" style={{ gap: 6, marginTop: 10 }}>
           {feed.emojis.map((e) => {
             const r = reactions.find((x) => x.emoji === e);
             return <button key={e} className={`react${r?.mine ? ' mine' : ''}`} onClick={() => react(e)} aria-pressed={!!r?.mine} aria-label={`React ${e}`}>{e}{r ? <span>{r.count}</span> : null}</button>;
           })}
           <button className="btn small ghost" style={{ marginLeft: 'auto' }} onClick={() => setOpen((o) => !o)}>💬 {count ? `${count} ${count === 1 ? 'comment' : 'comments'}` : 'Comment'}</button>
-        </footer>
-      )}
+      </footer>
       {open && <Comments postId={p.postId} feed={feed} challengeId={challengeId} onCount={setCount} />}
+    </article>
+  );
+}
+
+/**
+ * A post a moderator removed, collapsed to one line. Moderators see who removed it and why, and can open it to
+ * review; its author is told why and can delete it. Nobody else sees it at all.
+ */
+function RemovedPost({ p, onDelete, error }: { p: Post; onDelete: () => void; error: unknown }) {
+  const [show, setShow] = useState(false);
+  const [sure, setSure] = useState(false);
+  return (
+    <article className="card post removed">
+      <div className="spread" style={{ gap: 8 }}>
+        <span className="small">
+          {p.mine ? <>🚫 <b>Your post was removed by an admin</b></> : <>🚫 Post by <b>{p.author.displayName}</b> removed{p.removedBy ? <> by <b>{p.removedBy}</b></> : null}</>}
+          {p.removedReason && <>: <i>{p.removedReason}</i></>}
+          <span className="muted"> · {time(p.createdAt)}{!p.mine && ' · only moderators see this'}</span>
+        </span>
+        <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+          <button className="btn small ghost" aria-expanded={show} onClick={() => setShow((s) => !s)}>{show ? 'Hide' : 'Show'}</button>
+          {p.canDelete && <button className="btn small ghost danger" onClick={() => (sure ? onDelete() : setSure(true))}>{sure ? 'Tap again to delete' : 'Delete'}</button>}
+        </span>
+      </div>
+      <ErrorBox error={error} />
+      {show && (
+        <div className="removed-content">
+          {p.body && <p className="post-body">{p.body}</p>}
+          {p.photoFileId && <img src={`/api/files/${p.photoFileId}`} alt="" className="post-photo" />}
+        </div>
+      )}
     </article>
   );
 }
@@ -251,7 +280,12 @@ function Comments({ postId, feed, challengeId, onCount }: { postId: number; feed
       <Avatar fileId={c.author.photoFileId} name={c.author.displayName} size={reply ? 24 : 28} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="bubble"><button className="person-link small" onClick={() => navigate(c.mine ? '/profile' : `/people/${c.author.userId}`)}><b>{c.author.displayName}</b></button><div className="post-body small" style={{ margin: 0 }}>{c.body}</div></div>
-        {c.status === 'REMOVED' && <div className="muted small">Removed: {c.removedReason}</div>}
+        {c.status === 'REMOVED' && (
+          <div className="row small muted" style={{ gap: 12 }}>
+            <span>🚫 {c.mine ? 'Your comment was removed by an admin' : 'Removed'}{c.removedReason ? `: ${c.removedReason}` : ''}{!c.mine && ' · only moderators see this'}</span>
+            {c.mine && <button className="link" onClick={() => del(c)}>Delete</button>}
+          </div>
+        )}
         {c.status === 'VISIBLE' && (
           <div className="row small muted" style={{ gap: 12 }}>
             <span>{time(c.createdAt)}</span>

@@ -18,6 +18,7 @@ import { myDashboard } from './modules/checkin/days.js';
 import { adminOverview, participantCalendar } from './modules/checkin/overview.js';
 import * as restdays from './modules/checkin/restdays.js';
 import * as submissions from './modules/checkin/submissions.js';
+import { readerName } from './modules/verification/select.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -133,7 +134,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
       try { const [status, at] = readFileSync(config.backupStatusFile, 'utf8').trim().split(/\s+/); backup = { status: status ?? 'unknown', at }; } catch { backup = { status: 'none' }; }
     }
     return { status: 'ok', database: 'ok', migrations: mig ? mig.n : null, backup,
-      screenshotReading: process.env.ANTHROPIC_API_KEY ? 'on' : 'off', scheduler: process.env.FITNESS_SCHEDULER_ENABLED === 'true' ? 'on' : 'off' };
+      screenshotReading: readerName(), scheduler: process.env.FITNESS_SCHEDULER_ENABLED === 'true' ? 'on' : 'off' };
   });
 
   // ---------- Auth ----------

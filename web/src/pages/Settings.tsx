@@ -91,8 +91,8 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
       <Section title="Evidence and verification">
         <Area ctx={ctx} p={['submission', 'instructions']} label="Instructions shown to participants" />
         <p className="muted small">Deadline: midnight at the end of each day ({c.basics.timeZone}). Late evidence never counts for an earlier day.</p>
-        <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'AI reads the screenshot; unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
-        <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the AI is at least this sure (0.5–1)" step={0.01} />
+        <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or Claude if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
+        <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the reading is at least this sure (0.5–1)" step={0.01} />
       </Section>
 
       <Section title="Rest days">

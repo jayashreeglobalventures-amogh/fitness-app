@@ -27,7 +27,8 @@ What is shared with the other apps, and how it's touched (by `bootstrap-fitness.
 - **The sshd `AllowUsers` line:** `deploy-fitness` is appended, validated with `sshd -t` and rolled back on failure.
 - **The Docker engine.**
 
-Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per environment at most (DB 384 MB, app 384 MB).
+Nothing of IMS or Rent is otherwise read or changed. Memory: about 900 MB per environment at most (DB 384 MB, app 512 MB;
+the app includes the free screenshot reader).
 
 ## One-time setup (you, per environment — start with staging)
 
@@ -40,8 +41,10 @@ Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per en
    ```
    scp -i ~/.ssh/rent_admin -r deploy admin@<VPS IP>:/tmp/fitness-deploy
    ssh -i ~/.ssh/rent_admin admin@<VPS IP> \
-     sudo bash /tmp/fitness-deploy/bootstrap-fitness.sh --env staging --domain fitness-test.amogh.systems --deploy-key "$(cat ~/.ssh/fitness_deploy.pub)"
+     sudo bash /tmp/fitness-deploy/bootstrap-fitness.sh --env staging --domain fitness-test.amogh.systems --deploy-key "'$(cat ~/.ssh/fitness_deploy.pub)'"
    ```
+   Keep both kinds of quotes around the key: `ssh` sends the command to the server as one line, and without the inner
+   single quotes the server splits the key (it contains spaces) and the script stops with "unknown option".
    It creates `deploy-fitness`, `/opt/fitness-staging` with random secrets in `.env` (copy them into your password
    manager: `sudo cat /opt/fitness-staging/.env`) and the Caddy site.
 4. **Image access:** `sudo -iu deploy-fitness docker login ghcr.io -u <github user>` with a GitHub token that has
@@ -60,8 +63,8 @@ Nothing of IMS or Rent is otherwise read or changed. Memory: about 770 MB per en
    ```
    The first prints a temporary password (changed at first sign-in). Calamari is created as a draft: check its
    Settings in the app, then Publish, create accounts (People) and invite.
-8. **Screenshot reading (optional):** `sudo -iu deploy-fitness /opt/fitness-staging/set-key.sh anthropic`, then paste
-   the key. It is stored only in that environment's `.env`. Without it every screenshot goes to manual review.
+8. **Screenshot reading:** works out of the box with the free on-server reader (Tesseract; no key, images never leave
+   the server). Optionally, for unusual layouts, add a paid Claude key: `sudo -iu deploy-fitness /opt/fitness-staging/set-key.sh anthropic`.
 
 Production is the same with `--env production --domain fitness.amogh.systems` and `/opt/fitness`, then
 Actions → deploy → production.

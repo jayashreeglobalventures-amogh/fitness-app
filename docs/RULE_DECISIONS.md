@@ -9,7 +9,7 @@ change any of them. **Open** items are not implemented until the owner decides (
 |---|---|
 | Which day evidence counts for | The day (challenge time zone) the complete upload reaches the server. Never an earlier day. |
 | Resubmission | Allowed until midnight while the day isn't verified yet; the new upload replaces the old one (kept as *superseded*). |
-| AI decisions | The AI may only **approve** a clear, confident (≥ the configured confidence, Calamari 0.9), on-target reading of the right day. Below target, unclear date, unreadable, model flags, a total that disagrees with what the participant typed, reused images and AI outages all go to an admin. The AI never rejects. |
+| Automatic reading | The reader (free on-server Tesseract, or Claude if a key is set) may only **approve** a clear, confident (≥ the configured confidence, Calamari 0.9), on-target reading of the right day. Below target, unclear date, unreadable, model flags, a total that disagrees with what the participant typed, reused images and reader outages all go to an admin. It never rejects. The free reader also sends weekly/average screens, several dates, several step counts, and "Today" without a date to an admin. |
 | Duplicate images | An image already used by anyone else, or by the same person for another day, always goes to an admin. |
 | Admin decisions | "Target reached" needs a value ≥ target; "below target" a value < target; "rejected" and any change of decision (including deciding an appeal) need a reason. Nobody reviews their own evidence. |
 | Appeals | One appeal per decision (below target or rejected); it goes back to the review queue. |

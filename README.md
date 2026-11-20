@@ -28,7 +28,9 @@ npm run dev:local     # embedded PostgreSQL in .local/, migrations, then http://
 ```
 
 The first run prints a temporary password for the Super Admin `admin` and creates Calamari as a draft.
-Screenshot reading uses Claude when `ANTHROPIC_API_KEY` is set (otherwise every screenshot goes to manual review);
+Screenshots are read by a free on-server reader (Tesseract) or, when `ANTHROPIC_API_KEY` is set, by Claude;
+`SCREENSHOT_OCR=off` (with no key) sends every screenshot to an admin. `npx tsx scripts/ocr-probe.ts <image>` shows what
+the free reader sees in a screenshot.
 `FITNESS_SCHEDULER_ENABLED=true` turns on AI retries and closing exemption votes on time.
 `rm -rf .local` starts over.
 
@@ -64,7 +66,7 @@ src/
     challenges/challenges.ts  create, versioned edits, publish, duplicate, archive, admin roles
     roster/    invitations, rules acceptance, roster lock, participant status
     checkin/   day statuses, submissions + review + appeals, rest days, exemptions + voting, admin overview
-    verification/reader.ts  screenshot reading (Claude) behind an interface
+    verification/  screenshot readers behind one interface: ocr.ts (free, Tesseract), reader.ts (Claude), select.ts
 web/           React + Vite app (tabs: Home, Challenges, Profile, People)
 config/challenges/  challenge settings files
 test/          unit + integration tests

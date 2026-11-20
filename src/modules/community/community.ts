@@ -98,22 +98,29 @@ const reactionsOf = async (db: Queryable, postIds: number[], userId: number) => 
   return out;
 };
 
-const postOut = (r: Record<string, any>, userId: number, m: Member, reactions: { emoji: string; count: number; mine: boolean }[]) => ({
-  postId: Number(r.post_id), kind: r.kind, body: r.status === 'VISIBLE' || m.moderator ? r.body : '', photoFileId: r.photo_file_id && (r.status === 'VISIBLE' || m.moderator) ? Number(r.photo_file_id) : null,
-  status: r.status, removedReason: m.moderator ? r.removed_reason : null, pinned: !!r.pinned_at, createdAt: r.created_at.toISOString(),
-  author: { userId: Number(r.author_user_id), displayName: r.display_name, photoFileId: r.author_photo ? Number(r.author_photo) : null },
-  mine: Number(r.author_user_id) === userId, comments: Number(r.comment_count), reactions,
-  canDelete: Number(r.author_user_id) === userId && r.status === 'VISIBLE', canModerate: m.moderator,
-});
+// A removed post is seen only by moderators (to review) and by its author (told why, and able to delete it).
+const postOut = (r: Record<string, any>, userId: number, m: Member, reactions: { emoji: string; count: number; mine: boolean }[]) => {
+  const mine = Number(r.author_user_id) === userId;
+  const open = r.status === 'VISIBLE' || m.moderator || mine;
+  return {
+    postId: Number(r.post_id), kind: r.kind, body: open ? r.body : '', photoFileId: r.photo_file_id && open ? Number(r.photo_file_id) : null,
+    status: r.status, removedReason: m.moderator || mine ? r.removed_reason : null, removedBy: m.moderator ? r.removed_by_name ?? null : null,
+    pinned: !!r.pinned_at, createdAt: r.created_at.toISOString(),
+    author: { userId: Number(r.author_user_id), displayName: r.display_name, photoFileId: r.author_photo ? Number(r.author_photo) : null },
+    mine, comments: Number(r.comment_count), reactions,
+    canDelete: mine && (r.status === 'VISIBLE' || r.status === 'REMOVED'), canModerate: m.moderator,
+  };
+};
 
 /** The feed: pinned posts first, then newest; 20 at a time (pass `before` = the last post id for the next page). */
 export async function feed(db: Queryable, userId: number, challengeId: number, beforeRaw: unknown, now: Date): Promise<unknown> {
   const m = await member(db, userId, challengeId);
   const before = beforeRaw ? Number(beforeRaw) : null;
-  const statusFilter = m.moderator ? `p.status IN ('VISIBLE','REMOVED')` : `p.status = 'VISIBLE'`;
-  const select = `SELECT p.*, u.display_name, pr.photo_file_id AS author_photo,
+  const statusFilter = m.moderator ? `p.status IN ('VISIBLE','REMOVED')` : `(p.status = 'VISIBLE' OR (p.status = 'REMOVED' AND p.author_user_id = ${Math.trunc(userId)}))`;
+  const select = `SELECT p.*, u.display_name, pr.photo_file_id AS author_photo, rb.display_name AS removed_by_name,
       (SELECT count(*) FROM comments c WHERE c.post_id = p.post_id AND c.status = 'VISIBLE') AS comment_count
-    FROM posts p JOIN users u ON u.user_id = p.author_user_id LEFT JOIN user_profiles pr ON pr.user_id = p.author_user_id`;
+    FROM posts p JOIN users u ON u.user_id = p.author_user_id LEFT JOIN user_profiles pr ON pr.user_id = p.author_user_id
+    LEFT JOIN users rb ON rb.user_id = p.removed_by`;
   const pinned = before ? [] : (await db.query(`${select} WHERE p.challenge_id = $1 AND p.pinned_at IS NOT NULL AND p.status = 'VISIBLE' ORDER BY p.pinned_at DESC`, [challengeId])).rows;
   const { rows } = await db.query(
     `${select} WHERE p.challenge_id = $1 AND ${statusFilter} AND p.pinned_at IS NULL ${before ? 'AND p.post_id < $3' : ''} ORDER BY p.post_id DESC LIMIT $2`,
@@ -145,7 +152,8 @@ async function postFor(db: Queryable, postId: number) {
 export async function deletePost(db: Queryable, userId: number, postId: number, now: Date): Promise<void> {
   const p = await postFor(db, postId);
   if (Number(p.author_user_id) !== userId) throw forbidden('You can only delete your own posts.');
-  if (p.status !== 'VISIBLE') return;
+  if (p.status === 'DELETED') return;
+  // Also allowed after a moderator removed it; the removal (with the post's text) stays in the activity log.
   await db.query(`UPDATE posts SET status = 'DELETED', pinned_at = NULL, updated_at = $2 WHERE post_id = $1`, [postId, now]);
 }
 
@@ -166,15 +174,20 @@ export async function react(db: Queryable, userId: number, postId: number, emoji
 export async function comments(db: Queryable, userId: number, postId: number): Promise<unknown[]> {
   const p = await postFor(db, postId);
   const m = await member(db, userId, Number(p.challenge_id));
-  if (p.status !== 'VISIBLE' && !m.moderator) throw notFound('Post not found.');
+  if (p.status !== 'VISIBLE' && !m.moderator && Number(p.author_user_id) !== userId) throw notFound('Post not found.');
+  // Removed comments: moderators see them all; their authors see their own (with the reason, to delete them).
   const { rows } = await db.query(
     `SELECT c.*, u.display_name, pr.photo_file_id AS author_photo FROM comments c JOIN users u ON u.user_id = c.author_user_id LEFT JOIN user_profiles pr ON pr.user_id = c.author_user_id
-      WHERE c.post_id = $1 AND c.status ${m.moderator ? "IN ('VISIBLE','REMOVED')" : "= 'VISIBLE'"} ORDER BY c.comment_id`, [postId]);
-  return rows.map((c) => ({
-    commentId: Number(c.comment_id), parentId: c.parent_comment_id ? Number(c.parent_comment_id) : null, body: c.body, status: c.status, removedReason: m.moderator ? c.removed_reason : null,
-    createdAt: c.created_at.toISOString(), author: { userId: Number(c.author_user_id), displayName: c.display_name, photoFileId: c.author_photo ? Number(c.author_photo) : null },
-    mine: Number(c.author_user_id) === userId,
-  }));
+      WHERE c.post_id = $1 AND (c.status = 'VISIBLE' OR (c.status = 'REMOVED' AND ($2 OR c.author_user_id = $3))) ORDER BY c.comment_id`, [postId, m.moderator, userId]);
+  return rows.map((c) => {
+    const mine = Number(c.author_user_id) === userId;
+    return {
+      commentId: Number(c.comment_id), parentId: c.parent_comment_id ? Number(c.parent_comment_id) : null, body: c.body, status: c.status,
+      removedReason: m.moderator || mine ? c.removed_reason : null,
+      createdAt: c.created_at.toISOString(), author: { userId: Number(c.author_user_id), displayName: c.display_name, photoFileId: c.author_photo ? Number(c.author_photo) : null },
+      mine,
+    };
+  });
 }
 
 export async function addComment(db: Queryable, userId: number, postId: number, input: { body: unknown; parentId?: unknown }, now: Date): Promise<{ commentId: number }> {
@@ -200,7 +213,7 @@ export async function deleteComment(db: Queryable, userId: number, commentId: nu
   const { rows: [c] } = await db.query(`SELECT * FROM comments WHERE comment_id = $1`, [commentId]);
   if (!c) throw notFound('Comment not found.');
   if (Number(c.author_user_id) !== userId) throw forbidden('You can only delete your own comments.');
-  await db.query(`UPDATE comments SET status = 'DELETED' WHERE comment_id = $1 AND status = 'VISIBLE'`, [commentId]);
+  await db.query(`UPDATE comments SET status = 'DELETED' WHERE comment_id = $1 AND status IN ('VISIBLE','REMOVED')`, [commentId]);
 }
 
 // ---------- reports and moderation ----------
@@ -304,13 +317,13 @@ export async function myAchievements(db: Queryable, userId: number, challengeId:
   return rows.map((r) => ({ eventId: Number(r.event_id), rule: r.rule, day: r.day, points: r.points, streak: r.details?.streak ?? r.details?.teamStreak ?? null }));
 }
 
-/** Whether a viewer may see a community photo: a member of that challenge, while the post is visible (moderators always). */
+/** Whether a viewer may see a community photo: members while the post is visible; once removed, only moderators and its author. */
 export async function canSeeCommunityPhoto(db: Queryable, userId: number, fileId: number): Promise<boolean> {
-  const { rows } = await db.query(`SELECT challenge_id, status FROM posts WHERE photo_file_id = $1`, [fileId]);
+  const { rows } = await db.query(`SELECT challenge_id, status, author_user_id FROM posts WHERE photo_file_id = $1`, [fileId]);
   for (const r of rows) {
     try {
       const m = await member(db, userId, Number(r.challenge_id));
-      if (r.status === 'VISIBLE' || m.moderator) return true;
+      if (r.status === 'VISIBLE' || (r.status === 'REMOVED' && (m.moderator || Number(r.author_user_id) === userId))) return true;
     } catch { /* not a member */ }
   }
   return false;

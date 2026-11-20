@@ -89,6 +89,37 @@ describe('community feed', () => {
     expect(rows).toEqual([{ action: 'POST_REMOVED', reason: 'Advertising is not allowed' }]);
   });
 
+  it('a removed post: its author is told why and can delete it; moderators see who removed it; nobody else sees it or its photo', async () => {
+    const pid = (await ravi.upload(`/api/challenges/${id}/posts`, { body: 'My shop again' }, png('shop'))).body.data.postId;
+    const photo = (await feed(ravi)).posts.find((p: { postId: number }) => p.postId === pid).photoFileId;
+    await admin.post(`/api/posts/${pid}/remove`, { reason: 'Advertising is not allowed' });
+    // The author sees it, with the reason, and may delete it.
+    expect((await feed(ravi)).posts.find((p: { postId: number }) => p.postId === pid)).toMatchObject({ status: 'REMOVED', removedReason: 'Advertising is not allowed', canDelete: true, removedBy: null });
+    expect((await ravi.raw(`/api/files/${photo}`)).status).toBe(200);
+    // Moderators see who removed it.
+    expect((await feed(admin)).posts.find((p: { postId: number }) => p.postId === pid)).toMatchObject({ removedBy: 'admin1' });
+    // Everyone else: gone, photo included; and community photos are never cached.
+    expect((await feed(asha)).posts.some((p: { postId: number }) => p.postId === pid)).toBe(false);
+    expect((await asha.raw(`/api/files/${photo}`)).status).toBe(404);
+    expect(String((await admin.raw(`/api/files/${photo}`)).headers['cache-control'])).toBe('no-store');
+    // The author deletes it: gone for everyone, moderators included; the removal stays in the activity log.
+    expect((await asha.post(`/api/posts/${pid}/delete`)).status).toBe(403);
+    expect((await ravi.post(`/api/posts/${pid}/delete`)).status).toBe(200);
+    for (const c of [ravi, admin]) expect((await feed(c)).posts.some((p: { postId: number }) => p.postId === pid)).toBe(false);
+    expect((await h.admin.query(`SELECT count(*)::int AS n FROM audit_log WHERE action = 'POST_REMOVED' AND entity_id = $1`, [String(pid)])).rows[0].n).toBe(1);
+  });
+
+  it('a removed comment: its author sees why and can delete it; other participants don\'t see it', async () => {
+    const pinned = (await feed(asha)).pinned[0].postId;
+    const cid = (await ravi.post(`/api/posts/${pinned}/comments`, { body: 'Visit my shop' })).body.data.commentId;
+    await admin.post(`/api/comments/${cid}/remove`, { reason: 'Advertising is not allowed' });
+    expect((await ravi.get(`/api/posts/${pinned}/comments`)).body.data.find((c: { commentId: number }) => c.commentId === cid)).toMatchObject({ status: 'REMOVED', removedReason: 'Advertising is not allowed', mine: true });
+    expect((await asha.get(`/api/posts/${pinned}/comments`)).body.data.some((c: { commentId: number }) => c.commentId === cid)).toBe(false);
+    expect((await ravi.post(`/api/comments/${cid}/delete`)).status).toBe(200);
+    expect((await ravi.get(`/api/posts/${pinned}/comments`)).body.data.some((c: { commentId: number }) => c.commentId === cid)).toBe(false);
+    expect((await admin.get(`/api/posts/${pinned}/comments`)).body.data.some((c: { commentId: number }) => c.commentId === cid)).toBe(false);
+  });
+
   it('a muted person can read and react but not post or comment, until the mute ends or is lifted', async () => {
     expect((await admin.post(`/api/challenges/${id}/community-mutes`, { userId: ravi.userId, days: 3, reason: '' })).status).toBe(400);
     expect((await admin.post(`/api/challenges/${id}/community-mutes`, { userId: ravi.userId, days: 3, reason: 'Repeated advertising' })).status).toBe(200);

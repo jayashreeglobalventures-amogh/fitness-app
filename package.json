@@ -21,7 +21,9 @@
     "dev:local": "tsx scripts/dev-local.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.11.0",
     "@fastify/cookie": "^11.1.5",
+    "@fastify/multipart": "^10.1.9",
     "@fastify/static": "^10.1.12",
     "@node-rs/argon2": "^2.2.2",
     "@sinclair/typebox": "^0.34.52",

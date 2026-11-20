@@ -1,10 +1,9 @@
-# CI: runs on every pull request and on pushes to main.
+# CI: runs on every push (any branch) and on pull requests.
 name: ci
 
 on:
   pull_request:
   push:
-    branches: [main]
 
 permissions:
   contents: read

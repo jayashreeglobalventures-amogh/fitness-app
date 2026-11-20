@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { COOKIE } from '../../src/app.js';
 import { calamariConfig, client, login, makeHarness, ORIGIN, PASSWORD, type Harness } from '../helpers/app.js';
@@ -99,7 +100,8 @@ describe('accounts and sign-in (IMS model)', () => {
 
   it('/healthz reports the database and migrations', async () => {
     const r = await h.app.inject({ method: 'GET', url: '/healthz' });
-    expect(JSON.parse(r.body)).toMatchObject({ status: 'ok', database: 'ok', migrations: 1 });
+    const journal = JSON.parse(readFileSync(new URL('../../src/db/migrations/meta/_journal.json', import.meta.url), 'utf8'));
+    expect(JSON.parse(r.body)).toMatchObject({ status: 'ok', database: 'ok', migrations: journal.entries.length });
     void calamariConfig; void sql;
   });
 });

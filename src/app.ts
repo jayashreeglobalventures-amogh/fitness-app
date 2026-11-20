@@ -5,12 +5,19 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { Config } from './config.js';
 import { withTx } from './core/db.js';
 import { AppError } from './core/errors.js';
+import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
+import * as exemptions from './modules/checkin/exemptions.js';
+import { myDashboard } from './modules/checkin/days.js';
+import { adminOverview, participantCalendar } from './modules/checkin/overview.js';
+import * as restdays from './modules/checkin/restdays.js';
+import * as submissions from './modules/checkin/submissions.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -28,6 +35,8 @@ export interface AppDeps {
   now?: () => Date;
   logger?: boolean;
   webDir?: string;
+  /** Tests only: receives each background AI verification started after an upload. */
+  onBackground?: (done: Promise<unknown>) => void;
 }
 
 const SECURITY_HEADERS = {
@@ -43,6 +52,8 @@ interface Ctx {
   user: users.SessionUser;
   now: Date;
   req: FastifyRequest;
+  /** Work to start after the transaction has committed (e.g. AI verification of a new upload). */
+  after(fn: () => Promise<unknown>): void;
 }
 
 const id = (v: unknown): number => {
@@ -52,7 +63,7 @@ const id = (v: unknown): number => {
 };
 const body = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
 
-export async function buildApp({ config, pool, now, logger, webDir }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, pool, now, logger, webDir, onBackground }: AppDeps): Promise<FastifyInstance> {
   const clock = now ?? (() => new Date());
   const app = Fastify({
     trustProxy: config.trustProxy,
@@ -64,6 +75,7 @@ export async function buildApp({ config, pool, now, logger, webDir }: AppDeps): 
     },
   });
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 10, fieldSize: 4096 } });
 
   app.addHook('onSend', async (_req, reply, payload) => {
     for (const [k, v] of Object.entries(SECURITY_HEADERS)) reply.header(k, v);
@@ -102,7 +114,12 @@ export async function buildApp({ config, pool, now, logger, webDir }: AppDeps): 
     if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
     if (user.mustChangePassword && !opts.allowTempPassword) throw new users.PasswordChangeRequired();
     const t = clock();
-    const data = await withTx(pool, (tx) => fn({ tx, user, now: t, req }));
+    const later: (() => Promise<unknown>)[] = [];
+    const data = await withTx(pool, (tx) => fn({ tx, user, now: t, req, after: (f) => later.push(f) }));
+    for (const f of later) {
+      const done = f().catch((e) => req.log.error({ err: e }, 'background work failed'));
+      onBackground?.(done);
+    }
     return { success: true, data: data ?? null };
   };
 
@@ -193,6 +210,79 @@ export async function buildApp({ config, pool, now, logger, webDir }: AppDeps): 
   app.post('/api/invitations/:invitationId/decline', authed((c) => roster.decline(c.tx, c.user.userId, iid(c), c.now)));
   app.post('/api/invitations/:invitationId/revoke', authed((c) => roster.revokeInvitation(c.tx, c.user.userId, iid(c), c.now)));
   app.post('/api/invitations/:invitationId/resend', authed((c) => roster.resendInvitation(c.tx, c.user.userId, iid(c), c.now)));
+
+  // ---------- Daily participation ----------
+  /** Reads a multipart form: its text fields and at most one file (bytes). */
+  const form = async (req: FastifyRequest): Promise<{ fields: Record<string, string>; file: Buffer | null }> => {
+    if (!req.isMultipart()) throw new AppError('VALIDATION', 'Send the form as multipart/form-data.');
+    const fields: Record<string, string> = {};
+    let file: Buffer | null = null;
+    try {
+      for await (const part of req.parts()) {
+        if (part.type === 'file') {
+          file = await part.toBuffer();
+        } else fields[part.fieldname] = String(part.value ?? '');
+      }
+    } catch (e) {
+      if ((e as { code?: string }).code === 'FST_REQ_FILE_TOO_LARGE') throw new AppError('VALIDATION', 'The image is larger than 10 MB.');
+      throw e;
+    }
+    return { fields, file };
+  };
+  const pid = (c: Ctx) => id((c.req.params as { participantId: string }).participantId);
+  const sid = (c: Ctx) => id((c.req.params as { submissionId: string }).submissionId);
+  const verifyLater = (c: Ctx, r: submissions.Submitted) => { if (r.verify) c.after(() => submissions.verifySubmission(pool, config.mediaDir, r.submissionId, clock)); };
+
+  app.get('/api/challenges/:challengeId/me', authed((c) => myDashboard(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/challenges/:challengeId/submissions', authed(async (c) => {
+    const { fields, file } = await form(c.req);
+    if (!file) throw new AppError('VALIDATION', 'Choose a screenshot to upload.');
+    const r = await submissions.submit(c.tx, config.mediaDir, c.user.userId, cid(c), { image: file, clientRef: fields.clientRef, claimedValue: fields.claimedValue }, c.now);
+    verifyLater(c, r);
+    return r;
+  }));
+  app.post('/api/participants/:participantId/submissions', authed(async (c) => {
+    const { fields, file } = await form(c.req);
+    if (!file) throw new AppError('VALIDATION', 'Choose the screenshot to record.');
+    const r = await submissions.recordCorrection(c.tx, config.mediaDir, c.user.userId, pid(c),
+      { image: file, clientRef: fields.clientRef, claimedValue: fields.claimedValue, day: fields.day, receivedAt: fields.receivedAt, reason: fields.reason }, c.now);
+    verifyLater(c, r);
+    return r;
+  }));
+  app.get('/api/submissions/:submissionId', authed((c) => submissions.submissionDetail(c.tx, c.user.userId, sid(c))));
+  app.post('/api/submissions/:submissionId/review', authed((c) => submissions.review(c.tx, c.user.userId, sid(c), body(c.req) as never, c.now)));
+  app.post('/api/submissions/:submissionId/appeal', authed((c) => submissions.appeal(c.tx, c.user.userId, sid(c), body(c.req).note, c.now)));
+  app.get('/api/challenges/:challengeId/review-queue', authed((c) => submissions.reviewQueue(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/challenges/:challengeId/overview', authed((c) => adminOverview(c.tx, c.user.userId, cid(c), (c.req.query as { day?: string }).day, c.now)));
+  app.get('/api/participants/:participantId/days', authed((c) => participantCalendar(c.tx, c.user.userId, pid(c), c.now)));
+
+  // Evidence images: only for their owner or a reviewer of the challenge; anything else is a plain 404.
+  app.get('/api/files/:fileId', async (req, reply) => {
+    const user = await sessionUser(req);
+    if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
+    if (user.mustChangePassword) throw new users.PasswordChangeRequired();
+    const f = await submissions.canSeeFile(pool, user.userId, id((req.params as { fileId: string }).fileId));
+    if (!f) throw new AppError('NOT_FOUND', 'Not found.');
+    let bytes: Buffer;
+    try { bytes = await readImage(config.mediaDir, f.storageKey); } catch { throw new AppError('NOT_FOUND', 'Not found.'); }
+    return reply.header('cache-control', 'private, max-age=3600').header('content-disposition', 'inline').type(f.mimeType).send(bytes);
+  });
+
+  const rid = (c: Ctx) => id((c.req.params as { restDayId: string }).restDayId);
+  app.post('/api/challenges/:challengeId/rest-days', authed((c) => restdays.declare(c.tx, c.user.userId, cid(c), body(c.req).day, c.now)));
+  app.post('/api/rest-days/:restDayId/cancel', authed((c) => restdays.cancel(c.tx, c.user.userId, rid(c), c.now)));
+  app.post('/api/participants/:participantId/rest-days', authed((c) => restdays.adminDeclare(c.tx, c.user.userId, pid(c), body(c.req) as never, c.now)));
+  app.post('/api/rest-days/:restDayId/admin-cancel', authed((c) => restdays.adminCancel(c.tx, c.user.userId, rid(c), body(c.req).reason, c.now)));
+
+  const xid = (c: Ctx) => id((c.req.params as { requestId: string }).requestId);
+  app.post('/api/challenges/:challengeId/exemptions', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    return exemptions.requestExemption(c.tx, config.mediaDir, c.user.userId, cid(c), { startDay: fields.startDay, endDay: fields.endDay, reason: fields.reason, evidence: file }, c.now);
+  }));
+  app.get('/api/challenges/:challengeId/exemptions', authed((c) => exemptions.listRequests(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/exemptions/:requestId/vote', authed((c) => exemptions.vote(c.tx, c.user.userId, xid(c), body(c.req).vote, c.now)));
+  app.post('/api/exemptions/:requestId/decide', authed((c) => exemptions.decide(c.tx, c.user.userId, xid(c), body(c.req) as never, c.now)));
+  app.post('/api/exemptions/:requestId/withdraw', authed((c) => exemptions.withdraw(c.tx, c.user.userId, xid(c), c.now)));
 
   // ---------- The React app ----------
   const dir = webDir ?? WEB_DIST;

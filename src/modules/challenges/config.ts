@@ -129,7 +129,12 @@ export const ChallengeConfigSchema = Type.Object({
     // Different amounts for specific periods (e.g. a short final week).
     periodOverrides: Type.Array(Type.Composite([Type.Object({ periodNo: Type.Integer({ minimum: 1 }) }), ContributionSplit], { additionalProperties: false }), { maxItems: 60 }),
     finePerMissedDay: Paise,
+    // What happens to money left in a person's fine pool when the week closes:
+    // REFUND (owed back to them), PRIZE_POOL (the prize pool), YEAR_END_POOL (a separate year-end pool).
+    unusedFinePool: Type.Union([Type.Literal('REFUND'), Type.Literal('PRIZE_POOL'), Type.Literal('YEAR_END_POOL')]),
     dueWeekday: Weekday,
+    // Days after the due day before an unpaid contribution is shown as overdue. Never affects points.
+    graceDays: Type.Integer({ minimum: 0, maximum: 14 }),
     paymentInstructions: Type.String({ maxLength: 1000 }),
   }, { additionalProperties: false }),
   prizes: Type.Object({
@@ -161,6 +166,11 @@ export interface ConfigCheck { ok: boolean; errors: ConfigIssue[]; warnings: Con
 export function normalizeConfig<T>(input: T): T {
   if (!input || typeof input !== 'object') return input;
   const c = structuredClone(input) as Record<string, any>;
+  const f = c.finance;
+  if (f && typeof f === 'object') {
+    if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)
+    if (f.graceDays === undefined) f.graceDays = 2;
+  }
   const s = c.scoring;
   if (s && typeof s === 'object') {
     if (s.personalStreak && s.personalStreak.repeatAfterBreak === undefined) s.personalStreak.repeatAfterBreak = true;

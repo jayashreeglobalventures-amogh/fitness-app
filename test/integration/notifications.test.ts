@@ -37,15 +37,19 @@ describe('notifications', () => {
     await ben.post(`/api/invitations/${r.body.data.invited[1]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true });
     expect(await ids(asha)).toEqual([]); // before the start: nothing to do
     h.setNow('2026-11-22T06:30:00Z');
-    expect(await ids(asha)).toEqual(['today']);
+    expect((await ids(asha)).sort()).toEqual(['pay', 'today']); // today's check-in + week 1 contribution due
     await asha.upload(`/api/challenges/${id}/submissions`, { clientRef: 'asha-day-one' }, png('asha-1'));
-    expect(await ids(asha)).toEqual([]);
+    expect(await ids(asha)).toEqual(['pay']);
+    await asha.post(`/api/challenges/${id}/payments`, { periodNo: 1, amount: 1000, utr: 'NOTIF000111', paidOn: '2026-11-22' });
+    expect(await ids(asha)).toEqual([]); // reported: no longer nagged while the Finance Admin checks it
   });
 
   it('admins see screenshots waiting for review (not their own); the Finance Admin does not', async () => {
     const n = (await ca.get('/api/me/notifications')).body.data.find((x: { id: string }) => x.id.startsWith('reviews:'));
     expect(n).toMatchObject({ count: 1, link: `/challenges/${id}/review` });
     expect(await ids(fa)).not.toContain('reviews');
+    expect(await ids(fa)).toContain('payments'); // the Finance Admin has a UTR to confirm instead
+    expect(await ids(ca)).not.toContain('payments');
     expect(await ids(asha)).not.toContain('reviews');
   });
 });

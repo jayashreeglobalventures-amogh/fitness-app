@@ -8,14 +8,17 @@
 //   FINE              FINE_POOL:p:w +fine | MAIN_POOL -fine                          (missed eligible day; capped by balance)
 //   UNUSED_FINE_POOL  FINE_POOL:p:w +left | REFUND_DUE:p / MAIN_POOL / YEAR_END_POOL -left   (when the week is closed)
 //   REFUND            MAIN_POOL +amount   | REFUND_DUE:p -amount                     (approved by a Super Admin)
+//   YEAR_END_TRANSFER YEAR_END_POOL +x    | MAIN_POOL -x                             (approved settlement uses the year-end pool)
+//   PRIZE             MAIN_POOL +prize    | PRIZE_DUE:p -prize                       (approved settlement)
+//   PAYOUT            PRIZE_DUE:p +prize, REFUND_DUE:p +refund | RECEIVABLE:p -setoff, CASH -paid   (payout recorded)
 // The contribution is counted once (when due); fines and unused balances are internal moves of that same money.
 import { daysBetween, type Period } from '../../core/dates.js';
 import { contributionFor, type ChallengeConfig } from '../challenges/config.js';
 import type { DayClass } from '../scoring/engine.js';
 
-export type TxType = 'CONTRIBUTION_DUE' | 'PAYMENT' | 'FINE' | 'UNUSED_FINE_POOL' | 'REFUND';
+export type TxType = 'CONTRIBUTION_DUE' | 'PAYMENT' | 'FINE' | 'UNUSED_FINE_POOL' | 'REFUND' | 'YEAR_END_TRANSFER' | 'PRIZE' | 'PAYOUT';
 export interface Line { account: string; amount: number }
-export interface DesiredTx { baseKey: string; type: TxType; participantId: number; periodNo: number | null; day: string | null; lines: Line[]; origin: Record<string, unknown> }
+export interface DesiredTx { baseKey: string; type: TxType; participantId: number | null; periodNo: number | null; day: string | null; lines: Line[]; origin: Record<string, unknown> }
 
 export interface FinanceInput {
   periods: Period[];
@@ -23,6 +26,9 @@ export interface FinanceInput {
   participants: { participantId: number; joinedOn: string; leftOn: string | null; classes: Record<string, DayClass> }[];
   payments: { paymentId: number; participantId: number; periodNo: number; amount: number; paidOn: string }[];
   refunds: { refundId: number; participantId: number; amount: number }[];
+  /** The settlement in force (approved or published), if any. */
+  settlement?: { settlementId: number; yearEndUsed: number; prizes: { participantId: number; amount: number }[] } | null;
+  payouts?: { payoutId: number; participantId: number; prize: number; refund: number; setoff: number; paid: number; paidOn: string }[];
 }
 
 const takesPartIn = (p: { joinedOn: string; leftOn: string | null }, per: Period) =>
@@ -73,6 +79,21 @@ export function money(input: FinanceInput): DesiredTx[] {
   for (const r of input.refunds) {
     out.push({ baseKey: `refund:${r.refundId}`, type: 'REFUND', participantId: r.participantId, periodNo: null, day: null,
       lines: [{ account: 'MAIN_POOL', amount: r.amount }, { account: `REFUND_DUE:${r.participantId}`, amount: -r.amount }], origin: { refundId: r.refundId } });
+  }
+  const s = input.settlement;
+  if (s) {
+    if (s.yearEndUsed > 0) out.push({ baseKey: `yearend:${s.settlementId}`, type: 'YEAR_END_TRANSFER', participantId: null, periodNo: null, day: null,
+      lines: [{ account: 'YEAR_END_POOL', amount: s.yearEndUsed }, { account: 'MAIN_POOL', amount: -s.yearEndUsed }], origin: { settlementId: s.settlementId } });
+    for (const p of s.prizes) if (p.amount > 0) out.push({ baseKey: `prize:${s.settlementId}:${p.participantId}`, type: 'PRIZE', participantId: p.participantId, periodNo: null, day: null,
+      lines: [{ account: 'MAIN_POOL', amount: p.amount }, { account: `PRIZE_DUE:${p.participantId}`, amount: -p.amount }], origin: { settlementId: s.settlementId } });
+  }
+  for (const p of input.payouts ?? []) {
+    const lines: Line[] = [];
+    if (p.prize) lines.push({ account: `PRIZE_DUE:${p.participantId}`, amount: p.prize });
+    if (p.refund) lines.push({ account: `REFUND_DUE:${p.participantId}`, amount: p.refund });
+    if (p.setoff) lines.push({ account: `RECEIVABLE:${p.participantId}`, amount: -p.setoff });
+    if (p.paid) lines.push({ account: 'CASH', amount: -p.paid });
+    if (lines.length >= 2) out.push({ baseKey: `payout:${p.payoutId}`, type: 'PAYOUT', participantId: p.participantId, periodNo: null, day: p.paidOn, lines, origin: { payoutId: p.payoutId } });
   }
   return out;
 }

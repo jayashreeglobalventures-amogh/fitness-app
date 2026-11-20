@@ -118,10 +118,15 @@
   },
   "prizes": {
     "qualificationAdherencePct": 80,
-    "qualificationPoolPct": null,
-    "topThreePct": null,
-    "topThreeSplitPct": null,
-    "distribution": null,
+    "qualificationPoolPct": 70,
+    "topThreePct": 30,
+    "topThreeSplitPct": [
+      50,
+      30,
+      20
+    ],
+    "distribution": "EQUAL",
+    "topThreeIneligible": "NEXT_ELIGIBLE",
     "payoutDate": "2027-01-01"
   },
   "leaderboard": {

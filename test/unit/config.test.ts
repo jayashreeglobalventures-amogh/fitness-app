@@ -11,7 +11,7 @@ describe('challenge configuration', () => {
     expect(r.errors).toEqual([]);
     expect(r.ok).toBe(true);
     expect(r.periods).toHaveLength(6);
-    expect(paths(r.warnings)).toEqual(['/exemptions/voting', '/prizes']);
+    expect(paths(r.warnings)).toEqual(['/exemptions/voting']);
   });
 
   it('Calamari money: ₹1,000 weekly (₹400 + ₹600), ₹714 final week (₹286 + ₹428), ₹100 per missed day', () => {

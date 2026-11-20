@@ -38,8 +38,28 @@ Defaults applied where nothing was said (change in Settings if needed):
 | Corrections | A changed decision appends a reversal (and a new award) to the points ledger - never an edit |
 | Leaderboard | Provisional; prize eligibility = adherence ≥ 80 % and not withdrawn/removed/disqualified |
 
-## Still open (need the owner's ruling before money / settlement)
+## Phase 4 money - owner rulings (20 Nov 2026), in Calamari's settings
 
-From the assessment §11: **5** withdrawal refunds, **11** top-three when someone is under 80 %, **21** where unused fine
-money goes, **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*), **23** late payments. Also: what a
-**suspended** participant's days count as (today they still count).
+| Topic | Ruling | Setting |
+|---|---|---|
+| Money left in a fine pool when the week closes | **Refunded to the participant** (paid out with settlement). Alternatives available: the prize pool, or a separate year-end pool | `finance.unusedFinePool = REFUND` |
+| Late contribution | Due on the week's Sunday; **2-day grace**, then shown as overdue with reminders; fines still count against what they owe; **never affects points** | `finance.graceDays = 2` |
+| Withdrawal / removal money | **Admin decides each case**; a Finance Admin proposes a refund, a different Super Admin approves; only then is it owed | refund proposals |
+| Payments before Phase 4 went live | Reported later with the **original UTR and date**; a Finance Admin confirms | payment `paidOn` may be in the past |
+
+Defaults applied where nothing was said:
+
+| Topic | Default |
+|---|---|
+| Fines | ₹100 per missed eligible day (no evidence, below target, rejected), never more than the week's fine pool has left; rest days and approved exemptions cost nothing; a day still undecided isn't fined until decided |
+| When a week closes | When its last day is over and every day of it is decided |
+| Late joiner / leaver | Owes the weeks they take part in (any day of the week), full amount for that week - an admin can refund a part |
+| Duplicate UTR | Refused while the earlier report is pending or confirmed |
+| Who confirms | Finance Admin or Super Admin; never their own payment |
+| What participants see | Their own statement, the payment details, and the pool totals |
+
+## Still open (need the owner's ruling before settlement)
+
+From the assessment §11: **11** top-three when someone is under 80 %, **22** Calamari's exemption voting numbers (set in
+*Settings → Exemptions*), the prize split (qualification pool % / top-three % / 1st-2nd-3rd / equal or proportional, set
+in *Settings → Prizes*). Also: what a **suspended** participant's days count as (today they still count).

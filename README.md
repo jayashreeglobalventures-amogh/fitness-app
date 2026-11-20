@@ -15,7 +15,7 @@ It is a separate application: its own repository, database, secrets, image and d
 | 1 Foundation | Accounts (admin-created, temporary password), profile, roles, challenge settings (versioned), Calamari, invitations, roster, React app shell | **done** |
 | 2 Daily participation | Screenshot upload, AI-assisted reading (Claude Opus 5.5), review queue, appeals, rest days, exemptions + voting, dashboards, admin corrections | **done** — defaults in [docs/RULE_DECISIONS.md](docs/RULE_DECISIONS.md) |
 | 3 Scoring | Points ledger, streaks, penalties, comebacks, weekend bonus, team streak history, provisional leaderboard; installable PWA (iPhone + Android) | **done** — rulings in [docs/RULE_DECISIONS.md](docs/RULE_DECISIONS.md) |
-| 4 Money | UPI QR, manual payment confirmation, ledger, fine pools, prize pool | |
+| 4 Money | UPI ID / QR, report UTR + Finance Admin confirms, double-entry ledger, fine pools, refunds, overdue, reconciliation | **done** — rulings in [docs/RULE_DECISIONS.md](docs/RULE_DECISIONS.md) |
 | 5 Leaderboard & settlement | Ranking, ties, prize eligibility, settlement approval | |
 | Deploy | Staging `fitness-test.amogh.systems`, production `fitness.amogh.systems` | after owner approval |
 
@@ -69,6 +69,8 @@ src/
     checkin/   day statuses, submissions + review + appeals, rest days, exemptions + voting, admin overview
     verification/  screenshot readers behind one interface: ocr.ts (free, Tesseract), reader.ts (Claude), select.ts
     scoring/   engine.ts (pure rules), ledger.ts (append-only points, reconcile, leaderboard), bonus.ts (weekend activities)
+    finance/   engine.ts (pure money rules), finance.ts (double-entry ledger, payments, refunds, statements)
+    notifications/  what needs each person's attention, worked out live
 web/           React + Vite app (tabs: Home, Challenges, Profile, People)
 config/challenges/  challenge settings files
 test/          unit + integration tests

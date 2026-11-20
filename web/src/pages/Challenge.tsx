@@ -16,6 +16,7 @@ import { RulesSummary } from './RulesSummary';
 import { HeadsUp, SettingsSection } from './Settings';
 import { DemoSection } from './Demo';
 import { MoneySection } from './Money';
+import { ResultsSection } from './Results';
 
 export interface ChallengeView {
   challengeId: number; slug: string; name: string; category: string; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; timeZone: string;
@@ -40,6 +41,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
     { key: 'today', label: 'Today', show: isParticipant && live },
     { key: 'team', label: 'Team', show: isAdmin && live },
     { key: 'leaderboard', label: 'Leaderboard', show: (isParticipant || isAdmin) && live },
+    { key: 'results', label: 'Results', show: (isParticipant || isAdmin) && live && (isAdmin || v.phase === 'FINISHED') },
     { key: 'review', label: 'Review', show: can('submissions.review') && live },
     { key: 'bonus', label: 'Bonus', show: (isParticipant || can('bonus.manage')) && live && v.current.config.scoring.weekendBonus.enabled },
     { key: 'money', label: 'Money', show: live && (v.upcoming ?? v.current).config.finance.enabled && (isParticipant || can('finance.view') || can('finance.settings')) },
@@ -73,6 +75,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       {active === 'leaderboard' && <LeaderboardSection v={v} />}
       {active === 'demo' && <DemoSection v={v} />}
       {active === 'money' && <MoneySection v={v} />}
+      {active === 'results' && <ResultsSection v={v} />}
       {active === 'bonus' && <BonusSection v={v} />}
       {active === 'exemptions' && <ExemptionsSection v={v} />}
       {active === 'overview' && <Overview v={v} invitationId={invitation?.invitationId ?? null} onChanged={() => { view.reload(); invites.reload(); }} />}

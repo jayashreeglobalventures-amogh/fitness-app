@@ -34,6 +34,8 @@ import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
 import * as users from './modules/identity/users.js';
 import * as profile from './modules/profile/profile.js';
+import { personCard } from './modules/profile/person.js';
+import * as health from './modules/health/health.js';
 import * as roster from './modules/roster/roster.js';
 
 export const COOKIE = 'fit_session';
@@ -133,7 +135,11 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     if (user.mustChangePassword && !opts.allowTempPassword) throw new users.PasswordChangeRequired();
     const t = clock();
     const later: (() => Promise<unknown>)[] = [];
-    const data = await requestContext.run(origin(req), () => withTx(pool, (tx) => fn({ tx, user, now: t, req, after: (f) => later.push(f) })));
+    const data = await requestContext.run(origin(req), () => withTx(pool, async (tx) => {
+      // Who is signed in, for this transaction only: the database's row-level security on health data uses it.
+      await tx.query(`SELECT set_config('app.user_id', $1, true)`, [String(user.userId)]);
+      return fn({ tx, user, now: t, req, after: (f) => later.push(f) });
+    }));
     for (const f of later) {
       const done = f().catch((e) => req.log.error({ err: e }, 'background work failed'));
       onBackground?.(done);
@@ -187,6 +193,24 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
 
   // ---------- Profile ----------
   app.get('/api/me/profile', authed(({ tx, user }) => profile.getOwnProfile(tx, user.userId)));
+  app.get('/api/people/:userId', authed(({ tx, user, now, req }) => personCard(tx, user.userId, id((req.params as { userId: string }).userId), now)));
+
+  // Health profile (own data only; others' through the person page).
+  const recId = (req: FastifyRequest) => id((req.params as { recordId: string }).recordId);
+  app.get('/api/me/health', authed(({ tx, user, now }) => health.mine(tx, user.userId, now)));
+  app.post('/api/me/health/consent', authed(async ({ tx, user, now, req }) => { await health.giveConsent(tx, user.userId, body(req), now); return health.mine(tx, user.userId, now); }));
+  app.post('/api/me/health/withdraw', authed(async ({ tx, user, now, req }) => { await health.withdrawConsent(tx, user.userId, body(req), now); return health.mine(tx, user.userId, now); }));
+  app.post('/api/me/health/delete-all', authed(async ({ tx, user, now }) => { await health.deleteAll(tx, user.userId, now); return health.mine(tx, user.userId, now); }));
+  app.put('/api/me/health/profile', authed(({ tx, user, now, req }) => health.updateProfile(tx, user.userId, body(req), now)));
+  app.post('/api/me/health/records', authed(({ tx, user, now, req }) => health.addMeasurement(tx, user.userId, body(req), now)));
+  app.put('/api/me/health/records/:recordId', authed(({ tx, user, now, req }) => health.updateMeasurement(tx, user.userId, recId(req), body(req), now)));
+  app.post('/api/me/health/records/:recordId/delete', authed(({ tx, user, now, req }) => health.deleteMeasurement(tx, user.userId, recId(req), now)));
+  app.post('/api/me/health/support', authed(({ tx, user, now, req }) => health.grantSupport(tx, user.userId, body(req), now)));
+  app.post('/api/me/health/support/:recordId/revoke', authed(({ tx, user, now, req }) => health.revokeSupport(tx, user.userId, recId(req), now)));
+  app.get('/api/me/health/support-to-me', authed(({ tx, user, now }) => health.supportGrantsToMe(tx, user.userId, now)));
+  app.get('/api/health/support-admins', authed(async ({ tx }) =>
+    (await tx.query(`SELECT u.user_id, u.display_name FROM platform_roles r JOIN users u USING (user_id) WHERE r.role = 'SUPER_ADMIN' AND u.status = 'ACTIVE' ORDER BY u.display_name`))
+      .rows.map((r) => ({ userId: Number(r.user_id), name: r.display_name }))));
   app.put('/api/me/profile', authed(({ tx, user, now, req }) => profile.updateOwnProfile(tx, user.userId, body(req) as never, now)));
   app.post('/api/me/photo', authed(async (c) => {
     const { file } = await form(c.req);

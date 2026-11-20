@@ -120,6 +120,20 @@ Defaults applied where nothing was said:
 | Record | Each reminder is recorded in the activity log and shown on the row ("Reminded 8:40 pm by …") so admins don't repeat each other. The app can't see whether the message was actually sent |
 | Later | Automatic WhatsApp (Meta WhatsApp Business API, ~₹0.12–0.15 per message, needs a Meta business account and number) can be added if wanted |
 
+## Health profile (Phase 7, 21 Nov 2026 - per the PRD's privacy rules)
+
+| Topic | Rule |
+|---|---|
+| Optional, consent first | Nothing is collected until the person agrees (consent v1, recorded). Taking part in a challenge never requires it |
+| What | Height, weight, BMI (calculated: kg ÷ m², shown as a screening number only), body fat %, waist, resting heart rate; fitness level, activity level, goals, targets, health considerations |
+| History | Every entry is dated and kept; new entries never overwrite old ones; the owner can correct or delete an entry. Progress chart per measure |
+| Visibility | Per field: Only me (default) / My challenge admins / My challenge members / Everyone in the app. Health considerations at most challenge admins. A public basic profile never makes health data public |
+| Roles | Challenge admins see only fields shared with admins (or wider), of people in their challenges. The finance-manager and Super Admin roles grant nothing |
+| Support access | Granted by the person to one Super Admin for 1, 4, 24 or 72 hours; can be stopped any time; every view is in the activity log |
+| Withdraw / delete | Withdrawing consent stops all sharing at once (records kept hidden, or erased if chosen); "Delete all" erases everything permanently |
+| Enforcement | In the database: row-level security lets the app's connection read only the signed-in person's health rows; other people's data only via one function that applies their sharing. Values never go into the activity log, notifications, posts or AI |
+| Person page | Tapping a name (leaderboard, community) shows what that person shares with you - basic fields per their visibility, health per their health sharing |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

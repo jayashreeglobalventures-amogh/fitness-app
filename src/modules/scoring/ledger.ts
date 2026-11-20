@@ -140,7 +140,7 @@ export async function leaderboard(db: Queryable, userId: number, challengeId: nu
     const eligible = !['DISQUALIFIED', 'REMOVED', 'WITHDRAWN'].includes(p.status) && s.adherencePct !== null && s.adherencePct >= cfg.prizes.qualificationAdherencePct;
     return { participantId: p.participantId, displayName: p.displayName, status: p.status, points: t ? Number(t.points) : 0, adherencePct: s.adherencePct,
       successfulDays: s.achieved, longestStreak: st.longestStreak, currentStreak: st.currentStreak, finalScoreOn: t?.last_change ?? null, eligible,
-      me: me.rows[0] ? Number(me.rows[0].participant_id) === p.participantId : false, photoFileId: p.photoFileId };
+      me: me.rows[0] ? Number(me.rows[0].participant_id) === p.participantId : false, photoFileId: p.photoFileId, userId: p.userId };
   });
   return {
     standings: rank(rows, cfg.leaderboard.ranking), ranking: cfg.leaderboard.ranking, qualificationAdherencePct: cfg.prizes.qualificationAdherencePct,

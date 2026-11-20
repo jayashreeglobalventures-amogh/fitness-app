@@ -148,7 +148,7 @@ function PostCard({ p, feed, challengeId, onChanged }: { p: Post; feed: Feed; ch
       <header className="row" style={{ gap: 10, flexWrap: 'nowrap', alignItems: 'center' }}>
         <Avatar fileId={p.author.photoFileId} name={p.author.displayName} size={36} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <b>{p.author.displayName}</b>{p.mine && <span className="muted small"> (you)</span>}
+          <button className="person-link" onClick={() => navigate(p.mine ? '/profile' : `/people/${p.author.userId}`)}><b>{p.author.displayName}</b></button>{p.mine && <span className="muted small"> (you)</span>}
           <div className="muted small">{time(p.createdAt)}{p.kind === 'ANNOUNCEMENT' && ' · 📣 Announcement'}{p.pinned && ' · 📌 Pinned'}</div>
         </div>
         <Menu p={p} feed={feed} onAction={setAction} onDelete={() => run(() => api.post(`/api/posts/${p.postId}/delete`))} onPin={() => run(() => api.post(`/api/posts/${p.postId}/pin`, { pinned: !p.pinned }))} />
@@ -250,7 +250,7 @@ function Comments({ postId, feed, challengeId, onCount }: { postId: number; feed
     <div key={c.commentId} className={`comment${reply ? ' reply' : ''}${c.status === 'REMOVED' ? ' removed' : ''}`}>
       <Avatar fileId={c.author.photoFileId} name={c.author.displayName} size={reply ? 24 : 28} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="bubble"><b className="small">{c.author.displayName}</b><div className="post-body small" style={{ margin: 0 }}>{c.body}</div></div>
+        <div className="bubble"><button className="person-link small" onClick={() => navigate(c.mine ? '/profile' : `/people/${c.author.userId}`)}><b>{c.author.displayName}</b></button><div className="post-body small" style={{ margin: 0 }}>{c.body}</div></div>
         {c.status === 'REMOVED' && <div className="muted small">Removed: {c.removedReason}</div>}
         {c.status === 'VISIBLE' && (
           <div className="row small muted" style={{ gap: 12 }}>

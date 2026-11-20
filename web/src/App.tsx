@@ -12,6 +12,8 @@ import { NotificationsPage, useNoticeCount } from './pages/Notifications';
 import { HandoverPage } from './pages/Handover';
 import { CommunityPage } from './pages/Community';
 import { ActivityLogPage } from './pages/ActivityLog';
+import { HealthPage } from './pages/Health';
+import { PersonPage } from './pages/Person';
 import { navigate, usePath } from './router';
 import { Avatar } from './ui';
 
@@ -84,6 +86,9 @@ function route(path: string, me: Me, refresh: () => void): ReactNode {
   if (ho) return <HandoverPage id={Number(ho[1])} />;
   if (path === '/profile') return <ProfilePage onChanged={refresh} />;
   if (path === '/profile/password') return <ChangePasswordPage onDone={() => navigate('/profile')} />;
+  if (path === '/profile/health') return <HealthPage />;
+  const pp = /^\/people\/(\d+)$/.exec(path);
+  if (pp) return <PersonPage userId={Number(pp[1])} />;
   if (path === '/admin/users' && me.canManageAccounts) return <AccountsPage me={me} />;
   if (path === '/admin/activity' && me.superAdmin) return <ActivityLogPage />;
   return <div className="empty"><h1>Not found</h1><button className="btn" onClick={() => navigate('/')}>Go home</button></div>;

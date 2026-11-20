@@ -48,7 +48,10 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
         {saved && <div className="alert ok">Saved.</div>}
         <div className="row"><button className="btn primary" onClick={save}>Save profile</button><button className="btn ghost" onClick={() => navigate('/profile/password')}>Change password</button></div>
       </div>
-      <div className="card"><h3>Health profile</h3><p className="muted small">Height, weight, BMI and other measurements are coming in a later update. They'll be optional, private by default, and only collected with your explicit consent.</p></div>
+      <div className="card clickable" role="link" tabIndex={0} onClick={() => navigate('/profile/health')} onKeyDown={(e) => { if (e.key === 'Enter') navigate('/profile/health'); }}>
+        <div className="spread"><h3 style={{ margin: 0 }}>Health profile</h3><span aria-hidden="true">›</span></div>
+        <p className="muted small" style={{ marginBottom: 0 }}>Optional: height, weight, BMI, waist, body fat, resting heart rate, goals - with progress charts. Private unless you choose to share.</p>
+      </div>
     </>
   );
 }

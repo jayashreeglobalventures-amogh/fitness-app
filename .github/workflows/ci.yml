@@ -1,0 +1,63 @@
+# CI: runs on every pull request and on pushes to main.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: TypeScript (server + web)
+        run: npm run typecheck
+      - name: Tests (unit + integration on embedded PostgreSQL 17)
+        run: npm test
+      - name: Production build (server + web)
+        run: npm run build
+
+  image:
+    # The production image must build and answer /healthz against a real PostgreSQL 17.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: fitness
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the app image (not pushed)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          push: false
+          load: true
+          tags: fitness-app:ci
+      - name: Migrate, start and health-check the image
+        run: |
+          docker run --rm --network host -e MIGRATE_DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/fitness fitness-app:ci node dist/src/db/migrate.js
+          docker run -d --name app --network host -e HOST=127.0.0.1 -e PORT=3000 -e DATABASE_URL=postgres://postgres:ci@127.0.0.1:5432/fitness \
+            -e PUBLIC_ORIGIN=https://fitness.example -e MEDIA_DIR=/media fitness-app:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:3000/healthz && break; sleep 1; done
+          curl -fsS http://127.0.0.1:3000/healthz | grep '"status":"ok"'
+          curl -fsS http://127.0.0.1:3000/ | grep -q '<div id="root">'
+          docker run --rm fitness-app:ci node dist/src/cli.js validate-config config/challenges/calamari-2026.json
+      - name: Logs on failure
+        if: failure()
+        run: docker logs app || true

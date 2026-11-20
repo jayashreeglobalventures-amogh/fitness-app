@@ -17,7 +17,8 @@
     "build:server": "tsc -p tsconfig.build.json && node -e \"require('fs').cpSync('src/db/migrations','dist/src/db/migrations',{recursive:true})\"",
     "build:web": "vite build --config web/vite.config.ts",
     "build": "npm run build:server && npm run build:web",
-    "start": "node dist/src/server.js"
+    "start": "node dist/src/server.js",
+    "dev:local": "tsx scripts/dev-local.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

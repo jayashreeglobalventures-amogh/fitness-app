@@ -21,6 +21,7 @@ import * as submissions from './modules/checkin/submissions.js';
 import { readerName } from './modules/verification/select.js';
 import * as bonus from './modules/scoring/bonus.js';
 import { breakdown, leaderboard } from './modules/scoring/ledger.js';
+import { myNotifications } from './modules/notifications/notifications.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -209,6 +210,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.get('/api/challenges/:challengeId/participants', authed((c) => roster.listParticipants(c.tx, c.user.userId, cid(c))));
   app.post('/api/participants/:participantId/status', authed((c) => roster.changeStatus(c.tx, c.user.userId, id((c.req.params as { participantId: string }).participantId), body(c.req) as never, c.now)));
   const iid = (c: Ctx) => id((c.req.params as { invitationId: string }).invitationId);
+  app.get('/api/me/notifications', authed(({ tx, user, now }) => myNotifications(tx, user.userId, now)));
   app.get('/api/me/invitations', authed(({ tx, user, now }) => roster.myInvitations(tx, user.userId, now)));
   app.post('/api/invitations/:invitationId/accept', authed((c) => roster.accept(c.tx, c.user.userId, iid(c), body(c.req) as never, c.now)));
   app.post('/api/invitations/:invitationId/decline', authed((c) => roster.decline(c.tx, c.user.userId, iid(c), c.now)));

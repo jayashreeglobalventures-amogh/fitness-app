@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { ChallengeConfig, ConfigCheck } from '../../../src/modules/challenges/config';
 import { api, type Me, type Phase } from '../api';
 import { navigate } from '../router';
-import { day, ErrorBox, Loading, PHASE_LABEL, useLoad, Warnings } from '../ui';
+import { day, ErrorBox, Loading, PHASE_LABEL, useLoad } from '../ui';
 import { AdminsSection } from './ChallengeAdmins';
 import { BonusSection } from './Bonus';
 import { LeaderboardSection } from './Leaderboard';
@@ -13,7 +13,8 @@ import { ReviewSection } from './Review';
 import { TeamSection } from './Team';
 import { RosterSection } from './Roster';
 import { RulesSummary } from './RulesSummary';
-import { SettingsSection } from './Settings';
+import { HeadsUp, SettingsSection } from './Settings';
+import { DemoSection } from './Demo';
 
 export interface ChallengeView {
   challengeId: number; slug: string; name: string; category: string; status: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'; timeZone: string;
@@ -42,6 +43,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
     { key: 'bonus', label: 'Bonus', show: (isParticipant || can('bonus.manage')) && live && v.current.config.scoring.weekendBonus.enabled },
     { key: 'exemptions', label: 'Exemptions', show: (isParticipant || can('exemptions.review')) && live && (v.current.config.exemptions.enabled || can('exemptions.review')) },
     { key: 'overview', label: 'Rules', show: true },
+    { key: 'demo', label: 'Demo', show: true },
     { key: 'settings', label: 'Settings', show: isAdmin },
     { key: 'roster', label: 'Roster', show: isAdmin },
     { key: 'admins', label: 'Admins', show: isAdmin },
@@ -67,6 +69,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       {active === 'team' && <TeamSection v={v} me={me} />}
       {active === 'review' && <ReviewSection v={v} />}
       {active === 'leaderboard' && <LeaderboardSection v={v} />}
+      {active === 'demo' && <DemoSection v={v} />}
       {active === 'bonus' && <BonusSection v={v} />}
       {active === 'exemptions' && <ExemptionsSection v={v} />}
       {active === 'overview' && <Overview v={v} invitationId={invitation?.invitationId ?? null} onChanged={() => { view.reload(); invites.reload(); }} />}
@@ -117,7 +120,7 @@ function AdminStatus({ v, onChanged }: { v: ChallengeView; onChanged: () => void
       </div>
       <ErrorBox error={error} />
       {v.check && !v.check.ok && <ErrorBox error={{ message: 'The settings have problems to fix before publishing:', details: { errors: v.check.errors } }} />}
-      <Warnings items={v.check?.warnings} />
+      <HeadsUp count={v.check?.warnings.length ?? 0} />
     </div>
   );
 }

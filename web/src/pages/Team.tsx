@@ -72,7 +72,7 @@ function Correction({ v, person, defaultDay, onDone }: { v: ChallengeView; perso
     <div className="card">
       <h3>Correction for {person.displayName}</h3>
       <p className="muted small">For evidence or rest days sent outside the app (e.g. on WhatsApp before the app was live). Use the ORIGINAL time it was sent. Evidence still goes through the normal check; everything is recorded in the audit log.</p>
-      <div className="subnav" style={{ margin: '0 0 12px' }}>
+      <div className="subnav inline" style={{ margin: '0 0 12px' }}>
         <button aria-current={kind === 'evidence'} onClick={() => setKind('evidence')}>Record evidence</button>
         <button aria-current={kind === 'rest'} onClick={() => setKind('rest')}>Record rest day</button>
       </div>

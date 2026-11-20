@@ -5,6 +5,7 @@ import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import type pg from 'pg';
 import { buildApp, COOKIE } from '../../src/app.js';
+import type { PushMessage, PushSender } from '../../src/modules/notifications/push.js';
 import type { Config } from '../../src/config.js';
 import { createPool, withTx } from '../../src/core/db.js';
 import type { ChallengeConfig } from '../../src/modules/challenges/config.js';
@@ -17,6 +18,9 @@ export const PASSWORD = 'correct-horse-battery';
 export interface Harness {
   /** Waits for background work (AI verification) started by requests so far. */
   settle(): Promise<void>;
+  /** Phone notifications "sent" through the fake sender. */
+  pushes: ({ endpoint: string } & PushMessage)[];
+  pushSender: PushSender;
   mediaDir: string;
   app: FastifyInstance;
   pool: pg.Pool;   // fit_app (as production)
@@ -65,8 +69,12 @@ export async function makeHarness(db: TestPg, startIso = '2026-11-20T06:00:00Z')
   const mediaDir = mkdtempSync(path.join(os.tmpdir(), 'fit-media-'));
   const config: Config = { databaseUrl: appUrl, host: '127.0.0.1', port: 0, publicOrigin: ORIGIN, mediaDir, cookieSecure: true, trustProxy: false, logLevel: 'silent' };
   const background: Promise<unknown>[] = [];
-  const app = await buildApp({ config, pool, now: () => current, logger: false, webDir: '/nonexistent', onBackground: (p) => background.push(p) });
+  const pushes: Harness['pushes'] = [];
+  // Fake Web Push: records what would be sent; an endpoint containing "gone" answers 410 (the phone removed the app).
+  const pushSender: PushSender = async (sub, msg) => { pushes.push({ endpoint: sub.endpoint, ...msg }); return sub.endpoint.includes('gone') ? 410 : 201; };
+  const app = await buildApp({ config, pool, now: () => current, logger: false, webDir: '/nonexistent', onBackground: (p) => background.push(p), pushSender });
   const h: Harness = {
+    pushes, pushSender,
     async settle() { while (background.length) await background.shift(); },
     mediaDir,
     app, pool, admin,

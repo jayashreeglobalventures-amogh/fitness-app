@@ -11,7 +11,7 @@ const pool = createPool(config.databaseUrl);
 const app = await buildApp({ config, pool });
 await app.listen({ host: config.host, port: config.port });
 const stopScheduler = process.env.FITNESS_SCHEDULER_ENABLED === 'true'
-  ? startScheduler(pool, config.mediaDir, (msg, err) => app.log.error({ err }, msg)) : () => undefined;
+  ? startScheduler(pool, config.mediaDir, (msg, err) => app.log.error({ err }, msg), { publicOrigin: config.publicOrigin }) : () => undefined;
 app.log.info(`screenshot reading: ${readerName()}; scheduler: ${process.env.FITNESS_SCHEDULER_ENABLED === 'true' ? 'on' : 'off'}`);
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {

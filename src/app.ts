@@ -10,7 +10,10 @@ import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import type { Config } from './config.js';
+import { requestContext } from './core/audit.js';
 import { withTx } from './core/db.js';
+import * as activity from './modules/admin/activity.js';
+import * as push from './modules/notifications/push.js';
 import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
 import * as exemptions from './modules/checkin/exemptions.js';
@@ -45,6 +48,8 @@ export interface AppDeps {
   webDir?: string;
   /** Tests only: receives each background AI verification started after an upload. */
   onBackground?: (done: Promise<unknown>) => void;
+  /** Tests only: replaces the real Web Push sender. */
+  pushSender?: push.PushSender;
 }
 
 const SECURITY_HEADERS = {
@@ -71,7 +76,7 @@ const id = (v: unknown): number => {
 };
 const body = (req: FastifyRequest) => (req.body ?? {}) as Record<string, unknown>;
 
-export async function buildApp({ config, pool, now, logger, webDir, onBackground }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, pool, now, logger, webDir, onBackground, pushSender }: AppDeps): Promise<FastifyInstance> {
   const clock = now ?? (() => new Date());
   const app = Fastify({
     trustProxy: config.trustProxy,
@@ -110,20 +115,25 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
       return reply.code(e.statusCode ?? 400).send({ success: false, errorCode: 'VALIDATION', message: e.message ?? 'Invalid request.' });
     }
     req.log.error({ err }, 'unhandled error');
+    void activity.recordError(pool, { source: 'REQUEST', userId: (req as { fitUserId?: number }).fitUserId ?? null, method: req.method, path: req.url, err,
+      ip: req.ip || null, device: String(req.headers['user-agent'] ?? '') });
     return reply.code(500).send({ success: false, errorCode: 'SERVER_ERROR', message: 'An unexpected error occurred. Please try again.' });
   });
 
   const cookieOpts = { path: '/', httpOnly: true, secure: config.cookieSecure, sameSite: 'lax' as const, maxAge: users.SESSION_MAX_DAYS * 86_400 };
   const sessionUser = (req: FastifyRequest) => users.resolveSession(pool, req.cookies[COOKIE], clock());
+  /** Where a request came from, for the activity log (IP address and device/browser). */
+  const origin = (req: FastifyRequest) => ({ ip: req.ip || null, device: String(req.headers['user-agent'] ?? '').slice(0, 300) || null });
 
   /** Wraps a handler: session required, temp password must be changed first, one transaction, {success,data} reply. */
   const authed = (fn: (c: Ctx) => Promise<unknown>, opts: { allowTempPassword?: boolean } = {}) => async (req: FastifyRequest) => {
     const user = await sessionUser(req);
     if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
+    (req as { fitUserId?: number }).fitUserId = user.userId;
     if (user.mustChangePassword && !opts.allowTempPassword) throw new users.PasswordChangeRequired();
     const t = clock();
     const later: (() => Promise<unknown>)[] = [];
-    const data = await withTx(pool, (tx) => fn({ tx, user, now: t, req, after: (f) => later.push(f) }));
+    const data = await requestContext.run(origin(req), () => withTx(pool, (tx) => fn({ tx, user, now: t, req, after: (f) => later.push(f) })));
     for (const f of later) {
       const done = f().catch((e) => req.log.error({ err: e }, 'background work failed'));
       onBackground?.(done);
@@ -147,7 +157,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   // ---------- Auth ----------
   app.post('/api/auth/login', async (req, reply) => {
     const b = body(req);
-    const res = await users.login(pool, b.username, b.password, { ip: req.ip || null, userAgent: String(req.headers['user-agent'] ?? '') }, clock());
+    const res = await requestContext.run(origin(req), () => users.login(pool, b.username, b.password, { ip: req.ip || null, userAgent: String(req.headers['user-agent'] ?? '') }, clock()));
     if ('error' in res) {
       return reply.code(res.error === 'LOCKED' ? 429 : 401).send({ success: false, errorCode: res.error === 'LOCKED' ? 'LOCKED' : 'UNAUTHENTICATED',
         message: res.error === 'LOCKED' ? `Too many failed attempts. Try again in ${users.LOCKOUT_MINUTES} minutes.` : 'Incorrect username or password.' });
@@ -157,7 +167,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   });
 
   app.post('/api/auth/logout', async (req, reply) => {
-    await users.logout(pool, req.cookies[COOKIE], clock());
+    await requestContext.run(origin(req), () => users.logout(pool, req.cookies[COOKIE], clock()));
     reply.clearCookie(COOKIE, { path: '/' });
     return { success: true, data: null };
   });
@@ -223,6 +233,26 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   const iid = (c: Ctx) => id((c.req.params as { invitationId: string }).invitationId);
   app.get('/api/me/notifications', authed(({ tx, user, now }) => myNotifications(tx, user.userId, now)));
   app.post('/api/me/notifications/seen', authed(({ tx, user, now, req }) => markSeen(tx, user.userId, body(req).keys, now)));
+
+  // Phone notifications: on/off per person, one registration per phone.
+  const vapidSubject = config.publicOrigin.startsWith('https://') ? config.publicOrigin : 'https://fitness.amogh.systems';
+  app.get('/api/me/push', authed(async ({ tx, user }) => push.pushSettings(tx, user.userId, (await push.vapidKeys(tx, vapidSubject)).publicKey)));
+  app.post('/api/me/push/enable', authed(({ tx, user, now, req }) => push.enable(tx, user.userId, body(req).subscription as never, String(req.headers['user-agent'] ?? ''), now)));
+  app.post('/api/me/push/disable', authed(({ tx, user, now }) => push.disable(tx, user.userId, now)));
+  app.post('/api/me/push/test', authed(async ({ tx, user, now }) =>
+    push.sendTest(tx, pushSender ?? push.webPushSender(await push.vapidKeys(tx, vapidSubject)), user.userId, now)));
+
+  // Super Admin: activity log and server errors.
+  app.get('/api/admin/activity', authed(({ tx, user, req }) => activity.activity(tx, user.userId, req.query as activity.ActivityQuery)));
+  app.get('/api/admin/activity/facets', authed(({ tx, user }) => activity.facets(tx, user.userId)));
+  app.get('/api/admin/errors', authed(({ tx, user, req }) => activity.errors(tx, user.userId, (req.query as { before?: string }).before)));
+  app.get('/api/admin/activity.csv', async (req, reply) => {
+    const user = await sessionUser(req);
+    if (!user || user.mustChangePassword) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
+    const csv = await withTx(pool, (tx) => activity.activityCsv(tx, user.userId, req.query as activity.ActivityQuery));
+    const day = clock().toISOString().slice(0, 10);
+    return reply.header('content-type', 'text/csv; charset=utf-8').header('content-disposition', `attachment; filename="activity-log-${day}.csv"`).send(csv);
+  });
   app.get('/api/me/invitations', authed(({ tx, user, now }) => roster.myInvitations(tx, user.userId, now)));
   app.post('/api/invitations/:invitationId/accept', authed((c) => roster.accept(c.tx, c.user.userId, iid(c), body(c.req) as never, c.now)));
   app.post('/api/invitations/:invitationId/decline', authed((c) => roster.decline(c.tx, c.user.userId, iid(c), c.now)));

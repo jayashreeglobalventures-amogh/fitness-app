@@ -99,6 +99,17 @@ Defaults applied where nothing was said:
 | Reactions | 👍 ❤️ 🔥 👏 💪, tap again to take back |
 | Moderation | Challenge admins (not the finance manager) pin, remove with a recorded reason (audited), handle reports (remove or dismiss), and mute someone for 1–30 days (they can still read and react) |
 
+## Phone notifications and the activity log (owner, 21 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Phone notifications | Each person switches them on or off in Profile (off until they choose). On = this phone asks permission and registers; Off = stops on all their phones. iPhone: only for the app added to the Home Screen (iOS 16.4+) |
+| What is sent | Every new alert from the Alerts tab, once (alerts already there when switching on, or already read in the app, are not sent); more than 3 at once become one summary. Tapping opens the app on Alerts, signing in first if needed |
+| Privacy | The lock screen shows only the alert's title, never the details |
+| Activity log | Super Admins only (People → Activity log): every recorded action with who, what, when, which challenge, reason, before → after, IP address and device; filters, search, CSV download. Entries can't be edited or deleted |
+| Sign-ins | Successful, failed and locked-out sign-ins and sign-outs are recorded. For an unknown username nothing typed is kept |
+| Errors | Unexpected server errors and failed background work are recorded (person, page, device) and kept 180 days |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

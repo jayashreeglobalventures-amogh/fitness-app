@@ -51,11 +51,10 @@ describe('the finance manager: exactly one, changed only through a handover', ()
     await fm.post(`/api/payments/${p.body.data.paymentId}/decide`, { confirm: true });
   });
 
-  it('an admin starts a handover after seeing the checks; they can\'t appoint themselves; one at a time', async () => {
+  it('an admin starts a handover after seeing the checks; one at a time', async () => {
     const v = (await a1.get(`/api/challenges/${id}/finance-manager`)).body.data;
     expect(v).toMatchObject({ current: { username: 'oldfm' }, checks: { cashHeld: 1000, pendingPayments: 0, pendingRefunds: 0 }, pending: null, canChange: true });
     expect((await fm.post(`/api/challenges/${id}/finance-handovers`, { toUserId: newFm.userId, confirmHandedOver: true })).status).toBe(403); // not an admin
-    expect((await a1.post(`/api/challenges/${id}/finance-handovers`, { toUserId: a1.userId, confirmHandedOver: true })).status).toBe(403);
     expect((await a1.post(`/api/challenges/${id}/finance-handovers`, { toUserId: newFm.userId })).status).toBe(400); // must confirm the hand-over
     expect((await a1.post(`/api/challenges/${id}/finance-handovers`, { toUserId: newFm.userId, confirmHandedOver: true, note: 'Old FM travelling' })).status).toBe(200);
     expect((await a2.post(`/api/challenges/${id}/finance-handovers`, { toUserId: asha.userId, confirmHandedOver: true })).status).toBe(409);
@@ -89,5 +88,21 @@ describe('the finance manager: exactly one, changed only through a handover', ()
     expect((await a2.post(`/api/finance-handovers/${r.body.data.handoverId}/cancel`, { reason: 'Changed our mind' })).status).toBe(200);
     const { rows } = await h.admin.query(`SELECT action FROM audit_log WHERE challenge_id = $1 AND entity = 'FINANCE_HANDOVER' ORDER BY audit_id`, [id]);
     expect(rows.map((x) => x.action)).toEqual(['FINANCE_HANDOVER_STARTED', 'FINANCE_HANDOVER_ACCEPTED', 'FINANCE_HANDOVER_STARTED', 'FINANCE_HANDOVER_CANCELLED']);
+  });
+
+  it('an admin can also be the finance manager; their own money requests still need another admin', async () => {
+    const r = await a1.post(`/api/challenges/${id}/finance-handovers`, { toUserId: a1.userId, confirmHandedOver: true, note: 'Admin takes over the money' });
+    expect(r.status).toBe(200);
+    expect((await a1.post(`/api/finance-handovers/${r.body.data.handoverId}/accept`, { receivedAmount: 1000, accountsSettled: true })).status).toBe(200);
+    expect(await roles()).toEqual(['admin1:CHALLENGE_ADMIN', 'admin1:FINANCE_ADMIN', 'admin2:CHALLENGE_ADMIN']);
+    const pid = (await a1.get(`/api/challenges/${id}/participants`)).body.data.find((x: { username: string }) => x.username === 'asha').participantId;
+    // As finance manager they record a payment for Asha: they can't confirm it themselves; admin2 can.
+    const p = await a1.post(`/api/participants/${pid}/payments`, { periodNo: 2, amount: 1000, method: 'CASH', paidOn: '2026-11-20', reason: 'Cash handed over at the park' });
+    expect((await a1.post(`/api/payments/${p.body.data.paymentId}/decide`, { confirm: true })).status).toBe(403);
+    expect((await a2.post(`/api/payments/${p.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
+    // A refund they propose is approved by another admin, not by them.
+    const rf = await a1.post(`/api/participants/${pid}/refunds`, { amount: 100, reason: 'Overpaid by mistake' });
+    expect((await a1.post(`/api/refunds/${rf.body.data.refundId}/decide`, { approve: true })).status).toBe(403);
+    expect((await a2.post(`/api/refunds/${rf.body.data.refundId}/decide`, { approve: true })).status).toBe(200);
   });
 });

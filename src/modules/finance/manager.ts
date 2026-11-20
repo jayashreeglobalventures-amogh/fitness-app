@@ -5,6 +5,8 @@
 //   3. The role moves; the old payment details (UPI ID / QR) are hidden from participants and the new manager is asked
 //      to enter theirs.
 // Everything is audited. When there is no finance manager yet, the same flow appoints the first one (amount ₹0).
+// An admin may also be the finance manager (owner, 21 Nov 2026); the two-person rule still applies to their own
+// money requests (payments they record, refunds they propose are approved by another admin).
 import { writeAudit } from '../../core/audit.js';
 import { lockChallenge, type Queryable } from '../../core/db.js';
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
@@ -54,7 +56,6 @@ export async function startHandover(db: Queryable, actorUserId: number, challeng
   const u = (await db.query(`SELECT status FROM users WHERE user_id = $1`, [toUserId])).rows[0];
   if (!u) throw notFound('User not found.');
   if (u.status !== 'ACTIVE') throw conflict('That account is disabled.');
-  if (toUserId === actorUserId) throw forbidden('An admin can\'t appoint themselves as finance manager; another admin must.');
   const cur = await current(db, challengeId);
   if (cur && Number(cur.user_id) === toUserId) throw conflict('That person is already the finance manager.');
   const open = await db.query(`SELECT 1 FROM finance_handovers WHERE challenge_id = $1 AND status = 'PENDING'`, [challengeId]);

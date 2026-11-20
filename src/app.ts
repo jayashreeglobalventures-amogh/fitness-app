@@ -132,7 +132,8 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     if (config.backupStatusFile) {
       try { const [status, at] = readFileSync(config.backupStatusFile, 'utf8').trim().split(/\s+/); backup = { status: status ?? 'unknown', at }; } catch { backup = { status: 'none' }; }
     }
-    return { status: 'ok', database: 'ok', migrations: mig ? mig.n : null, backup };
+    return { status: 'ok', database: 'ok', migrations: mig ? mig.n : null, backup,
+      screenshotReading: process.env.ANTHROPIC_API_KEY ? 'on' : 'off', scheduler: process.env.FITNESS_SCHEDULER_ENABLED === 'true' ? 'on' : 'off' };
   });
 
   // ---------- Auth ----------

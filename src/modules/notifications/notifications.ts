@@ -68,6 +68,21 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       for (const v of votes.rows) out.push({ id: `vote:${v.request_id}`, kind: 'action', title: `${c.name}: vote on ${v.display_name}'s exemption`, body: 'Your vote is needed before voting closes.', link: `/challenges/${cid}/exemptions`, challengeId: cid });
     }
 
+    // Community: new announcements (last 7 days) and comments on my posts (last 7 days), for members.
+    if (c.participant_id || isSuper) {
+      const ann = await db.query(
+        `SELECT p.post_id, left(p.body, 120) AS body, u.display_name FROM posts p JOIN users u ON u.user_id = p.author_user_id
+          WHERE p.challenge_id = $1 AND p.kind = 'ANNOUNCEMENT' AND p.status = 'VISIBLE' AND p.created_at > $2::timestamptz - interval '7 days' AND p.author_user_id <> $3
+          ORDER BY p.post_id DESC LIMIT 5`, [cid, now, userId]);
+      for (const a of ann.rows) out.push({ id: `ann:${a.post_id}`, kind: 'info', title: `${c.name}: announcement from ${a.display_name}`, body: a.body, link: `/community/${cid}`, challengeId: cid });
+    }
+    {
+      const { rows: [cm] } = await db.query(
+        `SELECT count(*)::int AS n FROM comments k JOIN posts p USING (post_id)
+          WHERE p.challenge_id = $1 AND p.author_user_id = $2 AND k.author_user_id <> $2 AND k.status = 'VISIBLE' AND k.created_at > $3::timestamptz - interval '7 days'`, [cid, userId, now]);
+      if (cm.n) out.push({ id: `comments:${cid}`, kind: 'info', title: `${c.name}: comments on your posts`, body: `${cm.n} in the last week.`, link: `/community/${cid}`, challengeId: cid, count: cm.n });
+    }
+
     // As a participant: contributions due or overdue (money only; it never affects points).
     if (c.participant_id && c.status === 'PUBLISHED') {
       const cfg = (await latestVersion(db, cid)).config;
@@ -130,6 +145,10 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     if (can('settlement.approve')) {
       const { rows: [d] } = await db.query(`SELECT settlement_id FROM settlements WHERE challenge_id = $1 AND status = 'DRAFT'`, [cid]);
       if (d) out.push({ id: `settle:${d.settlement_id}`, kind: 'action', title: `${c.name}: final results waiting for approval`, body: 'Check the recommendation and approve it.', link: `/challenges/${cid}/results`, challengeId: cid });
+    }
+    if (can('community.moderate')) {
+      const { rows: [r] } = await db.query(`SELECT count(*)::int AS n FROM community_reports WHERE challenge_id = $1 AND status = 'OPEN'`, [cid]);
+      if (r.n) out.push({ id: `reports:${cid}`, kind: 'action', title: `${c.name}: community reports to look at`, body: `${r.n} open.`, link: `/community/${cid}`, challengeId: cid, count: r.n });
     }
     if (w.bonuses && can('bonus.manage')) out.push({ id: `bonus:${cid}`, kind: 'action', title: `${c.name}: weekend bonuses to approve`, body: `${w.bonuses} waiting.`, link: `/challenges/${cid}/bonus`, challengeId: cid, count: w.bonuses });
   }

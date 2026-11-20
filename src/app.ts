@@ -25,6 +25,7 @@ import { markSeen, myNotifications } from './modules/notifications/notifications
 import * as finance from './modules/finance/finance.js';
 import * as settlement from './modules/settlement/settlement.js';
 import * as manager from './modules/finance/manager.js';
+import * as community from './modules/community/community.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -346,6 +347,29 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.get('/api/finance-handovers/:handoverId', authed((c) => manager.handoverForMe(c.tx, c.user.userId, hid(c))));
   app.post('/api/finance-handovers/:handoverId/accept', authed((c) => manager.acceptHandover(c.tx, c.user.userId, hid(c), body(c.req) as never, c.now)));
   app.post('/api/finance-handovers/:handoverId/cancel', authed((c) => manager.cancelHandover(c.tx, c.user.userId, hid(c), body(c.req).reason, c.now)));
+
+  // ---------- Community ----------
+  const postId = (c: Ctx) => id((c.req.params as { postId: string }).postId);
+  app.get('/api/challenges/:challengeId/feed', authed((c) => community.feed(c.tx, c.user.userId, cid(c), (c.req.query as { before?: string }).before, c.now)));
+  app.post('/api/challenges/:challengeId/posts', authed(async (c) => {
+    const { fields, file } = c.req.isMultipart() ? await form(c.req) : { fields: body(c.req) as Record<string, string>, file: null };
+    return community.createPost(c.tx, config.mediaDir, c.user.userId, cid(c), { kind: fields.kind, body: fields.body, eventId: fields.eventId, photo: file }, c.now);
+  }));
+  app.get('/api/challenges/:challengeId/my-achievements', authed((c) => community.myAchievements(c.tx, c.user.userId, cid(c))));
+  app.get('/api/challenges/:challengeId/community-reports', authed((c) => community.reports(c.tx, c.user.userId, cid(c))));
+  app.post('/api/challenges/:challengeId/community-mutes', authed((c) => community.mute(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
+  app.post('/api/posts/:postId/delete', authed((c) => community.deletePost(c.tx, c.user.userId, postId(c), c.now)));
+  app.post('/api/posts/:postId/react', authed((c) => community.react(c.tx, c.user.userId, postId(c), body(c.req).emoji, c.now)));
+  app.get('/api/posts/:postId/comments', authed((c) => community.comments(c.tx, c.user.userId, postId(c))));
+  app.post('/api/posts/:postId/comments', authed((c) => community.addComment(c.tx, c.user.userId, postId(c), body(c.req) as never, c.now)));
+  app.post('/api/posts/:postId/pin', authed((c) => community.pin(c.tx, c.user.userId, postId(c), body(c.req).pinned !== false, c.now)));
+  app.post('/api/posts/:postId/report', authed((c) => community.report(c.tx, c.user.userId, { postId: postId(c) }, body(c.req).reason, c.now)));
+  app.post('/api/posts/:postId/remove', authed((c) => community.remove(c.tx, c.user.userId, { postId: postId(c) }, body(c.req).reason, c.now)));
+  const comId = (c: Ctx) => id((c.req.params as { commentId: string }).commentId);
+  app.post('/api/comments/:commentId/delete', authed((c) => community.deleteComment(c.tx, c.user.userId, comId(c))));
+  app.post('/api/comments/:commentId/report', authed((c) => community.report(c.tx, c.user.userId, { commentId: comId(c) }, body(c.req).reason, c.now)));
+  app.post('/api/comments/:commentId/remove', authed((c) => community.remove(c.tx, c.user.userId, { commentId: comId(c) }, body(c.req).reason, c.now)));
+  app.post('/api/community-reports/:reportId/dismiss', authed((c) => community.dismissReport(c.tx, c.user.userId, id((c.req.params as { reportId: string }).reportId), body(c.req).note, c.now)));
 
   // ---------- Results / settlement ----------
   const sett = (c: Ctx) => id((c.req.params as { settlementId: string }).settlementId);

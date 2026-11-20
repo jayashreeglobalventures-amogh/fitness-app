@@ -129,6 +129,11 @@
     "topThreeIneligible": "NEXT_ELIGIBLE",
     "payoutDate": "2027-01-01"
   },
+  "community": {
+    "enabled": true,
+    "participantsCanPost": true,
+    "photos": true
+  },
   "leaderboard": {
     "ranking": [
       "POINTS",

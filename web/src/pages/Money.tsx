@@ -10,7 +10,7 @@ interface Week { periodNo: number; startsOn: string; endsOn: string; dueOn: stri
 interface Payment { paymentId: number; periodNo: number; amount: number; method: string; utr: string | null; paidOn: string; status: string; decisionReason: string | null; proofFileId: number | null }
 interface Pools { prizePool: number; yearEndPool: number; collected: number; stillOwed: number; refundsDue: number; inFinePools: number; prizesDue: number }
 interface MyMoney { weeks: Week[]; owed: number; refundDue: number; payments: Payment[]; pools: Pools; today: string }
-interface Settings { upiId: string | null; payeeName: string | null; qrFileId: number | null; canEdit: boolean }
+interface Settings { upiId: string | null; payeeName: string | null; qrFileId: number | null; canEdit: boolean; needsUpdate: boolean }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 const STATUS: Record<string, { label: string; tone: string }> = {
@@ -23,7 +23,7 @@ const Badge = ({ s }: { s: string }) => <span className={`badge ${STATUS[s]?.ton
 export function MoneySection({ v }: { v: ChallengeView }) {
   const can = (p: string) => v.myPermissions.includes(p);
   const isParticipant = !!v.participantStatus;
-  const isFinance = can('finance.view');
+  const isFinance = can('finance.view') || can('refunds.approve');
   const [view, setView] = useState<'mine' | 'finance'>(isFinance ? 'finance' : 'mine');
   return (
     <>
@@ -99,7 +99,7 @@ function PayNow({ v, week, onReported }: { v: ChallengeView; week: Week; onRepor
   return (
     <div className="card today">
       <div className="spread"><h3>Week {week.periodNo}: {inr(amount)} {week.status === 'OVERDUE' ? 'overdue' : week.status === 'UPCOMING' ? `due ${day(week.dueOn)}` : 'due'}</h3><Badge s={week.status} /></div>
-      {!upi && !s.data.qrFileId ? <p className="muted">The Finance Admin hasn't added payment details yet.</p> : (
+      {!upi && !s.data.qrFileId ? <p className="muted">{s.data.needsUpdate ? 'A new finance manager is taking over: their payment details will appear here soon. Please don\'t pay the previous details.' : 'The Finance Admin hasn\'t added payment details yet.'}</p> : (
         <div className="grid2" style={{ alignItems: 'center' }}>
           {s.data.qrFileId && <img src={`/api/files/${s.data.qrFileId}`} alt="UPI QR code" style={{ width: '100%', maxWidth: 240, borderRadius: 12, background: '#fff', padding: 8 }} />}
           <div className="stack">
@@ -154,8 +154,9 @@ function PaymentDetails({ v, onSaved }: { v: ChallengeView; onSaved?: () => void
     try { await upload(`/api/challenges/${v.challengeId}/payment-settings`, cur, file); setSaved(true); setFile(null); s.reload(); onSaved?.(); } catch (e) { setError(e); }
   };
   return (
-    <details className="card" open={!s.data.upiId && !s.data.qrFileId}>
+    <details className="card" open={(!s.data.upiId && !s.data.qrFileId) || (s.data.needsUpdate && s.data.canEdit)}>
       <summary>Payment details (UPI ID and QR)</summary>
+      {s.data.needsUpdate && <div className="alert warn">{s.data.canEdit ? 'You are the new finance manager: enter your own UPI ID and QR. Until you save, participants see no payment details.' : 'Hidden from participants until the new finance manager enters theirs.'}</div>}
       {s.data.qrFileId && <img src={`/api/files/${s.data.qrFileId}`} alt="Current UPI QR code" style={{ width: 160, borderRadius: 12, background: '#fff', padding: 6, marginBottom: 10 }} />}
       {s.data.canEdit ? (<>
         <ErrorBox error={error} />
@@ -176,9 +177,9 @@ function PaymentDetails({ v, onSaved }: { v: ChallengeView; onSaved?: () => void
 interface Overview {
   pools: Pools; checks: { name: string; ok: boolean }[]; today: string; periods: { periodNo: number; startsOn: string; endsOn: string }[];
   participants: { participantId: number; displayName: string; status: string; owed: number; refundDue: number; paid: number; fines: number; overdueWeeks: number[]; checking: number[] }[];
-  payments: (Payment & { participantId: number; displayName: string; mine: boolean; note: string | null })[];
+  payments: (Payment & { participantId: number; displayName: string; mine: boolean; note: string | null; recordedByAdmin: boolean; recordedByMe: boolean })[];
   refunds: { refundId: number; participantId: number; displayName: string; amount: number; reason: string; status: string; proposedBy: number; decisionReason: string | null }[];
-  canConfirm: boolean; canProposeRefund: boolean; canApproveRefund: boolean;
+  canConfirm: boolean; canCountersign: boolean; canProposeRefund: boolean; canApproveRefund: boolean;
 }
 
 function FinanceView({ v }: { v: ChallengeView }) {
@@ -217,7 +218,8 @@ function FinanceView({ v }: { v: ChallengeView }) {
           <div className="spread"><b>{p.displayName} · week {p.periodNo} · {inr(p.amount)}</b><Badge s={p.status} /></div>
           <p className="small" style={{ margin: '6px 0' }}>{p.method === 'UPI' ? <>UTR <b style={{ userSelect: 'all' }}>{p.utr}</b></> : p.method.toLowerCase()} · paid {day(p.paidOn)}{p.note ? ` · ${p.note}` : ''}
             {p.proofFileId && <> · <a href={`/api/files/${p.proofFileId}`} target="_blank" rel="noreferrer">screenshot</a></>}</p>
-          {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : d.canConfirm && (
+          {p.recordedByAdmin && <p className="small"><span className="badge info">recorded by an admin</span> needs a second admin to confirm</p>}
+          {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : p.recordedByMe ? <p className="muted small">You recorded this: another admin must confirm it.</p> : (p.recordedByAdmin ? d.canCountersign : d.canConfirm) && (
             <div className="row">
               <button className="btn small primary" onClick={() => run(() => api.post(`/api/payments/${p.paymentId}/decide`, { confirm: true }))}>Confirm received</button>
               <button className="btn small danger" disabled={reason.trim().length < 5} onClick={() => run(() => api.post(`/api/payments/${p.paymentId}/decide`, { confirm: false, reason }))}>Not received</button>
@@ -255,7 +257,7 @@ function FinanceView({ v }: { v: ChallengeView }) {
                 <button className="btn small danger" disabled={reason.trim().length < 5} onClick={() => run(() => api.post(`/api/refunds/${r.refundId}/decide`, { approve: false, reason }))}>Reject (uses the reason above)</button>
               </div>
             )}
-            {r.status === 'PROPOSED' && !d.canApproveRefund && <p className="muted small">Waiting for a Super Admin to approve.</p>}
+            {r.status === 'PROPOSED' && !d.canApproveRefund && <p className="muted small">Waiting for another admin to approve.</p>}
           </div>
         ))}
       </>)}
@@ -305,7 +307,7 @@ function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: '
           <Field label="Reason (the admin decision)"><input type="text" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="e.g. withdrew on medical grounds" /></Field>
         </div>
       )}
-      <p className="muted small">{act.kind === 'record' ? 'It still needs confirming (by you or another Finance Admin) before it counts.' : 'A Super Admin (not you) must approve it before it is owed.'}</p>
+      <p className="muted small">{act.kind === 'record' ? 'Another admin must confirm it before it counts (two-person rule).' : 'Another admin (not you) must approve it before it is owed.'}</p>
       <button className="btn primary" onClick={send}>{act.kind === 'record' ? 'Record' : 'Propose refund'}</button>
     </div>
   );

@@ -25,22 +25,27 @@ export function useNoticeCount(path: string, enabled: boolean): number {
 
 export function NotificationsPage() {
   const l = useLoad(() => api.get<Notice[]>('/api/me/notifications'), []);
-  // Opening the page marks everything listed as seen; the "New" tags stay until the next visit.
-  useEffect(() => {
-    const unseen = (l.data ?? []).filter((n) => !n.seen).map((n) => n.seenKey);
-    if (!unseen.length) return;
-    api.post('/api/me/notifications/seen', { keys: unseen }).then(() => window.dispatchEvent(new Event('fit:notices-seen')), () => undefined);
-  }, [l.data]);
+  // A notification counts as read when you open it (or with "Mark all as read").
+  const markSeen = async (keys: string[]) => {
+    if (!keys.length) return;
+    await api.post('/api/me/notifications/seen', { keys }).catch(() => undefined);
+    window.dispatchEvent(new Event('fit:notices-seen'));
+  };
+  const open = async (n: Notice) => { if (!n.seen) await markSeen([n.seenKey]); navigate(n.link); };
+  const unseen = (l.data ?? []).filter((n) => !n.seen);
   if (l.loading && !l.data) return <Loading />;
   return (
     <>
       <button className="btn ghost small" onClick={() => goBack('/')}>← {previousPath()?.includes('/settings') ? 'Back to settings' : 'Back'}</button>
-      <h1 style={{ marginTop: 8 }}>Notifications</h1>
+      <div className="spread" style={{ marginTop: 8 }}>
+        <h1>Notifications</h1>
+        {unseen.length > 0 && <button className="btn small ghost" onClick={() => void markSeen(unseen.map((n) => n.seenKey)).then(l.reload)}>Mark all as read ({unseen.length})</button>}
+      </div>
       <ErrorBox error={l.error} />
       {l.data?.length === 0 && <div className="card empty">You're all caught up. ✅</div>}
-      {(l.data?.length ?? 0) > 0 && <p className="muted small">Items stay here until they're dealt with; the badge only counts new ones.</p>}
+      {(l.data?.length ?? 0) > 0 && <p className="muted small">Opening a notification marks it as read. Items stay here until they're dealt with; the badge counts unread ones.</p>}
       {l.data?.map((n) => (
-        <div key={n.id} className="card clickable" style={n.seen ? { opacity: 0.8 } : undefined} onClick={() => navigate(n.link)}>
+        <div key={n.id} className="card clickable" style={n.seen ? { opacity: 0.8 } : { borderColor: 'var(--info)' }} onClick={() => void open(n)}>
           <div className="spread">
             <b><span className={`badge ${TONE[n.kind]}`} style={{ marginRight: 8 }}>{ICON[n.kind]}</span>{n.title}</b>
             <span className="row" style={{ gap: 6 }}>{!n.seen && <span className="badge info">New</span>}{n.count ? <span className="badge warn">{n.count}</span> : null}</span>

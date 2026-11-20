@@ -79,6 +79,15 @@ Defaults applied where nothing was said:
 | Approval | Super Admin only; only when every blocking check passes and nothing changed since the draft; then frozen |
 | Corrections after approval | A new version with a reason; replaces the old one when approved; money already paid is never paid twice |
 
+## Admins and the finance manager - owner rulings (21 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Challenge admins | Any admin (or Super Admin) can make other users admins - **no limit**. A challenge needs **at least 2** to be published and can't drop below 2, so nothing depends on one person |
+| Two-person rule | A payment recorded by an admin on someone's behalf is confirmed by a **different** admin; a refund is approved by an admin other than the one who proposed it |
+| Finance manager | **Exactly one** per challenge. The first is appointed directly; changing it is a **handover** started by an admin (checks: money held, payment reports and refunds still waiting; the admin confirms the money is being handed over). The **new manager confirms the exact amount received and that the accounts are settled**; only then does the role move. The old UPI ID / QR are hidden from participants until the new manager enters theirs |
+| Self-appointment | An admin can't appoint themselves as finance manager |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

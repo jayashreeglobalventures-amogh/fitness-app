@@ -25,6 +25,8 @@ export interface Harness {
   now(): Date;
   /** Creates a user whose password is already set (no forced change); returns a signed-in client. */
   user(username: string, opts?: { superAdmin?: boolean }): Promise<Client>;
+  /** Adds challenge admins until the challenge has `n` (needed before publishing: at least 2). */
+  ensureAdmins(by: Client, challengeId: number, n?: number): Promise<Client[]>;
   close(): Promise<void>;
 }
 
@@ -79,6 +81,17 @@ export async function makeHarness(db: TestPg, startIso = '2026-11-20T06:00:00Z')
       // Set a known password through the real code path.
       await pool.query(`UPDATE users SET password_hash = $2 WHERE user_id = $1`, [u.userId, await hashPassword(PASSWORD)]);
       return client(app, username, u.userId, await login(app, username, PASSWORD));
+    },
+    async ensureAdmins(by, challengeId, n = 2) {
+      const { rows } = await admin.query(`SELECT count(*)::int AS k FROM challenge_roles WHERE challenge_id = $1 AND role = 'CHALLENGE_ADMIN'`, [challengeId]);
+      const made: Client[] = [];
+      for (let i = rows[0].k; i < n; i++) {
+        const c = await h.user(`helper-admin-${challengeId}-${i}-${Math.random().toString(36).slice(2, 7)}`);
+        const r = await by.post(`/api/challenges/${challengeId}/roles`, { userId: c.userId, role: 'CHALLENGE_ADMIN' });
+        if (r.status !== 200) throw new Error(`could not add admin: ${JSON.stringify(r.body)}`);
+        made.push(c);
+      }
+      return made;
     },
     async close() { await app.close(); await pool.end(); await admin.end(); },
   };

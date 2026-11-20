@@ -24,6 +24,7 @@ import { breakdown, leaderboard } from './modules/scoring/ledger.js';
 import { markSeen, myNotifications } from './modules/notifications/notifications.js';
 import * as finance from './modules/finance/finance.js';
 import * as settlement from './modules/settlement/settlement.js';
+import * as manager from './modules/finance/manager.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -337,6 +338,14 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/payments/:paymentId/withdraw', authed((c) => finance.withdrawPayment(c.tx, c.user.userId, payId(c), c.now)));
   app.post('/api/participants/:participantId/refunds', authed((c) => finance.proposeRefund(c.tx, c.user.userId, pid(c), body(c.req) as never, c.now)));
   app.post('/api/refunds/:refundId/decide', authed((c) => finance.decideRefund(c.tx, c.user.userId, id((c.req.params as { refundId: string }).refundId), body(c.req) as never, c.now)));
+
+  // ---------- Finance manager handover ----------
+  const hid = (c: Ctx) => id((c.req.params as { handoverId: string }).handoverId);
+  app.get('/api/challenges/:challengeId/finance-manager', authed((c) => manager.financeManagerView(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/challenges/:challengeId/finance-handovers', authed((c) => manager.startHandover(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
+  app.get('/api/finance-handovers/:handoverId', authed((c) => manager.handoverForMe(c.tx, c.user.userId, hid(c))));
+  app.post('/api/finance-handovers/:handoverId/accept', authed((c) => manager.acceptHandover(c.tx, c.user.userId, hid(c), body(c.req) as never, c.now)));
+  app.post('/api/finance-handovers/:handoverId/cancel', authed((c) => manager.cancelHandover(c.tx, c.user.userId, hid(c), body(c.req).reason, c.now)));
 
   // ---------- Results / settlement ----------
   const sett = (c: Ctx) => id((c.req.params as { settlementId: string }).settlementId);

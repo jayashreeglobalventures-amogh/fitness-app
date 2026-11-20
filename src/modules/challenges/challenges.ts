@@ -146,6 +146,7 @@ export async function publish(db: Queryable, actorUserId: number, challengeId: n
   const ch = await getChallenge(db, challengeId, true);
   requirePermission(await accessFor(db, actorUserId, challengeId), 'challenge.publish');
   if (ch.status !== 'DRAFT') throw conflict('Only a draft can be published.');
+  if ((await countAdmins(db, challengeId)) < MIN_CHALLENGE_ADMINS) throw conflict(`Add at least ${MIN_CHALLENGE_ADMINS} challenge admins (Admins tab) before publishing, so it never depends on one person.`);
   const cur = await latestVersion(db, challengeId);
   const check = validateConfig(cur.config);
   if (!check.ok) invalid(check.errors);
@@ -173,20 +174,41 @@ export async function duplicate(db: Queryable, actorUserId: number, challengeId:
   return createChallenge(db, actorUserId, slug, config, now, challengeId);
 }
 
+export const MIN_CHALLENGE_ADMINS = 2;
+const countAdmins = async (db: Queryable, challengeId: number) =>
+  Number((await db.query(`SELECT count(*)::int AS n FROM challenge_roles WHERE challenge_id = $1 AND role = 'CHALLENGE_ADMIN'`, [challengeId])).rows[0].n);
+
+/**
+ * Challenge admins: any admin (or Super Admin) can add more - no limit - and remove one, but a published challenge
+ * never drops below two (no dependency on one person). The finance manager: one per challenge; assigned directly only
+ * when there is none - changing it is a handover (finance/manager.ts).
+ */
 export async function setRole(db: Queryable, actorUserId: number, challengeId: number, userId: number, roleRaw: unknown, grant: boolean, now: Date): Promise<void> {
-  await getChallenge(db, challengeId);
-  requirePermission(await accessFor(db, actorUserId, challengeId), 'challenge.roles.manage');
+  await lockChallenge(db, challengeId);
+  const ch = await getChallenge(db, challengeId);
+  const access = await accessFor(db, actorUserId, challengeId);
   const role = String(roleRaw ?? '');
   if (role !== 'CHALLENGE_ADMIN' && role !== 'FINANCE_ADMIN') throw validation('Role must be CHALLENGE_ADMIN or FINANCE_ADMIN.');
+  requirePermission(access, role === 'FINANCE_ADMIN' ? 'finance.manager.assign' : 'challenge.roles.manage');
   const u = await db.query(`SELECT status FROM users WHERE user_id = $1`, [userId]);
   if (!u.rows[0]) throw notFound('User not found.');
+  if (grant && u.rows[0].status !== 'ACTIVE') throw conflict('That account is disabled.');
+  if (role === 'FINANCE_ADMIN') {
+    if (!grant) throw conflict('The finance manager can only be replaced through a handover (Admins → Change finance manager).');
+    const cur = await db.query(`SELECT user_id FROM challenge_roles WHERE challenge_id = $1 AND role = 'FINANCE_ADMIN'`, [challengeId]);
+    if (cur.rows[0] && Number(cur.rows[0].user_id) !== userId) throw conflict('This challenge already has a finance manager. Use "Change finance manager" (a handover with checks).');
+  }
   if (grant) {
     const r = await db.query(`INSERT INTO challenge_roles (challenge_id, user_id, role, granted_by, granted_at) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
       [challengeId, userId, role, actorUserId, now]);
     if (!r.rowCount) return;
   } else {
-    const r = await db.query(`DELETE FROM challenge_roles WHERE challenge_id = $1 AND user_id = $2 AND role = $3`, [challengeId, userId, role]);
-    if (!r.rowCount) return;
+    const has = await db.query(`SELECT 1 FROM challenge_roles WHERE challenge_id = $1 AND user_id = $2 AND role = $3`, [challengeId, userId, role]);
+    if (!has.rows[0]) return;
+    if (ch.status === 'PUBLISHED' && (await countAdmins(db, challengeId)) <= MIN_CHALLENGE_ADMINS) {
+      throw conflict(`A challenge needs at least ${MIN_CHALLENGE_ADMINS} admins. Add another admin before removing this one.`);
+    }
+    await db.query(`DELETE FROM challenge_roles WHERE challenge_id = $1 AND user_id = $2 AND role = $3`, [challengeId, userId, role]);
   }
   await writeAudit(db, now, { actorUserId, challengeId, action: grant ? 'CHALLENGE_ROLE_GRANTED' : 'CHALLENGE_ROLE_REVOKED', entity: 'USER', entityId: userId, after: { role } });
 }

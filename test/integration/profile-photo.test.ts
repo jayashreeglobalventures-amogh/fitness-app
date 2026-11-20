@@ -12,7 +12,7 @@ beforeAll(async () => {
   sa = await h.user('super', { superAdmin: true });
   [asha, ben, stranger] = [await h.user('asha'), await h.user('ben'), await h.user('stranger')];
   const id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).body.data.challengeId;
-  await sa.post(`/api/challenges/${id}/publish`);
+  await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
   for (const c of [asha, ben]) {
     const r = await sa.post(`/api/challenges/${id}/invitations`, { userIds: [c.userId] });
     await c.post(`/api/invitations/${r.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true });

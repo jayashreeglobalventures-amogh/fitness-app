@@ -29,7 +29,7 @@ beforeAll(async () => {
   id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).body.data.challengeId;
   await sa.post(`/api/challenges/${id}/roles`, { userId: ca.userId, role: 'CHALLENGE_ADMIN' });
   await sa.post(`/api/challenges/${id}/roles`, { userId: fa.userId, role: 'FINANCE_ADMIN' });
-  await sa.post(`/api/challenges/${id}/publish`);
+  await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);
   // Everyone joins before the start, including the Challenge Admin (an admin may also take part).
   for (const c of [priya, rahul, sita, meera, ca]) {
     const r = await sa.post(`/api/challenges/${id}/invitations`, { userIds: [c.userId] });

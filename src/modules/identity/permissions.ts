@@ -2,7 +2,8 @@
 // Notable rules encoded here (and unit-tested):
 //  - Nobody gets health-data access from a role: not Finance Admin, not Challenge Admin, not even Super Admin.
 //    Health access only comes from the participant's own explicit grant (later phase).
-//  - Challenge Admin cannot change financial allocations or approve final settlement.
+//  - Challenge Admin cannot change financial allocations or approve final settlement; challenge admins can appoint
+//    each other (at least 2 per challenge) and approve each other's money requests (never their own).
 //  - Finance Admin cannot approve final settlement.
 //  - Being an admin never gives scoring or exemption benefits: those are participant actions, checked separately,
 //    and the conflict-of-interest rule (no reviewing your own items) is enforced in the services.
@@ -31,6 +32,9 @@ export const PERMISSIONS = [
   'payouts.record',
   'settlement.approve',
   'audit.view',
+  'refunds.approve',           // approve a refund someone else proposed (two-person rule)
+  'payments.countersign',      // confirm a payment another admin recorded on someone's behalf (two-person rule)
+  'finance.manager.assign',    // appoint / change the challenge's finance manager (handover)
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
@@ -40,6 +44,9 @@ export type PlatformRole = 'SUPER_ADMIN';
 const CHALLENGE_ADMIN: Permission[] = [
   'challenge.view_admin', 'challenge.config.edit', 'roster.manage', 'submissions.review', 'exemptions.review',
   'restdays.correct', 'announcements.manage', 'bonus.manage', 'leaderboard.review', 'audit.view',
+  // Owner (21 Nov 2026): admins appoint other admins (no limit, at least 2), approve each other's money requests,
+  // and are the only ones who can change the finance manager.
+  'challenge.roles.manage', 'refunds.approve', 'payments.countersign', 'finance.manager.assign',
 ];
 const FINANCE_ADMIN: Permission[] = [
   'challenge.view_admin', 'finance.view', 'payments.verify', 'finance.reconcile', 'finance.settings', 'payouts.prepare', 'payouts.record', 'audit.view',

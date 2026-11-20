@@ -108,7 +108,11 @@ export async function paymentSettings(db: Queryable, userId: number, challengeId
   const inv = await db.query(`SELECT 1 FROM invitations WHERE challenge_id = $1 AND user_id = $2 AND status = 'INVITED'`, [challengeId, userId]);
   if (!access.permissions.has('challenge.view_admin') && !p && !inv.rows[0]) throw forbidden();
   const { rows: [s] } = await db.query(`SELECT * FROM payment_settings WHERE challenge_id = $1`, [challengeId]);
-  return { upiId: s?.upi_id ?? null, payeeName: s?.payee_name ?? null, qrFileId: s?.qr_file_id ? Number(s.qr_file_id) : null, canEdit: access.permissions.has('finance.settings') };
+  const canEdit = access.permissions.has('finance.settings');
+  // After a finance-manager handover the old details are hidden from participants until the new manager saves theirs.
+  const hidden = !!s?.needs_update && !canEdit;
+  return { upiId: hidden ? null : s?.upi_id ?? null, payeeName: hidden ? null : s?.payee_name ?? null, qrFileId: hidden || !s?.qr_file_id ? null : Number(s.qr_file_id),
+    canEdit, needsUpdate: !!s?.needs_update };
 }
 
 export async function setPaymentSettings(db: Queryable, mediaDir: string, actorUserId: number, challengeId: number, input: { upiId?: unknown; payeeName?: unknown; qr?: Buffer | null; removeQr?: unknown }, now: Date): Promise<void> {
@@ -126,7 +130,7 @@ export async function setPaymentSettings(db: Queryable, mediaDir: string, actorU
   } else if (input.removeQr === 'true' || input.removeQr === true) qrFileId = null;
   await db.query(
     `INSERT INTO payment_settings (challenge_id, upi_id, payee_name, qr_file_id, updated_by, updated_at) VALUES ($1,$2,$3,$4,$5,$6)
-     ON CONFLICT (challenge_id) DO UPDATE SET upi_id = EXCLUDED.upi_id, payee_name = EXCLUDED.payee_name, qr_file_id = EXCLUDED.qr_file_id, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at`,
+     ON CONFLICT (challenge_id) DO UPDATE SET upi_id = EXCLUDED.upi_id, payee_name = EXCLUDED.payee_name, qr_file_id = EXCLUDED.qr_file_id, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at, needs_update = false`,
     [challengeId, upiId, payeeName, qrFileId, actorUserId, now]);
   await writeAudit(db, now, { actorUserId, challengeId, action: 'PAYMENT_DETAILS_CHANGED', entity: 'CHALLENGE', entityId: challengeId,
     before: before ? { upiId: before.upi_id, payeeName: before.payee_name, qrFileId: before.qr_file_id } : null, after: { upiId, payeeName, qrFileId } });
@@ -205,9 +209,15 @@ export async function decidePayment(db: Queryable, actorUserId: number, paymentI
   if (!pay0) throw notFound('Payment not found.');
   await lockChallenge(db, Number(pay0.challenge_id));
   const pay = (await db.query(`SELECT * FROM payments WHERE payment_id = $1 FOR UPDATE`, [paymentId])).rows[0];
-  requirePermission(await accessFor(db, actorUserId, Number(pay.challenge_id)), 'payments.verify');
+  const access = await accessFor(db, actorUserId, Number(pay.challenge_id));
   const p = await participantById(db, Number(pay.participant_id));
   if (p.userId === actorUserId) throw forbidden('You can\'t confirm your own payment; another admin must do it.');
+  // Two-person rule: money an admin recorded on someone's behalf is confirmed by a different admin.
+  const recordedByAdmin = Number(pay.submitted_by) !== p.userId;
+  if (recordedByAdmin) {
+    if (Number(pay.submitted_by) === actorUserId) throw forbidden('You recorded this payment, so another admin must confirm it.');
+    if (!access.permissions.has('payments.verify') && !access.permissions.has('payments.countersign')) throw forbidden();
+  } else requirePermission(access, 'payments.verify');
   const confirm = input.confirm === true;
   const reason = String(input.reason ?? '').trim();
   const changing = pay.status === 'CONFIRMED' || pay.status === 'REJECTED';
@@ -253,8 +263,8 @@ export async function decideRefund(db: Queryable, actorUserId: number, refundId:
   if (!r0) throw notFound('Refund not found.');
   await lockChallenge(db, Number(r0.challenge_id));
   const r = (await db.query(`SELECT * FROM refund_proposals WHERE refund_id = $1 FOR UPDATE`, [refundId])).rows[0];
-  requirePermission(await accessFor(db, actorUserId, Number(r.challenge_id)), 'settlement.approve');
-  if (Number(r.proposed_by) === actorUserId) throw forbidden('The person who proposed a refund can\'t approve it.');
+  requirePermission(await accessFor(db, actorUserId, Number(r.challenge_id)), 'refunds.approve');
+  if (Number(r.proposed_by) === actorUserId) throw forbidden('The person who proposed a refund can\'t approve it; another admin must.');
   const p = await participantById(db, Number(r.participant_id));
   if (p.userId === actorUserId) throw forbidden('You can\'t approve a refund to yourself.');
   if (r.status !== 'PROPOSED') throw conflict(`This refund is already ${r.status.toLowerCase()}.`);
@@ -339,7 +349,7 @@ function poolsOf(bal: Map<string, number>) {
 /** The Finance dashboard: every participant's position, the pools, payments to check, refunds, and reconciliation. */
 export async function financeOverview(db: Queryable, userId: number, challengeId: number, now: Date): Promise<unknown> {
   const access = await accessFor(db, userId, challengeId);
-  requirePermission(access, 'finance.view');
+  if (!access.permissions.has('finance.view') && !access.permissions.has('refunds.approve')) throw forbidden();
   const { ctx } = await reconcileMoney(db, challengeId, now);
   const bal = await accountBalances(db, challengeId);
   const { rows: people } = await db.query(`SELECT p.participant_id, p.status, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ORDER BY u.display_name`, [challengeId]);
@@ -372,8 +382,10 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
   ];
   return {
     pools, checks, participants: rows, periods: ctx.periods, today: ctx.today,
-    canConfirm: access.permissions.has('payments.verify'), canProposeRefund: access.permissions.has('payouts.prepare'), canApproveRefund: access.permissions.has('settlement.approve'),
+    canConfirm: access.permissions.has('payments.verify'), canCountersign: access.permissions.has('payments.countersign') || access.permissions.has('payments.verify'),
+    canProposeRefund: access.permissions.has('payouts.prepare'), canApproveRefund: access.permissions.has('refunds.approve'),
     payments: pays.map((x) => ({ paymentId: Number(x.payment_id), participantId: Number(x.participant_id), displayName: x.display_name, mine: Number(x.user_id) === userId,
+      recordedByAdmin: Number(x.submitted_by) !== Number(x.user_id), recordedByMe: Number(x.submitted_by) === userId,
       periodNo: x.period_no, amount: rupees(Number(x.amount_paise)), method: x.method, utr: x.utr, paidOn: x.paid_on, note: x.note, status: x.status,
       proofFileId: x.proof_file_id ? Number(x.proof_file_id) : null, decisionReason: x.decision_reason, submittedAt: x.submitted_at.toISOString() })),
     refunds: refunds.map((r) => ({ refundId: Number(r.refund_id), participantId: Number(r.participant_id), displayName: r.display_name, amount: rupees(Number(r.amount_paise)), reason: r.reason,
@@ -383,10 +395,11 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
 
 /** Whether a user may see a payment file: QR for anyone in the challenge; proofs for their owner or finance viewers. */
 export async function canSeeFinanceFile(db: Queryable, userId: number, fileId: number): Promise<boolean> {
-  const qr = await db.query(`SELECT challenge_id FROM payment_settings WHERE qr_file_id = $1`, [fileId]);
+  const qr = await db.query(`SELECT challenge_id, needs_update FROM payment_settings WHERE qr_file_id = $1`, [fileId]);
   for (const r of qr.rows) {
     const cid = Number(r.challenge_id);
     if ((await accessFor(db, userId, cid)).permissions.has('challenge.view_admin')) return true;
+    if (r.needs_update) continue;
     const ok = await db.query(`SELECT 1 FROM participants WHERE challenge_id = $1 AND user_id = $2 UNION SELECT 1 FROM invitations WHERE challenge_id = $1 AND user_id = $2 AND status = 'INVITED'`, [cid, userId]);
     if (ok.rows[0]) return true;
   }

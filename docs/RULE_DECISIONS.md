@@ -110,6 +110,16 @@ Defaults applied where nothing was said:
 | Sign-ins | Successful, failed and locked-out sign-ins and sign-outs are recorded. For an unknown username nothing typed is kept |
 | Errors | Unexpected server errors and failed background work are recorded (person, page, device) and kept 180 days |
 
+## WhatsApp reminders (owner, 21 Nov 2026: option 2 - free, sent by an admin)
+
+| Topic | Rule |
+|---|---|
+| How | No paid service or API key. Team tab (today): "📲 Remind" opens the admin's own WhatsApp with an editable message to that person; "Message the group" opens it with one message naming everyone still pending, to send to the challenge group |
+| Who is listed | Active participants with no screenshot yet today, or whose screenshot was rejected |
+| Numbers | The mobile number from the person's account (entered by the admin, or by them in Profile); a 10-digit number is taken as Indian (+91). Only admins who manage the roster see numbers (not the finance manager) |
+| Record | Each reminder is recorded in the activity log and shown on the row ("Reminded 8:40 pm by …") so admins don't repeat each other. The app can't see whether the message was actually sent |
+| Later | Automatic WhatsApp (Meta WhatsApp Business API, ~₹0.12–0.15 per message, needs a Meta business account and number) can be added if wanted |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

@@ -18,7 +18,7 @@ import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
 import * as exemptions from './modules/checkin/exemptions.js';
 import { myDashboard } from './modules/checkin/days.js';
-import { adminOverview, participantCalendar } from './modules/checkin/overview.js';
+import { adminOverview, participantCalendar, recordReminder } from './modules/checkin/overview.js';
 import * as restdays from './modules/checkin/restdays.js';
 import * as submissions from './modules/checkin/submissions.js';
 import { readerName } from './modules/verification/select.js';
@@ -302,6 +302,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/submissions/:submissionId/appeal', authed((c) => submissions.appeal(c.tx, c.user.userId, sid(c), body(c.req).note, c.now)));
   app.get('/api/challenges/:challengeId/review-queue', authed((c) => submissions.reviewQueue(c.tx, c.user.userId, cid(c), c.now)));
   app.get('/api/challenges/:challengeId/overview', authed((c) => adminOverview(c.tx, c.user.userId, cid(c), (c.req.query as { day?: string }).day, c.now)));
+  app.post('/api/challenges/:challengeId/reminders', authed((c) => recordReminder(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
   app.get('/api/participants/:participantId/days', authed((c) => participantCalendar(c.tx, c.user.userId, pid(c), c.now)));
 
   // Evidence images: only for their owner or a reviewer of the challenge; anything else is a plain 404.

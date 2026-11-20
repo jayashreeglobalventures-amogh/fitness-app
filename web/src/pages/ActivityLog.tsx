@@ -34,6 +34,7 @@ const LABEL: Record<string, string> = {
   SETTLEMENT_PREPARED: 'prepared the settlement', SETTLEMENT_APPROVED: 'approved the settlement', SETTLEMENT_CORRECTION_APPROVED: 'approved a settlement correction', SETTLEMENT_DRAFT_DISCARDED: 'discarded a settlement draft', RESULTS_PUBLISHED: 'published the results',
   ANNOUNCEMENT_POSTED: 'posted an announcement', POST_REMOVED: 'removed a community post', COMMENT_REMOVED: 'removed a comment', COMMUNITY_MUTED: 'muted someone in the community', COMMUNITY_UNMUTED: 'unmuted someone in the community',
   PHONE_NOTIFICATIONS_ON: 'turned phone notifications on', PHONE_NOTIFICATIONS_OFF: 'turned phone notifications off',
+  WHATSAPP_REMINDER: 'sent a WhatsApp reminder', WHATSAPP_GROUP_REMINDER: 'sent a WhatsApp reminder to the group',
 };
 const label = (a: string) => LABEL[a] ?? a.toLowerCase().replaceAll('_', ' ');
 const isFailure = (a: string) => a.startsWith('SIGN_IN_') || a.endsWith('_REJECTED') || a.endsWith('_REMOVED') || a.includes('OVERRIDDEN') || a === 'USER_DISABLED' || a === 'COMMUNITY_MUTED';

@@ -39,8 +39,12 @@ if (fresh) {
   await withTx(pool, (tx) => createChallenge(tx, sa.userId, 'calamari-2026', calamari, new Date()));
   console.log(`\nFirst run: Super Admin "admin", temporary password: ${sa.tempPassword}\nCalamari was created as a draft.\n`);
 }
+// DEV_NOW=2026-11-23T14:30:00+05:30 runs the local copy as if it were that moment (to try challenge days early).
+const devNow = process.env.DEV_NOW ? new Date(process.env.DEV_NOW) : null;
+const startedAt = Date.now();
 const app = await buildApp({
   pool, logger: false,
+  ...(devNow ? { now: () => new Date(devNow.getTime() + (Date.now() - startedAt)) } : {}),
   config: { databaseUrl: '', host: '127.0.0.1', port: 3300, publicOrigin: 'http://localhost:3300', mediaDir: path.join(root, '.local', 'media'), cookieSecure: false, trustProxy: false, logLevel: 'info' },
 });
 await app.listen({ host: '127.0.0.1', port: 3300 });

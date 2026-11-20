@@ -10,6 +10,7 @@ import { ChangePasswordPage, LoginPage } from './pages/Login';
 import { ProfilePage } from './pages/Profile';
 import { NotificationsPage, useNoticeCount } from './pages/Notifications';
 import { navigate, usePath } from './router';
+import { Avatar } from './ui';
 
 const icon = (d: string) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg>;
 
@@ -49,7 +50,10 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <div className="brand"><span className="brand-dot" aria-hidden="true" />Fitness</div>
-        <button className="btn ghost small" onClick={signOut}>Sign out</button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn ghost small" style={{ padding: 2, minHeight: 0, borderRadius: '50%' }} onClick={() => navigate('/profile')} aria-label="My profile"><Avatar fileId={me.photoFileId} name={me.displayName} size={32} /></button>
+          <button className="btn ghost small" onClick={signOut}>Sign out</button>
+        </div>
       </header>
       <main>{route(path, me, refresh)}</main>
       <nav className="tabbar" aria-label="Main">

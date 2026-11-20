@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../router';
-import { ErrorBox, Field, Loading, useLoad } from '../ui';
+import { Avatar, ErrorBox, Field, Loading, squarePhoto, upload, useLoad } from '../ui';
 
 type F = 'fullName' | 'mobile' | 'email' | 'birthDate' | 'gender' | 'location' | 'about';
-interface Profile { userId: number; username: string; displayName: string; fields: Record<F, string | null>; visibility: Record<F, string> }
+interface Profile { userId: number; username: string; displayName: string; fields: Record<F, string | null>; visibility: Record<F, string>; photoFileId: number | null; photoVisibility: string }
 const FIELDS: { key: F; label: string; type: string }[] = [
   { key: 'fullName', label: 'Full name', type: 'text' }, { key: 'mobile', label: 'Mobile number', type: 'tel' }, { key: 'email', label: 'Email', type: 'email' },
   { key: 'birthDate', label: 'Date of birth', type: 'date' }, { key: 'gender', label: 'Gender', type: 'text' }, { key: 'location', label: 'Location', type: 'text' },
@@ -23,12 +23,13 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
   const setVis = (k: F, v: string) => { setP({ ...p, visibility: { ...p.visibility, [k]: v } }); setSaved(false); };
   const save = async () => {
     setSaveError(null);
-    try { setP(await api.put<Profile>('/api/me/profile', { displayName: p.displayName, fields: p.fields, visibility: p.visibility })); setSaved(true); onChanged(); } catch (e) { setSaveError(e); }
+    try { setP(await api.put<Profile>('/api/me/profile', { displayName: p.displayName, fields: p.fields, visibility: p.visibility, photoVisibility: p.photoVisibility })); setSaved(true); onChanged(); } catch (e) { setSaveError(e); }
   };
   return (
     <>
       <h1>My profile</h1>
       <p className="muted small">@{p.username} · Everything except your display name is private unless you choose otherwise.</p>
+      <PhotoCard p={p} onChanged={(np) => { setP(np); onChanged(); }} />
       <div className="card">
         <Field label="Display name (shown in challenges)"><input type="text" value={p.displayName} onChange={(e) => { setP({ ...p, displayName: e.target.value }); setSaved(false); }} maxLength={80} /></Field>
         {FIELDS.map((f) => (
@@ -46,5 +47,36 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
       </div>
       <div className="card"><h3>Health profile</h3><p className="muted small">Height, weight, BMI and other measurements are coming in a later update. They'll be optional, private by default, and only collected with your explicit consent.</p></div>
     </>
+  );
+}
+
+function PhotoCard({ p, onChanged }: { p: Profile; onChanged: (p: Profile) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState(false);
+  const pick = async (f: File | null) => {
+    if (!f) return;
+    setBusy(true); setError(null);
+    try { onChanged(await upload<Profile>('/api/me/photo', {}, await squarePhoto(f))); } catch (e) { setError(e); } finally { setBusy(false); if (input.current) input.current.value = ''; }
+  };
+  const remove = async () => { setBusy(true); setError(null); try { onChanged(await api.post<Profile>('/api/me/photo/remove')); } catch (e) { setError(e); } finally { setBusy(false); } };
+  const setVis = async (v: string) => { setError(null); try { onChanged(await api.put<Profile>('/api/me/profile', { photoVisibility: v })); } catch (e) { setError(e); } };
+  return (
+    <div className="card">
+      <div className="row" style={{ alignItems: 'center', gap: 16 }}>
+        <Avatar key={p.photoFileId ?? 0} fileId={p.photoFileId} name={p.displayName} size={88} />
+        <div className="stack" style={{ flex: 1, minWidth: 180 }}>
+          <input ref={input} type="file" accept="image/*" hidden onChange={(e) => void pick(e.target.files?.[0] ?? null)} />
+          <div className="row">
+            <button className="btn primary small" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : p.photoFileId ? 'Change photo' : 'Add a photo'}</button>
+            {p.photoFileId && <button className="btn ghost small" disabled={busy} onClick={remove}>Remove</button>}
+          </div>
+          <Field label="Who can see your photo"><select value={p.photoVisibility} onChange={(e) => void setVis(e.target.value)}>
+            {Object.entries(VIS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+        </div>
+      </div>
+      <p className="muted small" style={{ margin: 0 }}>Take one with the camera or choose from your gallery. It's cropped to a square.</p>
+      <ErrorBox error={error} />
+    </div>
   );
 }

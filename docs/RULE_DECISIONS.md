@@ -58,8 +58,28 @@ Defaults applied where nothing was said:
 | Who confirms | Finance Admin or Super Admin; never their own payment |
 | What participants see | Their own statement, the payment details, and the pool totals |
 
-## Still open (need the owner's ruling before settlement)
+## Phase 5 prizes and settlement - owner rulings (20 Nov 2026), in Calamari's settings
 
-From the assessment §11: **11** top-three when someone is under 80 %, **22** Calamari's exemption voting numbers (set in
-*Settings → Exemptions*), the prize split (qualification pool % / top-three % / 1st-2nd-3rd / equal or proportional, set
-in *Settings → Prizes*). Also: what a **suspended** participant's days count as (today they still count).
+| Topic | Ruling | Setting |
+|---|---|---|
+| Prize pool split | **70 %** to everyone who qualifies (≥ 80 % adherence), **30 %** to the top three | `prizes.qualificationPoolPct = 70`, `topThreePct = 30` |
+| Top three | **50 / 30 / 20** | `prizes.topThreeSplitPct` |
+| Qualification pool | Shared **equally** | `prizes.distribution = EQUAL` |
+| Top-three person not eligible | Skipped: **the next eligible person moves up** | `prizes.topThreeIneligible = NEXT_ELIGIBLE` |
+
+Defaults applied where nothing was said:
+
+| Topic | Default |
+|---|---|
+| Rounding | Amounts in paise; every split by the largest-remainder method, so parts always add up to the pool exactly |
+| Fewer than three eligible | Empty places' money goes to the qualification pool |
+| Ties that touch a prize place | Never decided automatically: the app shows the options (share equally - recommended - or an admin-set order) and an admin records the choice and the reason |
+| Nobody qualifies | The money stays unallocated; the approving Super Admin must record what happens to it |
+| Unpaid contributions at the end | Not blocking; deducted from what that person receives (set-off); anything beyond stays owed |
+| Approval | Super Admin only; only when every blocking check passes and nothing changed since the draft; then frozen |
+| Corrections after approval | A new version with a reason; replaces the old one when approved; money already paid is never paid twice |
+
+## Still open
+
+**22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).
+Also: what a **suspended** participant's days count as (today they still count).

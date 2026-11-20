@@ -61,6 +61,7 @@ export function RulesSummary({ c, periods }: { c: ChallengeConfig; periods?: { p
       <h3>Prizes</h3>
       <ul>
         <li>To qualify for prizes you need at least {c.prizes.qualificationAdherencePct}% of your eligible days successful (rest and approved exemption days don't count against you).</li>
+        {c.prizes.qualificationPoolPct !== null && c.prizes.topThreePct !== null && <li>The prize pool is split {c.prizes.qualificationPoolPct}% among everyone who qualifies ({c.prizes.distribution === 'PROPORTIONAL' ? 'in proportion to points' : 'equally'}) and {c.prizes.topThreePct}% to the top three{c.prizes.topThreeSplitPct ? ` (${c.prizes.topThreeSplitPct.join(' / ')}%)` : ''}. Top-three places also need {c.prizes.qualificationAdherencePct}% adherence{c.prizes.topThreeIneligible === 'NEXT_ELIGIBLE' ? '; if someone isn\'t eligible, the next eligible person moves up' : ''}.</li>}
         {c.prizes.payoutDate && <li>Planned payout: {day(c.prizes.payoutDate)}, after an admin approves the final results.</li>}
       </ul>
     </div>

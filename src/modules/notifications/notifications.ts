@@ -106,6 +106,10 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       if (m.payments && can('payments.verify')) out.push({ id: `payments:${cid}`, kind: 'action', title: `${c.name}: payments to confirm`, body: `${m.payments} UTR${m.payments === 1 ? '' : 's'} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.payments });
       if (m.refunds && can('settlement.approve')) out.push({ id: `refunds:${cid}`, kind: 'action', title: `${c.name}: refunds to approve`, body: `${m.refunds} waiting.`, link: `/challenges/${cid}/money`, challengeId: cid, count: m.refunds });
     }
+    if (can('settlement.approve')) {
+      const { rows: [d] } = await db.query(`SELECT settlement_id FROM settlements WHERE challenge_id = $1 AND status = 'DRAFT'`, [cid]);
+      if (d) out.push({ id: `settle:${d.settlement_id}`, kind: 'action', title: `${c.name}: final results waiting for approval`, body: 'Check the recommendation and approve it.', link: `/challenges/${cid}/results`, challengeId: cid });
+    }
     if (w.bonuses && can('bonus.manage')) out.push({ id: `bonus:${cid}`, kind: 'action', title: `${c.name}: weekend bonuses to approve`, body: `${w.bonuses} waiting.`, link: `/challenges/${cid}/bonus`, challengeId: cid, count: w.bonuses });
   }
   const order = { action: 0, warning: 1, info: 2 } as const;

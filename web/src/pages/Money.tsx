@@ -8,7 +8,7 @@ import type { ChallengeView } from './Challenge';
 
 interface Week { periodNo: number; startsOn: string; endsOn: string; dueOn: string; overdueFrom: string; due: number; paid: number; pending: number; status: string; finePool: number; fines: number; unused: number; unusedTo: string; finePoolLeft: number }
 interface Payment { paymentId: number; periodNo: number; amount: number; method: string; utr: string | null; paidOn: string; status: string; decisionReason: string | null; proofFileId: number | null }
-interface Pools { prizePool: number; yearEndPool: number; collected: number; stillOwed: number; refundsDue: number; inFinePools: number }
+interface Pools { prizePool: number; yearEndPool: number; collected: number; stillOwed: number; refundsDue: number; inFinePools: number; prizesDue: number }
 interface MyMoney { weeks: Week[]; owed: number; refundDue: number; payments: Payment[]; pools: Pools; today: string }
 interface Settings { upiId: string | null; payeeName: string | null; qrFileId: number | null; canEdit: boolean }
 
@@ -197,9 +197,10 @@ function FinanceView({ v }: { v: ChallengeView }) {
       <div className="stats" style={{ marginBottom: 12 }}>
         <div className="stat"><span>Prize pool</span><b>{inr(d.pools.prizePool)}</b></div>
         {d.pools.yearEndPool > 0 && <div className="stat"><span>Year-end pool</span><b>{inr(d.pools.yearEndPool)}</b></div>}
-        <div className="stat"><span>Received</span><b>{inr(d.pools.collected)}</b></div>
+        <div className="stat"><span>Held (received − paid out)</span><b>{inr(d.pools.collected)}</b></div>
         <div className="stat"><span>Still owed to us</span><b>{inr(d.pools.stillOwed)}</b></div>
         <div className="stat"><span>Refunds owed</span><b>{inr(d.pools.refundsDue)}</b></div>
+        {d.pools.prizesDue > 0 && <div className="stat"><span>Prizes owed</span><b>{inr(d.pools.prizesDue)}</b></div>}
         <div className="stat"><span>In fine pools</span><b>{inr(d.pools.inFinePools)}</b></div>
       </div>
       <details className="card"><summary>Reconciliation: {allOk ? '✅ all checks pass' : '⚠️ needs attention'}</summary>

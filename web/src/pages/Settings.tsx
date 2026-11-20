@@ -210,6 +210,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         </div>
         <SplitIn ctx={money} />
         <Select ctx={money} p={['prizes', 'distribution']} label="Qualification pool shared" options={{ '': 'Not decided yet', EQUAL: 'Equally', PROPORTIONAL: 'In proportion to points' }} nullable />
+        <Select ctx={money} p={['prizes', 'topThreeIneligible']} label="If a top-three person isn't eligible" options={{ NEXT_ELIGIBLE: 'The next eligible person moves up', TO_QUALIFICATION_POOL: 'That place\'s money joins the qualification pool' }} />
       </Section>
 
       <Section title="Leaderboard">

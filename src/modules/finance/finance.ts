@@ -26,10 +26,16 @@ async function desired(db: Queryable, ctx: ChallengeContext, challengeId: number
   }
   const pays = await db.query(`SELECT payment_id, participant_id, period_no, amount_paise, paid_on FROM payments WHERE challenge_id = $1 AND status = 'CONFIRMED'`, [challengeId]);
   const refs = await db.query(`SELECT refund_id, participant_id, amount_paise FROM refund_proposals WHERE challenge_id = $1 AND status = 'APPROVED'`, [challengeId]);
+  const { rows: [st] } = await db.query(`SELECT settlement_id, snapshot FROM settlements WHERE challenge_id = $1 AND status IN ('APPROVED','PUBLISHED')`, [challengeId]);
+  const pos = await db.query(`SELECT p.* FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1`, [challengeId]);
   return money({
     periods: ctx.periods, cfgOn: ctx.cfgOn, participants,
     payments: pays.rows.map((r) => ({ paymentId: Number(r.payment_id), participantId: Number(r.participant_id), periodNo: r.period_no, amount: Number(r.amount_paise), paidOn: r.paid_on })),
     refunds: refs.rows.map((r) => ({ refundId: Number(r.refund_id), participantId: Number(r.participant_id), amount: Number(r.amount_paise) })),
+    settlement: st ? { settlementId: Number(st.settlement_id), yearEndUsed: Number(st.snapshot.pools?.yearEndUsed ?? 0),
+      prizes: (st.snapshot.prizes?.allocations ?? []).map((a: { participantId: number; total: number }) => ({ participantId: a.participantId, amount: a.total })) } : null,
+    payouts: pos.rows.map((r) => ({ payoutId: Number(r.payout_id), participantId: Number(r.participant_id), prize: Number(r.prize_paise), refund: Number(r.refund_paise),
+      setoff: Number(r.setoff_paise), paid: Number(r.paid_paise), paidOn: r.paid_on })),
   });
 }
 
@@ -80,7 +86,7 @@ export async function reconcileAllMoney(pool: pg.Pool, now: Date): Promise<numbe
   return n;
 }
 
-async function accountBalances(db: Queryable, challengeId: number): Promise<Map<string, number>> {
+export async function accountBalances(db: Queryable, challengeId: number): Promise<Map<string, number>> {
   const { rows } = await db.query(
     `SELECT l.account, sum(l.amount_paise)::bigint AS amount FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id) WHERE t.challenge_id = $1 GROUP BY l.account`, [challengeId]);
   return balances(rows.map((r) => ({ account: r.account, amount: Number(r.amount) })));
@@ -319,14 +325,15 @@ export async function myMoney(db: Queryable, userId: number, challengeId: number
 }
 
 function poolsOf(bal: Map<string, number>) {
-  let refunds = 0, receivable = 0, fineLeft = 0;
+  let refunds = 0, receivable = 0, fineLeft = 0, prizes = 0;
   for (const [a, v] of bal) {
+    if (a.startsWith('PRIZE_DUE:')) prizes += -v;
     if (a.startsWith('REFUND_DUE:')) refunds += -v;
     if (a.startsWith('RECEIVABLE:')) receivable += v;
     if (a.startsWith('FINE_POOL:')) fineLeft += -v;
   }
   return { prizePool: rupees(-(bal.get('MAIN_POOL') ?? 0)), yearEndPool: rupees(-(bal.get('YEAR_END_POOL') ?? 0)), collected: rupees(bal.get('CASH') ?? 0),
-    stillOwed: rupees(receivable), refundsDue: rupees(refunds), inFinePools: rupees(fineLeft) };
+    stillOwed: rupees(receivable), refundsDue: rupees(refunds), inFinePools: rupees(fineLeft), prizesDue: rupees(prizes) };
 }
 
 /** The Finance dashboard: every participant's position, the pools, payments to check, refunds, and reconciliation. */
@@ -351,12 +358,17 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
   // Reconciliation: what the ledger says vs the source records.
   const { rows: [chk] } = await db.query(
     `SELECT (SELECT coalesce(sum(l.amount_paise), 0) FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id) WHERE t.challenge_id = $1)::bigint AS ledger_total,
-            (SELECT coalesce(sum(amount_paise), 0) FROM payments WHERE challenge_id = $1 AND status = 'CONFIRMED')::bigint AS confirmed`, [challengeId]);
+            (SELECT coalesce(sum(amount_paise), 0) FROM payments WHERE challenge_id = $1 AND status = 'CONFIRMED')::bigint AS confirmed,
+            (SELECT coalesce(sum(l.amount_paise), 0) FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
+              WHERE t.challenge_id = $1 AND t.type = 'CONTRIBUTION_DUE' AND l.account LIKE 'RECEIVABLE:%')::bigint AS due,
+            (SELECT coalesce(sum(p.paid_paise), 0) FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1)::bigint AS paid_out,
+            (SELECT coalesce(sum(p.setoff_paise), 0) FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1)::bigint AS set_off`, [challengeId]);
   const pools = poolsOf(bal);
+  const cents = (x: number) => Math.round(x * 100);
   const checks = [
     { name: 'Every entry balances (the ledger adds up to zero)', ok: Number(chk.ledger_total) === 0 },
-    { name: 'Money received = confirmed payments', ok: Math.round(pools.collected * 100) === Number(chk.confirmed) },
-    { name: 'Money owed + received = contributions due (nothing counted twice)', ok: Math.round((pools.stillOwed + pools.collected) * 100) === sumType(bal) },
+    { name: 'Money held = confirmed payments − payouts', ok: cents(pools.collected) === Number(chk.confirmed) - Number(chk.paid_out) },
+    { name: 'Owed + held = contributions due − payouts − set-offs (nothing counted twice)', ok: cents(pools.stillOwed + pools.collected) === Number(chk.due) - Number(chk.paid_out) - Number(chk.set_off) },
   ];
   return {
     pools, checks, participants: rows, periods: ctx.periods, today: ctx.today,
@@ -367,13 +379,6 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
     refunds: refunds.map((r) => ({ refundId: Number(r.refund_id), participantId: Number(r.participant_id), displayName: r.display_name, amount: rupees(Number(r.amount_paise)), reason: r.reason,
       status: r.status, proposedBy: Number(r.proposed_by), decisionReason: r.decision_reason })),
   };
-}
-
-/** Total of everything ever owed (receivables + cash, since a payment moves money from one to the other). */
-function sumType(bal: Map<string, number>): number {
-  let n = bal.get('CASH') ?? 0;
-  for (const [a, v] of bal) if (a.startsWith('RECEIVABLE:')) n += v;
-  return n;
 }
 
 /** Whether a user may see a payment file: QR for anyone in the challenge; proofs for their owner or finance viewers. */

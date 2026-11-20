@@ -23,7 +23,7 @@ describe('challenge lifecycle (Calamari created through configuration, not code)
     const r = await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() });
     expect(r.status).toBe(200);
     id = r.body.data.challengeId;
-    expect(r.body.data.warnings.map((w: { path: string }) => w.path)).toEqual(['/exemptions/voting', '/prizes']);
+    expect(r.body.data.warnings.map((w: { path: string }) => w.path)).toEqual(['/exemptions/voting']);
     expect((await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).status).toBe(409);
     const bad = calamariConfig(); bad.finance.contribution.mainPool = 1;
     const rb = await sa.post('/api/challenges', { slug: 'bad', config: bad });

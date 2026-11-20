@@ -144,6 +144,9 @@ export const ChallengeConfigSchema = Type.Object({
     topThreePct: Nullable(Pct),
     topThreeSplitPct: Nullable(Type.Tuple([Pct, Pct, Pct])),
     distribution: Nullable(Type.Union([Type.Literal('EQUAL'), Type.Literal('PROPORTIONAL')])),
+    // A top-three place held by someone not eligible: NEXT_ELIGIBLE (the next eligible person moves up) or
+    // TO_QUALIFICATION_POOL (that place's money joins the pool shared by all qualifiers).
+    topThreeIneligible: Type.Union([Type.Literal('NEXT_ELIGIBLE'), Type.Literal('TO_QUALIFICATION_POOL')]),
     payoutDate: Nullable(Day),
   }, { additionalProperties: false }),
   leaderboard: Type.Object({
@@ -166,6 +169,7 @@ export interface ConfigCheck { ok: boolean; errors: ConfigIssue[]; warnings: Con
 export function normalizeConfig<T>(input: T): T {
   if (!input || typeof input !== 'object') return input;
   const c = structuredClone(input) as Record<string, any>;
+  if (c.prizes && typeof c.prizes === 'object' && c.prizes.topThreeIneligible === undefined) c.prizes.topThreeIneligible = 'NEXT_ELIGIBLE';
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

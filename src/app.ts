@@ -23,6 +23,7 @@ import * as bonus from './modules/scoring/bonus.js';
 import { breakdown, leaderboard } from './modules/scoring/ledger.js';
 import { myNotifications } from './modules/notifications/notifications.js';
 import * as finance from './modules/finance/finance.js';
+import * as settlement from './modules/settlement/settlement.js';
 import * as challenges from './modules/challenges/challenges.js';
 import { validateConfig } from './modules/challenges/config.js';
 import { accessFor, canManageAccounts } from './modules/identity/permissions.js';
@@ -328,6 +329,15 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/payments/:paymentId/withdraw', authed((c) => finance.withdrawPayment(c.tx, c.user.userId, payId(c), c.now)));
   app.post('/api/participants/:participantId/refunds', authed((c) => finance.proposeRefund(c.tx, c.user.userId, pid(c), body(c.req) as never, c.now)));
   app.post('/api/refunds/:refundId/decide', authed((c) => finance.decideRefund(c.tx, c.user.userId, id((c.req.params as { refundId: string }).refundId), body(c.req) as never, c.now)));
+
+  // ---------- Results / settlement ----------
+  const sett = (c: Ctx) => id((c.req.params as { settlementId: string }).settlementId);
+  app.get('/api/challenges/:challengeId/results', authed((c) => settlement.resultsView(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/challenges/:challengeId/settlements', authed((c) => settlement.prepare(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
+  app.post('/api/settlements/:settlementId/approve', authed((c) => settlement.approve(c.tx, c.user.userId, sett(c), body(c.req) as never, c.now)));
+  app.post('/api/settlements/:settlementId/publish', authed((c) => settlement.publish(c.tx, c.user.userId, sett(c), c.now)));
+  app.post('/api/settlements/:settlementId/discard', authed((c) => settlement.discardDraft(c.tx, c.user.userId, sett(c), c.now)));
+  app.post('/api/settlements/:settlementId/payouts/:participantId', authed((c) => settlement.recordPayout(c.tx, c.user.userId, sett(c), pid(c), body(c.req) as never, c.now)));
 
   // ---------- The React app ----------
   const dir = webDir ?? WEB_DIST;

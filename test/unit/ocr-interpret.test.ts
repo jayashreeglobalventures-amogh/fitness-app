@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findDates, interpretOcr, type OcrLine } from '../../src/modules/verification/ocr.js';
+import { findDates, fixGrouping, interpretOcr, type OcrLine } from '../../src/modules/verification/ocr.js';
 import { judge } from '../../src/modules/checkin/submissions.js';
 
 const ctx = { expectedDay: '2026-11-22', timeZone: 'Asia/Kolkata', metricLabel: 'Steps', unit: 'steps' };
@@ -126,5 +126,30 @@ describe('Apple Fitness "Step Count" screen', () => {
     const r = read(apple('6,850', '16-22 Nov 2026', 'DAILY AVERAGE'));
     expect(r.value).toBeNull();
     expect(r.flags).toContain('WEEKLY_OR_AVERAGE');
+  });
+});
+
+// Apple Health "Summary" (owner's report, 21 Nov 2026): the total was read as 505 because OCR split "24,505" into
+// "24 . 505". Lines exactly as Tesseract read that screenshot.
+describe('Apple Health Summary card', () => {
+  const summary = L(['Summary sM.', 51], ['Pinned Edit', 65], ['O Activity Yesterday', 75], ['Move Exercise Stand ©', 96], ['539 cal | 9 min 15 hr', 75], ['O Steps 21:54', 62], ['24 . 505 steps', 84]);
+
+  it('reads 24,505 (not 505) and names the app', () => {
+    expect(read(summary)).toMatchObject({ value: 24505, sourceApp: 'Apple Health' });
+  });
+
+  it('no date on the card -> an admin checks it (with the number filled in), and the note explains why', () => {
+    const r = read(summary);
+    expect(r.date).toBeNull();
+    expect(r.notes).toContain('only a time (21:54)');
+    expect(approved(summary)).toBe(false);
+  });
+
+  it('split thousands are joined; decimals and times are left alone', () => {
+    expect(fixGrouping('24 . 505 steps')).toBe('24,505 steps');
+    expect(fixGrouping('8 , 214')).toBe('8,214');
+    expect(fixGrouping('5.21 km')).toBe('5.21 km');
+    expect(fixGrouping('Steps 21:54')).toBe('Steps 21:54');
+    expect(fixGrouping('12. 3456')).toBe('12. 3456'); // four digits after: not a thousands group
   });
 });

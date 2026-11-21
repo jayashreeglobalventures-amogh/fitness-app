@@ -34,6 +34,12 @@ const SUMMARY_RE = /\b(avg|average|daily average|weekly|this week|last week|per 
 const GOAL_BEFORE_RE = /(goal|target|of|\/)\s*$/i;
 const UNIT_AFTER_RE = /^\s*(k?cal|kj|km|mi|miles?|m\b|min|mins|minutes|hrs?|hours?|bpm|%|floors?|ft|kg|lbs?)/i;
 
+/**
+ * OCR often puts spaces around a thousands separator ("24 . 505", "8 , 214"): join them back ("24,505"), so the number
+ * isn't read as just its last three digits. Only when exactly three digits follow (a decimal like "5.21 km" stays).
+ */
+export const fixGrouping = (text: string) => text.replace(/(\d{1,3})\s+[.,·]\s*(?=\d{3}(?!\d))|(\d{1,3})\s*[.,·]\s+(?=\d{3}(?!\d))/g, (_m, a, b) => `${a ?? b},`);
+
 const pad = (n: number) => String(n).padStart(2, '0');
 const mkDate = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;
 
@@ -82,7 +88,8 @@ function scanLine(t: string, year: number, add: (y: number, m: number, d: number
 interface Candidate { value: number; confidence: number; how: 'same-line' | 'next-to-label' }
 
 /** Step-count candidates: numbers on a line that says "steps", or a number alone next to a "steps" line. */
-export function findTotals(lines: OcrLine[]): { candidates: Candidate[]; summary: boolean } {
+export function findTotals(rawLines: OcrLine[]): { candidates: Candidate[]; summary: boolean } {
+  const lines = rawLines.map((l) => ({ ...l, text: fixGrouping(l.text) }));
   const candidates: Candidate[] = [];
   let summary = false;
   const numbersIn = (text: string) => {
@@ -165,6 +172,10 @@ export function interpretOcr(lines: OcrLine[], ctx: ReadContext): Omit<Reading, 
     notes.push(`Several dates: ${dates.join(', ')}.`);
     date = dates.includes(ctx.expectedDay) ? ctx.expectedDay : dates[0]!;
     dateConf = 0;
+  } else if (lines.some((l) => STEPS_RE.test(l.text) && /\b([01]?\d|2[0-3]):[0-5]\d\b/.test(l.text) && !/yesterday/i.test(l.text))) {
+    // e.g. Apple Health "Steps 21:54": a time of day, no date - can't tell which day it is from the picture.
+    const t = lines.find((l) => STEPS_RE.test(l.text) && /\b([01]?\d|2[0-3]):[0-5]\d\b/.test(l.text))!.text.match(/\b([01]?\d|2[0-3]):[0-5]\d\b/)![0];
+    notes.push(`The steps card shows only a time (${t}), no date - check it is from ${ctx.expectedDay}.`);
   } else if (/\btoday\b/i.test(text)) {
     notes.push('Shows "Today" but no date.');
   } else if (/\byesterday\b/i.test(text)) {
@@ -172,7 +183,8 @@ export function interpretOcr(lines: OcrLine[], ctx: ReadContext): Omit<Reading, 
   }
 
   const confidence = value !== null && date !== null ? Math.min(valueConf, dateConf) / 100 : Math.max(valueConf, dateConf) / 200;
-  const app = /fitness\+|\bstep\s*count\b/i.test(text) && !/google|samsung|fitbit/i.test(text) ? 'Apple Fitness' : /google\s*fit/i.test(text) ? 'Google Fit' : /samsung\s*health/i.test(text) ? 'Samsung Health' : /fitbit/i.test(text) ? 'Fitbit'
+  const app = /fitness\+|\bstep\s*count\b/i.test(text) && !/google|samsung|fitbit/i.test(text) ? 'Apple Fitness'
+    : /\bsummary\b/i.test(text) && /\bpinned\b/i.test(text) ? 'Apple Health' : /google\s*fit/i.test(text) ? 'Google Fit' : /samsung\s*health/i.test(text) ? 'Samsung Health' : /fitbit/i.test(text) ? 'Fitbit'
     : /\bhealth\b/i.test(text) && /\bsteps\b/i.test(text) ? 'Health' : /mi\s*fit|zepp/i.test(text) ? 'Mi Fitness / Zepp' : /garmin/i.test(text) ? 'Garmin' : null;
   return { readable: true, date, value, sourceApp: app, confidence: Math.round(confidence * 1000) / 1000, flags, notes: notes.join(' ') };
 }

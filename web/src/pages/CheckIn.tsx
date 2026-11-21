@@ -5,6 +5,7 @@ import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, u
 import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
 import { CoachCard } from './Coach';
+import { MoneyRings } from './MoneyRings';
 
 interface DayInfo {
   day: string; status: string; periodNo: number | null;
@@ -58,7 +59,12 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
     <>
       {!t && <div className="card"><h3>{v.phase === 'UPCOMING' ? `Starts ${day(v.startsOn)}` : 'The challenge has ended'}</h3>
         <p className="muted small">{v.phase === 'UPCOMING' ? 'You can plan rest days now. Evidence can be uploaded from the first day.' : 'Results are provisional until the admins finish the review.'}</p></div>}
-      {t && <TodayCard v={v} d={d} left={left} onChanged={() => { polls.current = 0; dash.reload(); }} />}
+      {t && (
+        <div className="today-grid">
+          <TodayCard v={v} d={d} left={left} onChanged={() => { polls.current = 0; dash.reload(); }} />
+          {v.current.config.finance.enabled && <MoneyRings challengeId={v.challengeId} />}
+        </div>
+      )}
 
       <div className="stats" style={{ margin: '12px 0' }}>
         <div className="stat"><span>Points</span><b>{pts.data?.total ?? '—'}</b></div>

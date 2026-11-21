@@ -13,7 +13,8 @@ let h: Harness;
 let sa: Client, ca: Client, ca2: Client, asha: Client;
 let id: number;
 let value = 8000;
-const reader: ScreenshotReader = { async read(_i, _m, ctx) { return { readable: true, date: ctx.expectedDay, value, sourceApp: 'Fake', confidence: 0.99, flags: [], notes: '', model: 'fake', provider: 'fake' }; } };
+let otherDate: string | null = null;
+const reader: ScreenshotReader = { async read(_i, _m, ctx) { return { readable: true, date: otherDate ?? ctx.expectedDay, value, sourceApp: 'Fake', confidence: 0.99, flags: [], notes: '', model: 'fake', provider: 'fake' }; } };
 let n = 0;
 const shot = async (c: Client, v = 8000) => {
   value = v;
@@ -107,5 +108,24 @@ describe('after midnight: ask an admin', () => {
     expect((await ca.post(`/api/evidence-requests/${q[0].requestId}/decide`, { approve: true })).status).toBe(200);
     const { rows } = await h.admin.query(`SELECT action FROM audit_log WHERE action = 'EVIDENCE_IMAGE_ERASED'`);
     expect(rows).toHaveLength(1);
+  });
+});
+
+describe('admins approve or decline - the app decides met or missed (one screenshot a day)', () => {
+  it('approving a number below the target: the day is missed; above it: met; decline needs a reason', async () => {
+    h.setNow('2026-11-25T06:30:00Z');
+    otherDate = '2026-11-17'; // another day's date -> goes to an admin
+    const low = await shot(asha, 4660);
+    otherDate = null;
+    expect(await dayStatus('2026-11-25')).toBe('PENDING_VERIFICATION');
+    expect((await ca.post(`/api/submissions/${low}/review`, { outcome: 'APPROVED', value: 4660 })).status).toBe(200);
+    expect(await dayStatus('2026-11-25')).toBe('TARGET_MISSED');
+    h.setNow('2026-11-26T06:30:00Z');
+    otherDate = '2026-11-17';
+    const high = await shot(asha, 8200);
+    otherDate = null;
+    expect((await ca.post(`/api/submissions/${high}/review`, { outcome: 'REJECTED' })).status).toBe(400);
+    expect((await ca.post(`/api/submissions/${high}/review`, { outcome: 'APPROVED', value: 8200 })).status).toBe(200);
+    expect(await dayStatus('2026-11-26')).toBe('ACHIEVED');
   });
 });

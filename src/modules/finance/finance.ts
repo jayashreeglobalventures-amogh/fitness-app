@@ -282,6 +282,27 @@ export async function decideRefund(db: Queryable, actorUserId: number, refundId:
 const rupees = (p: number) => p / 100;
 
 /** One participant's money, week by week (for themselves or a finance viewer). */
+/**
+ * Fine-pool money carried over (CARRY_FORWARD), in paise: into = credited against week N's contribution; from = week M's
+ * leftover went to week N. Reversals (a week recalculated after a late decision) count against their original entry.
+ */
+export async function carriedInto(db: Queryable, challengeId: number, participantId: number): Promise<{ into: Map<number, number>; from: Map<number, number> }> {
+  const { rows } = await db.query(
+    `SELECT t.period_no AS from_period, (coalesce(o.origin, t.origin)->>'intoPeriod')::int AS into_period, -sum(l.amount_paise)::bigint AS amount
+       FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id) LEFT JOIN ledger_transactions o ON o.transaction_id = t.reverses_transaction_id
+      WHERE t.challenge_id = $1 AND t.participant_id = $2 AND t.type = 'UNUSED_FINE_POOL' AND l.account = $3
+        AND coalesce(o.origin, t.origin)->>'to' = 'CARRY_FORWARD'
+      GROUP BY 1, 2`, [challengeId, participantId, `RECEIVABLE:${participantId}`]);
+  const into = new Map<number, number>(), from = new Map<number, number>();
+  for (const r of rows) {
+    const amt = Number(r.amount);
+    if (!amt) continue;
+    into.set(r.into_period, (into.get(r.into_period) ?? 0) + amt);
+    from.set(r.from_period, r.into_period);
+  }
+  return { into, from };
+}
+
 async function statementOf(db: Queryable, ctx: ChallengeContext, participantId: number) {
   const bal = await db.query(
     `SELECT l.account, sum(l.amount_paise)::bigint AS amount FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
@@ -298,21 +319,30 @@ async function statementOf(db: Queryable, ctx: ChallengeContext, participantId: 
     `SELECT t.period_no, sum(l.amount_paise)::bigint AS amount FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
       WHERE t.challenge_id = $1 AND t.type = 'CONTRIBUTION_DUE' AND l.account = $2 GROUP BY t.period_no`, [ctx.ch.challengeId, `RECEIVABLE:${participantId}`])).rows;
   const pays = (await db.query(`SELECT * FROM payments WHERE participant_id = $1 ORDER BY submitted_at`, [participantId])).rows;
+  const carried = await carriedInto(db, ctx.ch.challengeId, participantId);
+  let credit = 0; // confirmed payments beyond what earlier weeks needed (e.g. paid the full amount before a carry-over)
   const weeks = ctx.periods.map((per) => {
     const cfg = ctx.cfgOn(per.startsOn);
-    const due = Number(dues.find((d) => d.period_no === per.periodNo)?.amount ?? 0);
-    const paid = pays.filter((x) => x.period_no === per.periodNo && x.status === 'CONFIRMED').reduce((a, x) => a + Number(x.amount_paise), 0);
+    const carriedIn = carried.into.get(per.periodNo) ?? 0;
+    const fullDue = Number(dues.find((d) => d.period_no === per.periodNo)?.amount ?? 0);
+    // What is owed for the week: the contribution, less fine-pool money carried over from an earlier week.
+    const due = Math.max(0, fullDue - carriedIn);
+    const paidHere = pays.filter((x) => x.period_no === per.periodNo && x.status === 'CONFIRMED').reduce((a, x) => a + Number(x.amount_paise), 0);
+    const fromEarlier = fullDue ? Math.min(credit, due) : 0;
+    const paid = paidHere + fromEarlier;
+    if (fullDue) credit = credit - fromEarlier + Math.max(0, paidHere - (due - fromEarlier));
     const pending = pays.filter((x) => x.period_no === per.periodNo && x.status === 'SUBMITTED').reduce((a, x) => a + Number(x.amount_paise), 0);
     const dueDay = dueOn(per, cfg.finance.dueWeekday);
     const overdueFrom = addDays(dueDay, cfg.finance.graceDays + 1);
-    const status = due === 0 ? 'NOT_DUE' : paid >= due ? 'PAID' : pending > 0 && paid + pending >= due ? 'CHECKING'
+    const status = fullDue === 0 ? 'NOT_DUE' : paid >= due ? 'PAID' : pending > 0 && paid + pending >= due ? 'CHECKING'
       : daysBetween(overdueFrom, ctx.today) >= 0 ? 'OVERDUE' : daysBetween(dueDay, ctx.today) >= 0 ? 'DUE' : 'UPCOMING';
     const c = contributionFor(cfg, per.periodNo);
     return {
       periodNo: per.periodNo, startsOn: per.startsOn, endsOn: per.endsOn, dueOn: dueDay, overdueFrom,
-      due: rupees(due), paid: rupees(paid), pending: rupees(pending), status,
-      finePool: due ? rupees(c.finePool) : 0, fines: rupees(-Number(fines.find((f) => f.period_no === per.periodNo)?.amount ?? 0)),
-      unused: rupees(Number(unused.find((f) => f.period_no === per.periodNo)?.amount ?? 0)), unusedTo: cfg.finance.unusedFinePool,
+      due: rupees(due), paid: rupees(paid), pending: rupees(pending), status, creditUsed: rupees(fromEarlier),
+      finePool: fullDue ? rupees(c.finePool) : 0, fines: rupees(-Number(fines.find((f) => f.period_no === per.periodNo)?.amount ?? 0)),
+      unused: rupees(Number(unused.find((f) => f.period_no === per.periodNo)?.amount ?? 0)), unusedTo: carried.from.has(per.periodNo) ? 'CARRY_FORWARD' : cfg.finance.unusedFinePool === 'CARRY_FORWARD' ? 'REFUND' : cfg.finance.unusedFinePool,
+      carriedTo: carried.from.get(per.periodNo) ?? null, carriedIn: rupees(carriedIn), fullDue: rupees(fullDue),
       finePoolLeft: rupees(-(b.get(`FINE_POOL:${participantId}:${per.periodNo}`) ?? 0)),
     };
   });
@@ -357,7 +387,7 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
   for (const r of people) {
     const s = await statementOf(db, ctx, Number(r.participant_id));
     rows.push({ participantId: Number(r.participant_id), displayName: r.display_name, status: r.status, owed: s.owed, refundDue: s.refundDue,
-      paid: s.weeks.reduce((a, w) => a + w.paid, 0), fines: s.weeks.reduce((a, w) => a + w.fines, 0),
+      paid: Math.round(s.weeks.reduce((a, w) => a + w.paid - w.creditUsed, 0) * 100) / 100, fines: s.weeks.reduce((a, w) => a + w.fines, 0),
       overdueWeeks: s.weeks.filter((w) => w.status === 'OVERDUE').map((w) => w.periodNo), checking: s.weeks.filter((w) => w.status === 'CHECKING').map((w) => w.periodNo) });
   }
   const { rows: pays } = await db.query(
@@ -372,13 +402,16 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
             (SELECT coalesce(sum(l.amount_paise), 0) FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
               WHERE t.challenge_id = $1 AND t.type = 'CONTRIBUTION_DUE' AND l.account LIKE 'RECEIVABLE:%')::bigint AS due,
             (SELECT coalesce(sum(p.paid_paise), 0) FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1)::bigint AS paid_out,
-            (SELECT coalesce(sum(p.setoff_paise), 0) FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1)::bigint AS set_off`, [challengeId]);
+            (SELECT coalesce(sum(p.setoff_paise), 0) FROM payouts p JOIN settlements s USING (settlement_id) WHERE s.challenge_id = $1)::bigint AS set_off,
+            (SELECT coalesce(-sum(l.amount_paise), 0) FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
+              WHERE t.challenge_id = $1 AND t.type = 'UNUSED_FINE_POOL' AND l.account LIKE 'RECEIVABLE:%')::bigint AS carried`, [challengeId]);
   const pools = poolsOf(bal);
   const cents = (x: number) => Math.round(x * 100);
   const checks = [
     { name: 'Every entry balances (the ledger adds up to zero)', ok: Number(chk.ledger_total) === 0 },
     { name: 'Money held = confirmed payments − payouts', ok: cents(pools.collected) === Number(chk.confirmed) - Number(chk.paid_out) },
-    { name: 'Owed + held = contributions due − payouts − set-offs (nothing counted twice)', ok: cents(pools.stillOwed + pools.collected) === Number(chk.due) - Number(chk.paid_out) - Number(chk.set_off) },
+    { name: 'Owed + held = contributions due − carried-over fine money − payouts − set-offs (nothing counted twice)',
+      ok: cents(pools.stillOwed + pools.collected) === Number(chk.due) - Number(chk.carried) - Number(chk.paid_out) - Number(chk.set_off) },
   ];
   return {
     pools, checks, participants: rows, periods: ctx.periods, today: ctx.today,

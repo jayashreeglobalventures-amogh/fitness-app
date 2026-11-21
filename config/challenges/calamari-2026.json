@@ -111,7 +111,7 @@
       }
     ],
     "finePerMissedDay": 10000,
-    "unusedFinePool": "REFUND",
+    "unusedFinePool": "CARRY_FORWARD",
     "dueWeekday": "SUNDAY",
     "graceDays": 2,
     "paymentInstructions": "Pay your weekly contribution every Sunday by UPI (scan the QR in the app), then enter the UPI reference (UTR) in the app. A Finance Admin confirms it."

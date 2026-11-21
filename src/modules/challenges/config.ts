@@ -130,8 +130,9 @@ export const ChallengeConfigSchema = Type.Object({
     periodOverrides: Type.Array(Type.Composite([Type.Object({ periodNo: Type.Integer({ minimum: 1 }) }), ContributionSplit], { additionalProperties: false }), { maxItems: 60 }),
     finePerMissedDay: Paise,
     // What happens to money left in a person's fine pool when the week closes:
-    // REFUND (owed back to them), PRIZE_POOL (the prize pool), YEAR_END_POOL (a separate year-end pool).
-    unusedFinePool: Type.Union([Type.Literal('REFUND'), Type.Literal('PRIZE_POOL'), Type.Literal('YEAR_END_POOL')]),
+    // REFUND (owed back to them), PRIZE_POOL (the prize pool), YEAR_END_POOL (a separate year-end pool),
+    // CARRY_FORWARD (credited against next week's contribution, so they only pay the top-up; refunded after the last week).
+    unusedFinePool: Type.Union([Type.Literal('REFUND'), Type.Literal('PRIZE_POOL'), Type.Literal('YEAR_END_POOL'), Type.Literal('CARRY_FORWARD')]),
     dueWeekday: Weekday,
     // Days after the due day before an unpaid contribution is shown as overdue. Never affects points.
     graceDays: Type.Integer({ minimum: 0, maximum: 14 }),

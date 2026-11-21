@@ -7,6 +7,8 @@
 //   PAYMENT           CASH +amount        | RECEIVABLE:p -amount                     (confirmed by Finance Admin)
 //   FINE              FINE_POOL:p:w +fine | MAIN_POOL -fine                          (missed eligible day; capped by balance)
 //   UNUSED_FINE_POOL  FINE_POOL:p:w +left | REFUND_DUE:p / MAIN_POOL / YEAR_END_POOL -left   (when the week is closed)
+//                     CARRY_FORWARD: FINE_POOL:p:w +left | RECEIVABLE:p -left - a credit against the next week the
+//                     person takes part in (origin.intoPeriod), so they only pay the top-up; refunded if there is none.
 //   REFUND            MAIN_POOL +amount   | REFUND_DUE:p -amount                     (approved by a Super Admin)
 //   YEAR_END_TRANSFER YEAR_END_POOL +x    | MAIN_POOL -x                             (approved settlement uses the year-end pool)
 //   PRIZE             MAIN_POOL +prize    | PRIZE_DUE:p -prize                       (approved settlement)
@@ -66,9 +68,19 @@ export function money(input: FinanceInput): DesiredTx[] {
       }
       // 3. Close the week: once every day of it is decided, what's left goes where the settings say.
       if (!undecided && left > 0 && per.days > 0 && lastDayDecided(p, per)) {
-        const to = cfg.finance.unusedFinePool === 'REFUND' ? `REFUND_DUE:${pid}` : cfg.finance.unusedFinePool === 'YEAR_END_POOL' ? 'YEAR_END_POOL' : 'MAIN_POOL';
-        out.push({ baseKey: `unused:${pid}:${per.periodNo}`, type: 'UNUSED_FINE_POOL', participantId: pid, periodNo: per.periodNo, day: per.endsOn,
-          lines: [{ account: pool, amount: left }, { account: to, amount: -left }], origin: { to: cfg.finance.unusedFinePool } });
+        const rule = cfg.finance.unusedFinePool;
+        // Carry forward: the next week this person takes part in (with money on); none left -> refunded at the end.
+        const next = rule === 'CARRY_FORWARD'
+          ? input.periods.find((x) => x.periodNo > per.periodNo && takesPartIn(p, x) && input.cfgOn(x.startsOn).finance.enabled && contributionFor(input.cfgOn(x.startsOn), x.periodNo).total >= left)
+          : undefined;
+        if (next) {
+          out.push({ baseKey: `unused:${pid}:${per.periodNo}`, type: 'UNUSED_FINE_POOL', participantId: pid, periodNo: per.periodNo, day: per.endsOn,
+            lines: [{ account: pool, amount: left }, { account: `RECEIVABLE:${pid}`, amount: -left }], origin: { to: 'CARRY_FORWARD', intoPeriod: next.periodNo } });
+        } else {
+          const to = rule === 'REFUND' || rule === 'CARRY_FORWARD' ? `REFUND_DUE:${pid}` : rule === 'YEAR_END_POOL' ? 'YEAR_END_POOL' : 'MAIN_POOL';
+          out.push({ baseKey: `unused:${pid}:${per.periodNo}`, type: 'UNUSED_FINE_POOL', participantId: pid, periodNo: per.periodNo, day: per.endsOn,
+            lines: [{ account: pool, amount: left }, { account: to, amount: -left }], origin: { to: rule === 'CARRY_FORWARD' ? 'REFUND' : rule } });
+        }
       }
     }
   }

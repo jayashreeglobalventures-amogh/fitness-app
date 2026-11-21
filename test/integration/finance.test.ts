@@ -26,7 +26,9 @@ beforeAll(async () => {
   sa = await h.user('super', { superAdmin: true });
   sa2 = await h.user('super2', { superAdmin: true });
   [ca, fa, asha, ben] = [await h.user('chadmin'), await h.user('finadmin'), await h.user('asha'), await h.user('ben')];
-  id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: calamariConfig() })).body.data.challengeId;
+  // This file tests the "refunded at the end" rule; carry-over (Calamari's setting) is tested in carry-over.test.ts.
+  const cfg = calamariConfig(); cfg.finance.unusedFinePool = 'REFUND';
+  id = (await sa.post('/api/challenges', { slug: 'calamari-2026', config: cfg })).body.data.challengeId;
   await sa.post(`/api/challenges/${id}/roles`, { userId: ca.userId, role: 'CHALLENGE_ADMIN' });
   await sa.post(`/api/challenges/${id}/roles`, { userId: fa.userId, role: 'FINANCE_ADMIN' });
   await h.ensureAdmins(sa, id); await sa.post(`/api/challenges/${id}/publish`);

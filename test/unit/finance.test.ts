@@ -5,7 +5,9 @@ import { normalizeConfig, type ChallengeConfig } from '../../src/modules/challen
 import { balances, money, type FinanceInput } from '../../src/modules/finance/engine.js';
 import type { DayClass } from '../../src/modules/scoring/engine.js';
 
-const calamari = (): ChallengeConfig => normalizeConfig(JSON.parse(readFileSync(new URL('../../config/challenges/calamari-2026.json', import.meta.url), 'utf8')));
+const calamariAsIs = (): ChallengeConfig => normalizeConfig(JSON.parse(readFileSync(new URL('../../config/challenges/calamari-2026.json', import.meta.url), 'utf8')));
+/** Calamari's amounts with the "refunded at the end" rule (most tests below); carry-over has its own tests. */
+const calamari = (): ChallengeConfig => { const c = calamariAsIs(); c.finance.unusedFinePool = 'REFUND'; return c; };
 const PERIODS = computePeriods('2026-11-22', '2026-12-31', 'SUNDAY');
 const DAYS = Array.from({ length: 40 }, (_, i) => addDays('2026-11-22', i));
 const rs = (n: number) => n * 100; // rupees -> paise
@@ -86,6 +88,33 @@ describe('Calamari money (paise; debit +, credit -)', () => {
     expect(late.txs.filter((t) => t.type === 'CONTRIBUTION_DUE').map((t) => t.periodNo)).toEqual([2, 3, 4, 5, 6]);
     const gone = run({ 1: all('S', 10) + all('.', 30) }, { left: { 1: '2026-12-01' } });
     expect(gone.txs.filter((t) => t.type === 'CONTRIBUTION_DUE').map((t) => t.periodNo)).toEqual([1, 2]);
+  });
+
+  it('Calamari carries unused fine-pool money over: no misses -> next week owes only ₹400', () => {
+    expect(calamariAsIs().finance.unusedFinePool).toBe('CARRY_FORWARD');
+    const { txs, bal } = run({ 1: all('S', 7) }, { cfg: calamariAsIs() });
+    const carry = txs.find((t) => t.baseKey === 'unused:1:1')!;
+    expect(carry.lines).toEqual([{ account: 'FINE_POOL:1:1', amount: rs(600) }, { account: 'RECEIVABLE:1', amount: -rs(600) }]);
+    expect(carry.origin).toEqual({ to: 'CARRY_FORWARD', intoPeriod: 2 });
+    expect(bal('REFUND_DUE:1')).toBe(0);
+    expect(bal('FINE_POOL:1:2')).toBe(-rs(600)); // week 2's fine pool is full again
+  });
+
+  it('owner\'s example: 3 misses in week 1 -> ₹300 carried, so week 2 owes ₹400 + ₹300 = ₹700', () => {
+    const { txs } = run({ 1: 'SMMMSSS' }, { cfg: calamariAsIs() });
+    expect(txs.filter((t) => t.type === 'FINE').length).toBe(3);
+    expect(txs.find((t) => t.baseKey === 'unused:1:1')!.lines).toEqual([{ account: 'FINE_POOL:1:1', amount: rs(300) }, { account: 'RECEIVABLE:1', amount: -rs(300) }]);
+    const owedWeek2 = rs(1000) - rs(300);
+    expect(owedWeek2).toBe(rs(700));
+  });
+
+  it('carry-over: the last week\'s leftover (or after leaving) is refunded; every entry still balances', () => {
+    const { txs, bal } = run({ 1: all('S') }, { cfg: calamariAsIs() });
+    for (const t of txs) expect(t.lines.reduce((a, l) => a + l.amount, 0)).toBe(0);
+    expect(txs.filter((t) => t.origin.to === 'CARRY_FORWARD').map((t) => t.periodNo)).toEqual([1, 2, 3, 4, 5]);
+    expect(bal('REFUND_DUE:1')).toBe(-rs(428)); // the short last week's fine pool (₹428), nothing to carry it into
+    const gone = run({ 1: all('S', 10) + all('.', 30) }, { cfg: calamariAsIs(), left: { 1: '2026-12-01' } });
+    expect(gone.txs.find((t) => t.baseKey === 'unused:1:2')!.origin).toEqual({ to: 'REFUND' });
   });
 
   it('unused fine-pool money can go to the prize pool or a separate year-end pool instead (settings)', () => {

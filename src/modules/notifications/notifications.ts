@@ -56,7 +56,8 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     // As a participant: today's check-in, votes waiting for me.
     if (c.participant_id && c.p_status === 'ACTIVE' && live && daysBetween(c.joined_on, today) >= 0 && (!c.left_on || daysBetween(today, c.left_on) >= 0)) {
       const { rows: [t] } = await db.query(
-        `SELECT (SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED') AS sub,
+        `SELECT coalesce((SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' AND NOT part),
+                         (SELECT 'PARTS' FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status <> 'REJECTED' LIMIT 1)) AS sub,
                 EXISTS (SELECT 1 FROM rest_days WHERE participant_id = $1 AND day = $2 AND cancelled_at IS NULL) AS rest,
                 EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused`,
         [c.participant_id, today]);

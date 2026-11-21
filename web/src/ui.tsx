@@ -48,6 +48,7 @@ export const DAY_STATUS: Record<string, { label: string; tone: string }> = {
   NOT_PARTICIPATING: { label: 'Not taking part', tone: '' },
   UPCOMING: { label: 'Upcoming', tone: '' },
   NOT_SUBMITTED: { label: 'Not submitted', tone: 'warn' },
+  IN_PROGRESS: { label: 'In progress', tone: 'info' },
   SUBMITTED: { label: 'Submitted', tone: 'info' },
   PENDING_VERIFICATION: { label: 'Pending verification', tone: 'info' },
   ACHIEVED: { label: 'Target achieved', tone: 'ok' },

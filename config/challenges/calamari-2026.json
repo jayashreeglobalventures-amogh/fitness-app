@@ -28,7 +28,11 @@
   "submission": {
     "evidence": "SCREENSHOT",
     "instructions": "The screenshot must clearly show the date and your total steps for that day. Submit it in the app before midnight (IST). WhatsApp is not a submission channel.",
-    "deadline": "END_OF_DAY"
+    "deadline": "END_OF_DAY",
+    "multiplePerDay": {
+      "enabled": false,
+      "combine": "SUM"
+    }
   },
   "verification": {
     "mode": "AI_ASSISTED",

@@ -94,6 +94,12 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
 
       <Section title="Evidence and verification">
         <Area ctx={ctx} p={['submission', 'instructions']} label="Instructions shown to participants" />
+        <Check ctx={ctx} p={['submission', 'multiplePerDay', 'enabled']} label="Allow several screenshots a day (e.g. phone + watch)" />
+        {get(c, ['submission', 'multiplePerDay', 'enabled']) === true && (
+          <Select ctx={ctx} p={['submission', 'multiplePerDay', 'combine']} label="How they count"
+            options={{ SUM: 'Add them up (different devices or apps)', HIGHEST: 'Use the highest (the same app\'s running total)' }}
+            hint="Each screenshot is checked on its own (approve / decline). The day is met as soon as the approved total reaches the target; otherwise it is decided at midnight. The same picture can't be added twice." />
+        )}
         <p className="muted small">Deadline: midnight at the end of each day ({c.basics.timeZone}). Late evidence never counts for an earlier day.</p>
         <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or Claude if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
         <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the reading is at least this sure (0.5–1)" step={0.01} />

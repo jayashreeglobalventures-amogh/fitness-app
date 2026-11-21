@@ -57,6 +57,12 @@ export const ChallengeConfigSchema = Type.Object({
     instructions: Type.String({ maxLength: 1000 }),
     // The deadline of a day is midnight at its end (local). Late evidence never counts for an earlier day.
     deadline: Type.Literal('END_OF_DAY'),
+    // Several screenshots a day (e.g. phone + watch): each is checked on its own; the day's total is the approved
+    // ones added up (SUM) or the highest (HIGHEST - for one app's running total). Off: one screenshot, a new one replaces it.
+    multiplePerDay: Type.Object({
+      enabled: Type.Boolean(),
+      combine: Type.Union([Type.Literal('SUM'), Type.Literal('HIGHEST')]),
+    }, { additionalProperties: false }),
   }, { additionalProperties: false }),
   verification: Type.Object({
     mode: Type.Union([Type.Literal('AI_ASSISTED'), Type.Literal('MANUAL')]),
@@ -184,6 +190,7 @@ export function normalizeConfig<T>(input: T): T {
   if (c.prizes && typeof c.prizes === 'object' && c.prizes.topThreeIneligible === undefined) c.prizes.topThreeIneligible = 'NEXT_ELIGIBLE';
   if (c.community === undefined && c.schemaVersion !== undefined) c.community = { enabled: true, participantsCanPost: true, photos: true };
   if (c.coach === undefined && c.schemaVersion !== undefined) c.coach = { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true };
+  if (c.submission && typeof c.submission === 'object' && c.submission.multiplePerDay === undefined) c.submission.multiplePerDay = { enabled: false, combine: 'SUM' };
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

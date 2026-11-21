@@ -1,14 +1,15 @@
 // Participant: today's goal, screenshot upload, rest day, progress and calendar.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad } from '../ui';
+import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
 import { CoachCard } from './Coach';
 
 interface DayInfo {
   day: string; status: string; periodNo: number | null;
-  submission: { submissionId: number; status: string; finalValue: number | null; claimedValue: number | null; receivedAt: string; decisionReason: string | null; appealed: boolean } | null;
+  submission: { submissionId: number; status: string; finalValue: number | null; claimedValue: number | null; receivedAt: string; decisionReason: string | null; appealed: boolean; fileId?: number } | null;
+  parts?: { submissionId: number; status: string; value: number | null; receivedAt: string; fileId: number; decisionReason: string | null }[];
   restDay: { restDayId: number; declaredAt: string; source: string } | null;
   exemption: { requestId: number; status: string } | null;
 }
@@ -18,7 +19,7 @@ interface Dashboard {
   days: DayInfo[];
   summary: { achieved: number; missed: number; rest: number; excused: number; pending: number; adherencePct: number | null; restDaysUsed: number; restDaysThisPeriod: number; daysLeft: number };
   periods: { periodNo: number; startsOn: string; endsOn: string }[];
-  rules: { restDays: { enabled: boolean; perPeriod: number; maxTotal: number; declareBefore: string }; exemptions: { enabled: boolean }; instructions: string };
+  rules: { restDays: { enabled: boolean; perPeriod: number; maxTotal: number; declareBefore: string }; exemptions: { enabled: boolean }; instructions: string; multiplePerDay: { enabled: boolean; combine: 'SUM' | 'HIGHEST' } };
   serverNow: string; timeZone: string;
 }
 
@@ -108,7 +109,9 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
   const cancelRest = async () => {
     try { await api.post(`/api/rest-days/${t.restDay!.restDayId}/cancel`); onChanged(); } catch (e) { setError(e); }
   };
-  const canUpload = ['NOT_SUBMITTED', 'SUBMITTED', 'PENDING_VERIFICATION', 'TARGET_MISSED', 'REJECTED'].includes(t.status) && left !== 'closed';
+  const multi = d.rules.multiplePerDay.enabled;
+  const parts = t.parts ?? [];
+  const canUpload = ['NOT_SUBMITTED', 'SUBMITTED', 'PENDING_VERIFICATION', 'TARGET_MISSED', 'REJECTED', 'IN_PROGRESS'].includes(t.status) && left !== 'closed';
   const beforeCutoff = Date.now() < Date.parse(t.restCutoff);
   const restAllowed = d.rules.restDays.enabled && !t.submission && t.status === 'NOT_SUBMITTED' && beforeCutoff
     && d.summary.restDaysThisPeriod < d.rules.restDays.perPeriod && d.summary.restDaysUsed < d.rules.restDays.maxTotal;
@@ -122,7 +125,10 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
       <ErrorBox error={error} />
       {t.status === 'ACHIEVED' && <div className="alert ok" style={{ marginTop: 12 }}>Done for today: {t.submission?.finalValue?.toLocaleString('en-IN')} {t.unit}. 🎉</div>}
       {t.status === 'SUBMITTED' && <div className="alert" style={{ marginTop: 12 }}>Reading your screenshot…</div>}
-      {t.status === 'PENDING_VERIFICATION' && <div className="alert" style={{ marginTop: 12 }}>An admin will check your screenshot. You can upload a clearer one until midnight.</div>}
+      {t.status === 'PENDING_VERIFICATION' && <div className="alert" style={{ marginTop: 12 }}>{multi ? 'An admin will check a screenshot. You can add more until midnight.' : 'An admin will check your screenshot. You can upload a clearer one until midnight.'}</div>}
+      {t.status === 'IN_PROGRESS' && <div className="alert" style={{ marginTop: 12 }}>{(t.submission?.finalValue ?? 0).toLocaleString('en-IN')} of {t.target.toLocaleString('en-IN')} {t.unit} so far. Add another screenshot (e.g. from your watch) before midnight.</div>}
+      {multi && parts.length > 0 && <Parts parts={parts} combine={d.rules.multiplePerDay.combine} unit={t.unit} />}
+      {!multi && t.submission?.fileId && <p className="small" style={{ marginTop: 8 }}><ViewPhoto fileId={t.submission.fileId} alt="My screenshot for today">View my screenshot</ViewPhoto></p>}
       {(t.status === 'TARGET_MISSED' || t.status === 'REJECTED') && <div className="alert error" style={{ marginTop: 12 }}>{DAY_STATUS[t.status]!.label}{t.submission?.decisionReason ? `: ${t.submission.decisionReason}` : '.'} You can upload new evidence until midnight.</div>}
       {t.status === 'REST' && <div className="alert" style={{ marginTop: 12 }}>Rest day. Enjoy it. {beforeCutoff && <button className="btn small ghost" onClick={cancelRest}>Cancel rest day</button>}</div>}
       {t.status === 'EXCUSED' && <div className="alert" style={{ marginTop: 12 }}>Excused by an approved exemption. Get well soon.</div>}
@@ -132,7 +138,7 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
           <input ref={input} type="file" accept="image/*" hidden onChange={(e) => pick(e.target.files?.[0] ?? null)} />
           {!file ? (
             <div className="dropzone" role="button" tabIndex={0} onClick={() => input.current?.click()} onKeyDown={(e) => e.key === 'Enter' && input.current?.click()}>
-              <b>Upload today's screenshot</b><span className="muted small">{d.rules.instructions}</span>
+              <b>{multi && parts.length ? 'Add another screenshot' : 'Upload today\'s screenshot'}</b><span className="muted small">{multi ? `${d.rules.instructions} You can add several (e.g. phone and watch): ${d.rules.multiplePerDay.combine === 'SUM' ? 'their steps are added up' : 'the highest counts'}.` : d.rules.instructions}</span>
             </div>
           ) : (
             <div className="stack">
@@ -146,6 +152,27 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
         </div>
       )}
       {restAllowed && !file && <button className="btn ghost small" style={{ marginTop: 10 }} onClick={rest}>Take today as a rest day (until {d.rules.restDays.declareBefore})</button>}
+    </div>
+  );
+}
+
+const PART_LABEL: Record<string, string> = { PENDING_AI: 'reading…', PENDING_REVIEW: 'waiting for an admin', APPROVED: 'approved', REJECTED: 'declined' };
+/** Several screenshots a day: each one, its number and state, and the day's total. */
+function Parts({ parts, combine, unit }: { parts: NonNullable<DayInfo['parts']>; combine: 'SUM' | 'HIGHEST'; unit: string }) {
+  const approved = parts.filter((p) => p.status === 'APPROVED').map((p) => p.value ?? 0);
+  const total = approved.length ? (combine === 'SUM' ? approved.reduce((a, v) => a + v, 0) : Math.max(...approved)) : 0;
+  return (
+    <div className="parts">
+      {parts.map((p, i) => (
+        <div key={p.submissionId} className="spread small" style={{ padding: '4px 0' }}>
+          <ViewPhoto fileId={p.fileId} alt={`Screenshot ${i + 1}`}>Screenshot {i + 1}</ViewPhoto>
+          <span><b>{p.value !== null && p.status === 'APPROVED' ? p.value.toLocaleString('en-IN') : '—'}</b> <span className={`badge ${p.status === 'APPROVED' ? 'ok' : p.status === 'REJECTED' ? 'danger' : ''}`}>{PART_LABEL[p.status] ?? p.status}</span></span>
+        </div>
+      ))}
+      {parts.filter((p) => p.status === 'REJECTED' && p.decisionReason).map((p) => <p key={p.submissionId} className="muted small" style={{ margin: 0 }}>Declined: {p.decisionReason}</p>)}
+      <div className="spread" style={{ borderTop: '1px solid var(--border)', paddingTop: 6, marginTop: 4 }}>
+        <b className="small">{combine === 'SUM' ? 'Total (approved, added up)' : 'Highest approved'}</b><b>{total.toLocaleString('en-IN')} {unit}</b>
+      </div>
     </div>
   );
 }

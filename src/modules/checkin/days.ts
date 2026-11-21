@@ -7,8 +7,10 @@ import { getChallenge, versions, versionOn, type ChallengeRow, type ChallengeVer
 import type { ChallengeConfig } from '../challenges/config.js';
 
 export type DayStatus =
-  | 'NOT_PARTICIPATING' | 'UPCOMING' | 'NOT_SUBMITTED' | 'SUBMITTED' | 'PENDING_VERIFICATION'
+  | 'NOT_PARTICIPATING' | 'UPCOMING' | 'NOT_SUBMITTED' | 'SUBMITTED' | 'PENDING_VERIFICATION' | 'IN_PROGRESS'
   | 'ACHIEVED' | 'TARGET_MISSED' | 'REJECTED' | 'MISSED_DEADLINE' | 'EXCUSED' | 'REST';
+// IN_PROGRESS: several screenshots a day are allowed, some are approved, the total is still below the target and the
+// day isn't over - more can be added until midnight.
 
 /** Statuses that are final for adherence (a pending one may still change). */
 export const SUCCESS: ReadonlySet<DayStatus> = new Set(['ACHIEVED']);
@@ -52,9 +54,33 @@ export const periodOf = (periods: Period[], day: string) => periods.find((p) => 
 /** The instant after which a rest day can no longer be declared or cancelled by the participant. */
 export const restCutoff = (cfg: ChallengeConfig, day: string) => zonedInstant(day, cfg.restDays.declareBefore, cfg.basics.timeZone);
 
+export interface DayPart { submissionId: number; status: string; value: number | null; receivedAt: string; fileId: number; decisionReason: string | null; appealed: boolean }
+
+/**
+ * A day with several screenshots: the approved ones, added up (SUM) or the highest (HIGHEST), against the target.
+ * Met as soon as the approved total reaches it; otherwise in progress until midnight, then decided.
+ */
+export function combineParts(parts: Record<string, any>[], cfg: ChallengeConfig, dayOver: boolean): { status: DayStatus; summaryStatus: string; total: number; combine: 'SUM' | 'HIGHEST' } {
+  const combine = cfg.submission.multiplePerDay.combine;
+  const values = parts.filter((p) => p.status === 'APPROVED').map((p) => Number(p.final_value ?? 0));
+  const total = values.length ? (combine === 'HIGHEST' ? Math.max(...values) : values.reduce((a, v) => a + v, 0)) : 0;
+  const pending = parts.some((p) => p.status === 'PENDING_AI' || p.status === 'PENDING_REVIEW');
+  const target = cfg.activity.dailyTarget;
+  let status: DayStatus;
+  if (values.length && total >= target) status = 'ACHIEVED';
+  else if (!dayOver) status = pending ? (parts.some((p) => p.status === 'PENDING_REVIEW') ? 'PENDING_VERIFICATION' : 'SUBMITTED') : values.length ? 'IN_PROGRESS' : 'NOT_SUBMITTED';
+  else if (pending) status = 'PENDING_VERIFICATION';
+  else status = values.length ? 'TARGET_MISSED' : 'REJECTED';
+  const summaryStatus = status === 'ACHIEVED' ? 'ACHIEVED' : status === 'TARGET_MISSED' ? 'BELOW_TARGET' : status === 'REJECTED' ? 'REJECTED' : pending ? 'PENDING_REVIEW' : 'IN_PROGRESS';
+  return { status, summaryStatus, total, combine };
+}
+
 export interface DayInfo {
   day: string; status: DayStatus; periodNo: number | null;
-  submission: { submissionId: number; status: string; finalValue: number | null; claimedValue: number | null; receivedAt: string; decisionReason: string | null; appealed: boolean } | null;
+  submission: { submissionId: number; status: string; finalValue: number | null; claimedValue: number | null; receivedAt: string; decisionReason: string | null; appealed: boolean; fileId?: number } | null;
+  /** Several screenshots a day: each one, in upload order (empty otherwise). */
+  parts?: DayPart[];
+  combine?: 'SUM' | 'HIGHEST' | null;
   restDay: { restDayId: number; declaredAt: string; source: string } | null;
   exemption: { requestId: number; status: string } | null;
 }
@@ -66,11 +92,17 @@ export async function participantDays(db: Queryable, ctx: ChallengeContext, p: P
     db.query(`SELECT * FROM rest_days WHERE participant_id = $1 AND cancelled_at IS NULL`, [p.participantId]),
     db.query(`SELECT * FROM exemption_requests WHERE participant_id = $1 AND status IN ('VOTING','ADMIN_REVIEW','APPROVED') ORDER BY request_id`, [p.participantId]),
   ]);
-  const subOf = new Map(subs.rows.map((r) => [String(r.day), r]));
+  const subOf = new Map(subs.rows.filter((r) => !r.part).map((r) => [String(r.day), r]));
+  const partsOf = new Map<string, Record<string, any>[]>();
+  for (const r of subs.rows.filter((x) => x.part).sort((a, b) => Number(a.submission_id) - Number(b.submission_id))) {
+    partsOf.set(String(r.day), [...(partsOf.get(String(r.day)) ?? []), r]);
+  }
   const restOf = new Map(rests.rows.map((r) => [String(r.day), r]));
   const out: DayInfo[] = [];
   for (let d = ctx.ch.startsOn; daysBetween(d, ctx.ch.endsOn) >= 0; d = addDays(d, 1)) {
     const s = subOf.get(d);
+    const parts = partsOf.get(d) ?? [];
+    const multi = parts.length ? combineParts(parts, ctx.cfgOn(d), now >= endOfDay(d, ctx.ch.timeZone)) : null;
     const r = restOf.get(d);
     const ex = exs.rows.filter((e) => daysBetween(e.start_day, d) >= 0 && daysBetween(d, e.end_day) >= 0);
     const approved = ex.find((e) => e.status === 'APPROVED');
@@ -79,13 +111,21 @@ export async function participantDays(db: Queryable, ctx: ChallengeContext, p: P
     if (!participatesOn(p, d)) status = 'NOT_PARTICIPATING';
     else if (approved) status = 'EXCUSED';
     else if (r) status = 'REST';
+    else if (multi) status = multi.status;
     else if (s) status = ({ PENDING_AI: 'SUBMITTED', PENDING_REVIEW: 'PENDING_VERIFICATION', ACHIEVED: 'ACHIEVED', BELOW_TARGET: 'TARGET_MISSED', REJECTED: 'REJECTED' } as const)[s.status as 'ACHIEVED'];
     else if (daysBetween(ctx.today, d) > 0) status = 'UPCOMING';
     else status = now < endOfDay(d, ctx.ch.timeZone) ? 'NOT_SUBMITTED' : 'MISSED_DEADLINE';
+    const last = parts.at(-1);
     out.push({
       day: d, status, periodNo: periodOf(ctx.periods, d)?.periodNo ?? null,
-      submission: s ? { submissionId: Number(s.submission_id), status: s.status, finalValue: s.final_value, claimedValue: s.claimed_value, receivedAt: s.received_at.toISOString(),
-        decisionReason: s.decision_reason, appealed: !!s.appealed_at } : null,
+      // With several screenshots, "submission" summarises the day: total so far, latest upload.
+      submission: multi && last ? { submissionId: Number(last.submission_id), status: multi.summaryStatus, finalValue: multi.total, claimedValue: null, receivedAt: last.received_at.toISOString(),
+          decisionReason: null, appealed: false, fileId: Number(last.file_id) }
+        : s ? { submissionId: Number(s.submission_id), status: s.status, finalValue: s.final_value, claimedValue: s.claimed_value, receivedAt: s.received_at.toISOString(),
+          decisionReason: s.decision_reason, appealed: !!s.appealed_at, fileId: Number(s.file_id) } : null,
+      parts: parts.map((x) => ({ submissionId: Number(x.submission_id), status: x.status, value: x.final_value, receivedAt: x.received_at.toISOString(), fileId: Number(x.file_id),
+        decisionReason: x.decision_reason, appealed: !!x.appealed_at })),
+      combine: multi ? multi.combine : null,
       restDay: r ? { restDayId: Number(r.rest_day_id), declaredAt: r.declared_at.toISOString(), source: r.source } : null,
       exemption: approved ? { requestId: Number(approved.request_id), status: 'APPROVED' } : pending ? { requestId: Number(pending.request_id), status: pending.status } : null,
     });
@@ -138,7 +178,7 @@ export async function myDashboard(db: Queryable, userId: number, challengeId: nu
       restCutoff: restCutoff(todayCfg, ctx.today).toISOString(),
     },
     days, summary: summarize(days, ctx), periods: ctx.periods,
-    rules: { restDays: todayCfg.restDays, exemptions: { enabled: todayCfg.exemptions.enabled }, instructions: todayCfg.submission.instructions },
+    rules: { restDays: todayCfg.restDays, exemptions: { enabled: todayCfg.exemptions.enabled }, instructions: todayCfg.submission.instructions, multiplePerDay: todayCfg.submission.multiplePerDay },
     serverNow: now.toISOString(), timeZone: ctx.ch.timeZone,
   };
 }

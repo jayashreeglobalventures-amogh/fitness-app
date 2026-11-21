@@ -361,7 +361,14 @@ export async function myMoney(db: Queryable, userId: number, challengeId: number
   if (!p) throw forbidden('You are not taking part in this challenge.');
   const { ctx } = await reconcileMoney(db, challengeId, now);
   const bal = await accountBalances(db, challengeId);
-  return { ...(await statementOf(db, ctx, p.participantId)), pools: poolsOf(bal), today: ctx.today, finance: ctx.cfgOn(ctx.today < ctx.ch.startsOn ? ctx.ch.startsOn : ctx.today).finance };
+  // The prize pool and what it is made of: everyone's weekly prize-pool share (all weeks, as owed) and fines from misses.
+  const { rows: [fx] } = await db.query(
+    `SELECT coalesce(-sum(l.amount_paise), 0)::bigint AS fines FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
+      WHERE t.challenge_id = $1 AND t.type = 'FINE' AND l.account = 'MAIN_POOL'`, [challengeId]);
+  const pools = poolsOf(bal);
+  const fromFines = rupees(Number(fx.fines));
+  return { ...(await statementOf(db, ctx, p.participantId)), pools, prizePool: { total: pools.prizePool, fromFines, fromContributions: Math.max(0, Math.round((pools.prizePool - fromFines) * 100) / 100) },
+    today: ctx.today, finance: ctx.cfgOn(ctx.today < ctx.ch.startsOn ? ctx.ch.startsOn : ctx.today).finance };
 }
 
 function poolsOf(bal: Map<string, number>) {

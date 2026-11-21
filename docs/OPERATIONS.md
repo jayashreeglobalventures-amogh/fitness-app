@@ -24,9 +24,15 @@ All commands run on the VPS as `deploy-fitness` in the environment's directory
 - **Before every deploy:** a verified dump in `backups/predeploy/` (last 10 kept).
 - **Weekly restore test** (`fitness-restore-test@<env>.timer`, Sunday 04:15 IST): the newest dump is restored into a
   throwaway PostgreSQL with no network, and every evidence file the database refers to must be in the image archive.
-- **Off-site (recommended):** encrypted with restic, sent with rclone (e.g. to Google Drive). Install `restic` and
-  `rclone`, then create `offsite.env`, `offsite.pass` (keep a copy of the password in your password manager) and
-  `rclone.conf` in the environment directory as described at the top of `offsite.sh`. `backup.sh` then runs it nightly.
+- **Off-site:** encrypted with restic, sent with rclone to Google Drive (`Fitness-backups/<env>`), right after the
+  nightly backup; keeps 30 daily / 12 weekly / 12 monthly; prune + integrity check on Sundays. Status: `offsite:` in
+  `ssh … deploy-fitness@VPS status <env>`. One-time setup per environment:
+  1. On your Mac: `rclone config create gdrive drive scope=drive.file` (a browser opens: sign in to the Google
+     account that should hold the backups), then `rclone config show gdrive > ~/gdrive-rclone.conf`.
+  2. `scp -i ~/.ssh/rent_admin ~/gdrive-rclone.conf deploy/setup-offsite.sh admin@VPS:/tmp/`
+  3. `ssh -t -i ~/.ssh/rent_admin admin@VPS "sudo bash /tmp/setup-offsite.sh production /tmp/gdrive-rclone.conf && sudo bash /tmp/setup-offsite.sh staging /tmp/gdrive-rclone.conf; rm -f /tmp/gdrive-rclone.conf"`
+  4. **Save each printed encryption password in the password manager** - without it the copies can't be opened.
+  `scope=drive.file` lets the server see only the files it created in that Drive, nothing else.
 
 ## Restore
 

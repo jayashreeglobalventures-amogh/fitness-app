@@ -227,13 +227,19 @@ export async function review(db: Queryable, actorUserId: number, submissionId: n
   if (p.userId === actorUserId) throw forbidden('You can\'t review your own evidence; another admin must do it.');
   if (s.status === 'SUPERSEDED') throw conflict('This evidence was replaced by a newer upload.');
   if (s.status === 'WITHDRAWN') throw conflict('This screenshot was removed.');
-  const outcome = String(input.outcome ?? '');
-  // One of several screenshots a day: approve (its number counts towards the day) or decline. Otherwise the day's result.
-  if (s.part ? !['APPROVED', 'REJECTED'].includes(outcome) : !['ACHIEVED', 'BELOW_TARGET', 'REJECTED'].includes(outcome)) {
-    throw validation(s.part ? 'Choose: approve or decline.' : 'Choose: target reached, below target, or rejected.');
+  let outcome = String(input.outcome ?? '');
+  // Admins approve the number a screenshot shows, or decline it; the app works out whether the target was met.
+  // (ACHIEVED / BELOW_TARGET are still accepted for a single screenshot, as before.)
+  if (s.part ? !['APPROVED', 'REJECTED'].includes(outcome) : !['APPROVED', 'ACHIEVED', 'BELOW_TARGET', 'REJECTED'].includes(outcome)) {
+    throw validation('Choose: approve or decline.');
   }
   const ctx = await challengeContext(db, challengeId, now);
   const target = ctx.cfgOn(s.day).activity.dailyTarget;
+  if (!s.part && outcome === 'APPROVED') {
+    const v = Number(input.value);
+    if (!Number.isSafeInteger(v) || v < 0) throw validation('Enter the number shown in the screenshot.');
+    outcome = v >= target ? 'ACHIEVED' : 'BELOW_TARGET';
+  }
   let value: number | null = null;
   if (outcome !== 'REJECTED') {
     value = Number(input.value);

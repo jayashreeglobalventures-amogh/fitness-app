@@ -52,6 +52,7 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
         <div className="spread"><h3 style={{ margin: 0 }}>Health profile</h3><span aria-hidden="true">›</span></div>
         <p className="muted small" style={{ marginBottom: 0 }}>Optional: height, weight, BMI, waist, body fat, resting heart rate, goals - with progress charts. Private unless you choose to share.</p>
       </div>
+      <p className="muted small" style={{ textAlign: 'center' }}><a href="/privacy.html">Privacy policy</a></p>
     </>
   );
 }

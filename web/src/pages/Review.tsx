@@ -1,7 +1,7 @@
 // Admin review queue: the screenshot, what the AI read (and why it wasn't approved), and the decision.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, time, useLoad, ViewPhoto } from '../ui';
+import { Collapsible, day, ErrorBox, Field, Loading, time, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Result { method: string; model: string | null; extractedDate: string | null; extractedValue: number | null; sourceApp: string | null; confidence: number | null; flags: string[]; outcome: string; reason: string | null; at: string }
@@ -14,6 +14,7 @@ export function ReviewSection({ v }: { v: ChallengeView }) {
     <>
       <ErrorBox error={q.error} />
       <p className="muted small">The AI approves only clear, on-target screenshots of the right day. Everything else waits here. Flags are prompts to check, not proof of anything.</p>
+      <RemovalRequests challengeId={v.challengeId} />
       {q.data?.length === 0 && <div className="card empty">Nothing to review. ✅</div>}
       {q.data?.map((it) => <ReviewCard key={it.submissionId} it={it} tz={v.timeZone} onDone={q.reload} />)}
     </>
@@ -34,8 +35,7 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
   };
   const n = Number(value);
   return (
-    <div className="card">
-      <div className="spread"><h3>{it.displayName} · {day(it.day)}</h3><span className="muted small">uploaded {time(it.receivedAt, tz)}</span></div>
+    <Collapsible id={`review-${it.submissionId}`} title={<span className="spread" style={{ width: '100%' }}><span>{it.displayName} · {day(it.day)}</span><span className="muted small" style={{ fontWeight: 400 }}>uploaded {time(it.receivedAt, tz)}</span></span>}>
       <div className="grid2">
         <ViewPhoto fileId={it.fileId} alt={`Evidence from ${it.displayName}`}><img className="shot" src={`/api/files/${it.fileId}`} alt={`Evidence from ${it.displayName}`} loading="lazy" /></ViewPhoto>
         <div>
@@ -71,6 +71,57 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
           )}
         </div>
       </div>
-    </div>
+    </Collapsible>
+  );
+}
+
+interface EvReq { requestId: number; submissionId: number; kind: 'REMOVE' | 'ERASE'; eraseImage: boolean; reason: string; requestedAt: string; day: string; status: string; value: number | null; part: boolean; fileId: number | null; displayName: string; mine: boolean }
+
+/** Requests from participants to remove a screenshot after its day (and/or erase the image). */
+function RemovalRequests({ challengeId }: { challengeId: number }) {
+  const q = useLoad(() => api.get<EvReq[]>(`/api/challenges/${challengeId}/evidence-requests`), [challengeId]);
+  if (!q.data?.length) return null;
+  return (
+    <>
+      <h3 style={{ margin: '4px 0 8px' }}>Requests to remove screenshots ({q.data.length})</h3>
+      {q.data.map((r) => <RemovalCard key={r.requestId} r={r} onDone={q.reload} />)}
+    </>
+  );
+}
+
+function RemovalCard({ r, onDone }: { r: EvReq; onDone: () => void }) {
+  const [erase, setErase] = useState(r.kind === 'ERASE' || r.eraseImage);
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<unknown>(null);
+  const decide = async (approve: boolean) => {
+    setError(null);
+    try { await api.post(`/api/evidence-requests/${r.requestId}/decide`, { approve, erase, note }); onDone(); } catch (e) { setError(e); }
+  };
+  const effect = r.kind === 'ERASE' ? 'The screenshot was already removed; this only erases the image.'
+    : r.part ? 'Removing it takes its number out of that day\'s total; points and fines are recalculated.'
+      : 'Removing it leaves that day without evidence (a missed day unless it has a rest day or exemption); points and fines are recalculated.';
+  return (
+    <Collapsible id={`evreq-${r.requestId}`} title={<span className="spread" style={{ width: '100%' }}><span>{r.displayName} · {day(r.day)} · {r.kind === 'ERASE' ? 'erase image' : 'remove'}</span><span className="badge warn">request</span></span>}>
+      <ErrorBox error={error} />
+      <div className="grid2">
+        {r.fileId ? <ViewPhoto fileId={r.fileId} alt={`Screenshot from ${r.displayName}`}><img className="shot" src={`/api/files/${r.fileId}`} alt={`Screenshot from ${r.displayName}`} loading="lazy" /></ViewPhoto>
+          : <p className="muted small">Image already erased.</p>}
+        <div>
+          <p className="small" style={{ marginTop: 0 }}><b>Their reason:</b> “{r.reason}”</p>
+          <p className="small muted">{r.value !== null ? `Counted: ${r.value.toLocaleString('en-IN')}. ` : ''}{effect}</p>
+          {r.mine ? <div className="alert">This is about your own screenshot: another admin must decide.</div> : (
+            <>
+              {r.kind === 'REMOVE' && <label className="check small"><input type="checkbox" checked={erase} onChange={(e) => setErase(e.target.checked)} />
+                <span>Also erase the image permanently{r.eraseImage ? ' (they asked for this - a private photo)' : ''}</span></label>}
+              <Field label="Note (required to decline)"><input type="text" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+              <div className="row">
+                <button className="btn primary small" onClick={() => decide(true)}>{r.kind === 'ERASE' ? 'Erase the image' : erase ? 'Remove and erase' : 'Remove'}</button>
+                <button className="btn small" disabled={note.trim().length < 5} onClick={() => decide(false)}>Decline</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Collapsible>
   );
 }

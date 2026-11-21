@@ -78,6 +78,13 @@
       "when": 1796515200000,
       "tag": "0010_multiple_screenshots",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1796601600000,
+      "tag": "0011_removing_screenshots",
+      "breakpoints": true
     }
   ]
 }

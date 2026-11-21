@@ -88,7 +88,7 @@ export interface DayInfo {
 /** Every challenge day for one participant. */
 export async function participantDays(db: Queryable, ctx: ChallengeContext, p: ParticipantRow, now: Date): Promise<DayInfo[]> {
   const [subs, rests, exs] = await Promise.all([
-    db.query(`SELECT * FROM submissions WHERE participant_id = $1 AND status <> 'SUPERSEDED'`, [p.participantId]),
+    db.query(`SELECT * FROM submissions WHERE participant_id = $1 AND status NOT IN ('SUPERSEDED','WITHDRAWN')`, [p.participantId]),
     db.query(`SELECT * FROM rest_days WHERE participant_id = $1 AND cancelled_at IS NULL`, [p.participantId]),
     db.query(`SELECT * FROM exemption_requests WHERE participant_id = $1 AND status IN ('VOTING','ADMIN_REVIEW','APPROVED') ORDER BY request_id`, [p.participantId]),
   ]);

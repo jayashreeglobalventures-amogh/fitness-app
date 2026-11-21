@@ -2,7 +2,7 @@
 // uploader's folder; metadata and ownership in PostgreSQL (files table). The type is decided from the bytes, never
 // from the client's file name or MIME type. Files are only ever served through authorised routes.
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { validation } from './errors.js';
 
@@ -41,3 +41,8 @@ export function resolveKey(mediaDir: string, storageKey: string): string {
 }
 
 export const readImage = (mediaDir: string, storageKey: string) => readFile(resolveKey(mediaDir, storageKey));
+
+/** Deletes a stored image for good (an admin erasing a private photo). Missing already = fine. */
+export async function eraseImage(mediaDir: string, storageKey: string): Promise<void> {
+  await rm(resolveKey(mediaDir, storageKey), { force: true });
+}

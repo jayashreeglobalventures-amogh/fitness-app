@@ -21,6 +21,7 @@ import { myDashboard } from './modules/checkin/days.js';
 import { adminOverview, participantCalendar, recordReminder } from './modules/checkin/overview.js';
 import * as restdays from './modules/checkin/restdays.js';
 import * as submissions from './modules/checkin/submissions.js';
+import * as removal from './modules/checkin/removal.js';
 import { readerName } from './modules/verification/select.js';
 import * as bonus from './modules/scoring/bonus.js';
 import { breakdown, leaderboard } from './modules/scoring/ledger.js';
@@ -325,6 +326,14 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.get('/api/submissions/:submissionId', authed((c) => submissions.submissionDetail(c.tx, c.user.userId, sid(c))));
   app.post('/api/submissions/:submissionId/review', authed((c) => submissions.review(c.tx, c.user.userId, sid(c), body(c.req) as never, c.now)));
   app.post('/api/submissions/:submissionId/appeal', authed((c) => submissions.appeal(c.tx, c.user.userId, sid(c), body(c.req).note, c.now)));
+  // Removing a screenshot: yourself until midnight; afterwards by asking an admin (who may also erase the image).
+  app.post('/api/submissions/:submissionId/withdraw', authed((c) => removal.withdraw(c.tx, c.user.userId, sid(c), body(c.req) as never, c.now)));
+  app.post('/api/submissions/:submissionId/removal-request', authed((c) => removal.requestRemoval(c.tx, c.user.userId, sid(c), body(c.req) as never, c.now)));
+  app.get('/api/challenges/:challengeId/evidence-requests', authed((c) => removal.pendingRequests(c.tx, c.user.userId, cid(c))));
+  app.post('/api/evidence-requests/:requestId/decide', authed(async (c) => {
+    const r = await removal.decideRequest(c.tx, c.user.userId, id((c.req.params as { requestId: string }).requestId), body(c.req) as never, c.now);
+    if (r.eraseKey) { const key = r.eraseKey; c.after(() => removal.deleteErased(config.mediaDir, key)); }
+  }));
   app.get('/api/challenges/:challengeId/review-queue', authed((c) => submissions.reviewQueue(c.tx, c.user.userId, cid(c), c.now)));
   app.get('/api/challenges/:challengeId/overview', authed((c) => adminOverview(c.tx, c.user.userId, cid(c), (c.req.query as { day?: string }).day, c.now)));
   app.post('/api/challenges/:challengeId/reminders', authed((c) => recordReminder(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));

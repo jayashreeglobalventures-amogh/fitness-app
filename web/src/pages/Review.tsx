@@ -1,11 +1,11 @@
 // Admin review queue: the screenshot, what the AI read (and why it wasn't approved), and the decision.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, time, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, time, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Result { method: string; model: string | null; extractedDate: string | null; extractedValue: number | null; sourceApp: string | null; confidence: number | null; flags: string[]; outcome: string; reason: string | null; at: string }
-interface Item { submissionId: number; day: string; fileId: number; receivedAt: string; claimedValue: number | null; status: string; source: string; correctionReason: string | null; appealNote: string | null; decisionReason: string | null; displayName: string; mine: boolean; target: number; results: Result[] }
+interface Item { submissionId: number; day: string; fileId: number; receivedAt: string; claimedValue: number | null; status: string; source: string; correctionReason: string | null; appealNote: string | null; decisionReason: string | null; displayName: string; mine: boolean; target: number; results: Result[]; part: boolean }
 
 export function ReviewSection({ v }: { v: ChallengeView }) {
   const q = useLoad(() => api.get<Item[]>(`/api/challenges/${v.challengeId}/review-queue`), [v.challengeId]);
@@ -27,7 +27,7 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
   const [reason, setReason] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
-  const decide = async (outcome: 'ACHIEVED' | 'BELOW_TARGET' | 'REJECTED') => {
+  const decide = async (outcome: 'ACHIEVED' | 'BELOW_TARGET' | 'REJECTED' | 'APPROVED') => {
     setBusy(true); setError(null);
     try { await api.post(`/api/submissions/${it.submissionId}/review`, { outcome, value: outcome === 'REJECTED' ? undefined : Number(value), reason }); onDone(); }
     catch (e) { setError(e); } finally { setBusy(false); }
@@ -37,7 +37,7 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
     <div className="card">
       <div className="spread"><h3>{it.displayName} · {day(it.day)}</h3><span className="muted small">uploaded {time(it.receivedAt, tz)}</span></div>
       <div className="grid2">
-        <a href={`/api/files/${it.fileId}`} target="_blank" rel="noreferrer"><img className="shot" src={`/api/files/${it.fileId}`} alt={`Evidence from ${it.displayName}`} loading="lazy" /></a>
+        <ViewPhoto fileId={it.fileId} alt={`Evidence from ${it.displayName}`}><img className="shot" src={`/api/files/${it.fileId}`} alt={`Evidence from ${it.displayName}`} loading="lazy" /></ViewPhoto>
         <div>
           <dl className="kv">
             <dt>Target</dt><dd>{it.target.toLocaleString('en-IN')}</dd>
@@ -52,13 +52,21 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
           {it.mine ? <div className="alert">This is your own evidence: another admin must review it.</div> : (
             <>
               <ErrorBox error={error} />
-              <Field label="Total shown in the screenshot"><input type="number" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
-              <Field label={it.appealNote ? 'Reason (required)' : 'Reason (required to reject)'}><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-              <div className="row">
-                <button className="btn primary small" disabled={busy || !(n >= it.target)} onClick={() => decide('ACHIEVED')}>Target reached</button>
-                <button className="btn small" disabled={busy || !(value !== '' && n < it.target)} onClick={() => decide('BELOW_TARGET')}>Below target</button>
-                <button className="btn small danger" disabled={busy || reason.trim().length < 5} onClick={() => decide('REJECTED')}>Reject</button>
-              </div>
+              {it.part && <p className="small muted" style={{ marginTop: 0 }}>One of several screenshots for the day: approve the number it shows; the day's result comes from all approved screenshots together.</p>}
+              <Field label={it.part ? 'Number shown in this screenshot' : 'Total shown in the screenshot'}><input type="number" inputMode="numeric" value={value} onChange={(e) => setValue(e.target.value)} /></Field>
+              <Field label={it.appealNote ? 'Reason (required)' : it.part ? 'Reason (required to decline)' : 'Reason (required to reject)'}><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+              {it.part ? (
+                <div className="row">
+                  <button className="btn primary small" disabled={busy || value === '' || !(n >= 0)} onClick={() => decide('APPROVED')}>Approve</button>
+                  <button className="btn small danger" disabled={busy || reason.trim().length < 5} onClick={() => decide('REJECTED')}>Decline</button>
+                </div>
+              ) : (
+                <div className="row">
+                  <button className="btn primary small" disabled={busy || !(n >= it.target)} onClick={() => decide('ACHIEVED')}>Target reached</button>
+                  <button className="btn small" disabled={busy || !(value !== '' && n < it.target)} onClick={() => decide('BELOW_TARGET')}>Below target</button>
+                  <button className="btn small danger" disabled={busy || reason.trim().length < 5} onClick={() => decide('REJECTED')}>Reject</button>
+                </div>
+              )}
             </>
           )}
         </div>

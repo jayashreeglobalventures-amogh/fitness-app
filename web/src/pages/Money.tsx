@@ -3,10 +3,13 @@
 // payment details. Money never affects points.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
-interface Week { periodNo: number; startsOn: string; endsOn: string; dueOn: string; overdueFrom: string; due: number; paid: number; pending: number; status: string; finePool: number; fines: number; unused: number; unusedTo: string; finePoolLeft: number }
+interface Week {
+  periodNo: number; startsOn: string; endsOn: string; dueOn: string; overdueFrom: string; due: number; paid: number; pending: number; status: string; finePool: number; fines: number;
+  unused: number; unusedTo: string; finePoolLeft: number; carriedTo: number | null; carriedIn: number; fullDue: number; creditUsed: number;
+}
 interface Payment { paymentId: number; periodNo: number; amount: number; method: string; utr: string | null; paidOn: string; status: string; decisionReason: string | null; proofFileId: number | null }
 interface Pools { prizePool: number; yearEndPool: number; collected: number; stillOwed: number; refundsDue: number; inFinePools: number; prizesDue: number }
 interface MyMoney { weeks: Week[]; owed: number; refundDue: number; payments: Payment[]; pools: Pools; today: string }
@@ -65,9 +68,10 @@ function MyMoneyView({ v }: { v: ChallengeView }) {
           </div>
           <dl className="kv" style={{ marginTop: 8 }}>
             <dt>Contribution</dt><dd>{inr(w.due)} · due {day(w.dueOn)}{w.status === 'DUE' ? ` (overdue from ${day(w.overdueFrom)})` : ''}</dd>
-            {w.paid > 0 && <><dt>Paid</dt><dd>{inr(w.paid)}</dd></>}
+            {w.carriedIn > 0 && <><dt>Carried over</dt><dd className="small">{inr(w.fullDue)} − {inr(w.carriedIn)} unused fine-pool money from last week = {inr(w.due)}</dd></>}
+            {w.paid > 0 && <><dt>Paid</dt><dd>{inr(w.paid)}{w.creditUsed > 0 && <span className="muted small"> (incl. {inr(w.creditUsed)} paid earlier)</span>}</dd></>}
             {w.pending > 0 && <><dt>Being checked</dt><dd>{inr(w.pending)}</dd></>}
-            <dt>Fine pool</dt><dd>{inr(w.finePool)}{w.fines ? ` − fines ${inr(w.fines)}` : ''}{w.unused ? ` → ${inr(w.unused)} ${w.unusedTo === 'REFUND' ? 'owed back to you' : w.unusedTo === 'PRIZE_POOL' ? 'to the prize pool' : 'to the year-end pool'}` : w.fines < w.finePool ? ` (${inr(w.finePoolLeft)} left)` : ''}</dd>
+            <dt>Fine pool</dt><dd>{inr(w.finePool)}{w.fines ? ` − fines ${inr(w.fines)}` : ''}{w.unused ? ` → ${inr(w.unused)} ${w.unusedTo === 'CARRY_FORWARD' ? `carried to week ${w.carriedTo}` : w.unusedTo === 'REFUND' ? 'owed back to you' : w.unusedTo === 'PRIZE_POOL' ? 'to the prize pool' : 'to the year-end pool'}` : w.fines < w.finePool ? ` (${inr(w.finePoolLeft)} left)` : ''}</dd>
           </dl>
           {(w.status === 'DUE' || w.status === 'OVERDUE' || w.status === 'UPCOMING') && open !== w.periodNo && <button className="btn small" style={{ marginTop: 8 }} onClick={() => setOpen(w.periodNo)}>I've paid this week</button>}
           {open === w.periodNo && <ReportPayment v={v} week={w} onDone={() => { setOpen(null); m.reload(); }} />}
@@ -217,7 +221,7 @@ function FinanceView({ v }: { v: ChallengeView }) {
         <div key={p.paymentId} className="card">
           <div className="spread"><b>{p.displayName} · week {p.periodNo} · {inr(p.amount)}</b><Badge s={p.status} /></div>
           <p className="small" style={{ margin: '6px 0' }}>{p.method === 'UPI' ? <>UTR <b style={{ userSelect: 'all' }}>{p.utr}</b></> : p.method.toLowerCase()} · paid {day(p.paidOn)}{p.note ? ` · ${p.note}` : ''}
-            {p.proofFileId && <> · <a href={`/api/files/${p.proofFileId}`} target="_blank" rel="noreferrer">screenshot</a></>}</p>
+            {p.proofFileId && <> · <ViewPhoto fileId={p.proofFileId} alt="Payment screenshot">screenshot</ViewPhoto></>}</p>
           {p.recordedByAdmin && <p className="small"><span className="badge info">recorded by an admin</span> needs a second admin to confirm</p>}
           {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : p.recordedByMe ? <p className="muted small">You recorded this: another admin must confirm it.</p> : (p.recordedByAdmin ? d.canCountersign : d.canConfirm) && (
             <div className="row">

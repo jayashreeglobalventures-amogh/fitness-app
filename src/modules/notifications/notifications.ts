@@ -7,7 +7,7 @@ import { validateConfig } from '../challenges/config.js';
 import { accessFor } from '../identity/permissions.js';
 import { addDays, computePeriods } from '../../core/dates.js';
 import { contributionFor } from '../challenges/config.js';
-import { dueOn } from '../finance/finance.js';
+import { carriedInto, dueOn } from '../finance/finance.js';
 import { coachNotices } from '../coach/coach.js';
 
 export interface Notice {
@@ -56,7 +56,8 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     // As a participant: today's check-in, votes waiting for me.
     if (c.participant_id && c.p_status === 'ACTIVE' && live && daysBetween(c.joined_on, today) >= 0 && (!c.left_on || daysBetween(today, c.left_on) >= 0)) {
       const { rows: [t] } = await db.query(
-        `SELECT (SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED') AS sub,
+        `SELECT coalesce((SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' AND NOT part),
+                         (SELECT 'PARTS' FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status <> 'REJECTED' LIMIT 1)) AS sub,
                 EXISTS (SELECT 1 FROM rest_days WHERE participant_id = $1 AND day = $2 AND cancelled_at IS NULL) AS rest,
                 EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused`,
         [c.participant_id, today]);
@@ -96,12 +97,18 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
       if (cfg.finance.enabled) {
         const periods = computePeriods(c.starts_on, c.ends_on, cfg.periods.weekStartsOn);
         const { rows: pays } = await db.query(`SELECT period_no, status, amount_paise FROM payments WHERE participant_id = $1 AND status IN ('SUBMITTED','CONFIRMED')`, [c.participant_id]);
+        const carried = await carriedInto(db, cid, Number(c.participant_id));
+        let credit = 0; // reported beyond what earlier weeks needed (e.g. paid in full before a carry-over)
         for (const per of periods) {
           if (daysBetween(c.joined_on, per.endsOn) < 0 || (c.left_on && daysBetween(per.startsOn, c.left_on) < 0)) continue;
+          // Owed: the contribution less fine-pool money carried over from the week before (CARRY_FORWARD).
+          const amount = Math.max(0, contributionFor(cfg, per.periodNo).total - (carried.into.get(per.periodNo) ?? 0));
+          const here = pays.filter((x) => x.period_no === per.periodNo).reduce((a, x) => a + Number(x.amount_paise), 0);
+          const used = Math.min(credit, amount);
+          const reported = here + used;
+          credit = credit - used + Math.max(0, here - (amount - used));
           const due = dueOn(per, cfg.finance.dueWeekday);
           if (daysBetween(due, today) < 0) continue;
-          const amount = contributionFor(cfg, per.periodNo).total;
-          const reported = pays.filter((x) => x.period_no === per.periodNo).reduce((a, x) => a + Number(x.amount_paise), 0);
           if (reported >= amount) continue;
           const overdue = daysBetween(addDays(due, cfg.finance.graceDays + 1), today) >= 0;
           out.push({ id: `pay:${cid}:${per.periodNo}`, kind: overdue ? 'warning' : 'action', title: `${c.name}: week ${per.periodNo} contribution ${overdue ? 'overdue' : 'due'}`,

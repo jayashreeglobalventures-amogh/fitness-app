@@ -71,6 +71,13 @@
       "when": 1796428800000,
       "tag": "0009_health_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1796515200000,
+      "tag": "0010_multiple_screenshots",
+      "breakpoints": true
     }
   ]
 }

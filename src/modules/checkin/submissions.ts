@@ -45,8 +45,10 @@ const parseClaim = (v: unknown): number | null => {
  * Creates the live submission for (participant, day), superseding a previous not-yet-approved one.
  * Shared by participant uploads and admin corrections.
  */
+export const MAX_PARTS_PER_DAY = 10;
+
 async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantRow, day: string, receivedAt: Date, input: SubmitInput,
-  actorUserId: number, source: 'PARTICIPANT' | 'ADMIN_CORRECTION', correctionReason: string | null, now: Date, aiEnabled: boolean): Promise<Submitted> {
+  actorUserId: number, source: 'PARTICIPANT' | 'ADMIN_CORRECTION', correctionReason: string | null, now: Date, aiEnabled: boolean, multi = false): Promise<Submitted> {
   const clientRef = String(input.clientRef ?? '');
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(clientRef)) throw validation('Missing upload reference.');
   // Idempotency: the same upload sent twice (retry, double tap) returns the first result.
@@ -59,12 +61,26 @@ async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantR
   const ex = await db.query(`SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day`, [p.participantId, day]);
   if (ex.rows[0]) throw conflict('This day is covered by an approved exemption.');
 
-  const live = await db.query(`SELECT submission_id, status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' FOR UPDATE`, [p.participantId, day]);
-  const prev = live.rows[0];
-  if (prev && prev.status === 'ACHIEVED') throw conflict('Your evidence for this day is already verified.');
-  if (prev) await db.query(`UPDATE submissions SET status = 'SUPERSEDED', updated_at = $2 WHERE submission_id = $1`, [prev.submission_id, now]);
+  let prev: { submission_id: string; status: string } | undefined;
+  if (multi) {
+    // Several screenshots a day: each one is an extra part; nothing is replaced.
+    const { rows: [c] } = await db.query(`SELECT count(*)::int AS n FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status <> 'REJECTED'`, [p.participantId, day]);
+    if (c.n >= MAX_PARTS_PER_DAY) throw conflict(`You can add up to ${MAX_PARTS_PER_DAY} screenshots a day.`);
+  } else {
+    const live = await db.query(`SELECT submission_id, status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' AND NOT part FOR UPDATE`, [p.participantId, day]);
+    prev = live.rows[0];
+    if (prev && prev.status === 'ACHIEVED') throw conflict('Your evidence for this day is already verified.');
+    if (prev) await db.query(`UPDATE submissions SET status = 'SUPERSEDED', updated_at = $2 WHERE submission_id = $1`, [prev.submission_id, now]);
+  }
 
   const file = await insertFile(db, mediaDir, p.userId, actorUserId, 'STEP_EVIDENCE', input.image, now);
+  if (multi) {
+    // The same picture twice on one day would count twice: refused.
+    const same = await db.query(
+      `SELECT 1 FROM submissions s JOIN files f USING (file_id) WHERE s.participant_id = $1 AND s.day = $2 AND s.part AND s.status <> 'REJECTED' AND f.sha256 = $3 AND s.file_id <> $4`,
+      [p.participantId, day, file.sha256, file.fileId]);
+    if (same.rows[0]) throw conflict('You already added this screenshot today. Add a different one (e.g. from another device).');
+  }
   // The same image used for any other submission (anyone's, any day) is never auto-approved.
   const dup = await db.query(
     `SELECT s.submission_id FROM submissions s JOIN files f USING (file_id) WHERE f.sha256 = $1 AND (s.participant_id <> $2 OR s.day <> $3) LIMIT 1`,
@@ -72,9 +88,9 @@ async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantR
   const duplicate = !!dup.rows[0];
   const status = duplicate || !aiEnabled ? 'PENDING_REVIEW' : 'PENDING_AI';
   const { rows } = await db.query(
-    `INSERT INTO submissions (challenge_id, participant_id, day, file_id, received_at, client_ref, claimed_value, status, source, recorded_by, correction_reason, supersedes_id, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13) RETURNING submission_id`,
-    [p.challengeId, p.participantId, day, file.fileId, receivedAt, clientRef, claimedValue, status, source, actorUserId, correctionReason, prev ? prev.submission_id : null, now]);
+    `INSERT INTO submissions (challenge_id, participant_id, day, file_id, received_at, client_ref, claimed_value, status, source, recorded_by, correction_reason, supersedes_id, part, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$14,$13,$13) RETURNING submission_id`,
+    [p.challengeId, p.participantId, day, file.fileId, receivedAt, clientRef, claimedValue, status, source, actorUserId, correctionReason, prev ? prev.submission_id : null, now, multi]);
   const submissionId = Number(rows[0].submission_id);
   if (duplicate || !aiEnabled) {
     await db.query(`INSERT INTO verification_results (submission_id, method, outcome, flags, reason, created_at) VALUES ($1,'SYSTEM','NEEDS_REVIEW',$2,$3,$4)`,
@@ -96,7 +112,7 @@ export async function submit(db: Queryable, mediaDir: string, userId: number, ch
   if (daysBetween(day, ctx.ch.endsOn) < 0) throw conflict('The challenge has ended; evidence can no longer be submitted.');
   if (!participatesOn(p, day)) throw conflict('You are not taking part on this day.');
   const cfg = ctx.cfgOn(day);
-  const r = await createSubmission(db, mediaDir, p, day, now, input, userId, 'PARTICIPANT', null, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null);
+  const r = await createSubmission(db, mediaDir, p, day, now, input, userId, 'PARTICIPANT', null, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null, cfg.submission.multiplePerDay.enabled);
   await writeAudit(db, now, { actorUserId: userId, challengeId, action: 'EVIDENCE_SUBMITTED', entity: 'SUBMISSION', entityId: r.submissionId, after: { day, status: r.status, duplicate: r.duplicate } });
   return r;
 }
@@ -123,7 +139,7 @@ export async function recordCorrection(db: Queryable, mediaDir: string, actorUse
   const reason = String(input.reason ?? '').trim();
   if (reason.length < 5) throw validation('Give a reason (at least 5 characters), e.g. where the evidence came from.');
   const cfg = ctx.cfgOn(day);
-  const r = await createSubmission(db, mediaDir, p0, day, receivedAt, input, actorUserId, 'ADMIN_CORRECTION', reason, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null);
+  const r = await createSubmission(db, mediaDir, p0, day, receivedAt, input, actorUserId, 'ADMIN_CORRECTION', reason, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null, cfg.submission.multiplePerDay.enabled);
   await writeAudit(db, now, { actorUserId, challengeId: p0.challengeId, action: 'EVIDENCE_RECORDED_BY_ADMIN', entity: 'SUBMISSION', entityId: r.submissionId, reason,
     after: { participantId, day, receivedAt: receivedAt.toISOString() } });
   return r;
@@ -178,7 +194,8 @@ export async function verifySubmission(pool: pg.Pool, mediaDir: string, submissi
       return giveUp ? 'PENDING_REVIEW' : 'PENDING_AI';
     }
     const r = reading!;
-    const verdict = judge(r, s.day, cfg.activity.dailyTarget, cfg.verification.autoApproveMinConfidence, s.claimed_value);
+    // A part (one of several screenshots a day) isn't judged against the target: the day's total is.
+    const verdict = judge(r, s.day, s.part ? 0 : cfg.activity.dailyTarget, cfg.verification.autoApproveMinConfidence, s.claimed_value);
     await tx.query(
       `INSERT INTO verification_results (submission_id, method, provider, model, extracted_date, extracted_value, source_app, confidence, readable, flags, outcome, reason, created_at)
        VALUES ($1,'AI',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
@@ -186,9 +203,10 @@ export async function verifySubmission(pool: pg.Pool, mediaDir: string, submissi
         [verdict.reason, r.notes].filter(Boolean).join(' '), at]);
     if (cur.status !== 'PENDING_AI') return cur.status; // decided or superseded meanwhile: keep the reading, change nothing
     if (verdict.approve) {
-      await tx.query(`UPDATE submissions SET status = 'ACHIEVED', final_value = $2, ai_attempts = ai_attempts + 1, decided_at = $3, decision_reason = $4, updated_at = $3 WHERE submission_id = $1`,
-        [submissionId, r.value, at, verdict.reason]);
-      return 'ACHIEVED';
+      const approved = s.part ? 'APPROVED' : 'ACHIEVED';
+      await tx.query(`UPDATE submissions SET status = $5, final_value = $2, ai_attempts = ai_attempts + 1, decided_at = $3, decision_reason = $4, updated_at = $3 WHERE submission_id = $1`,
+        [submissionId, r.value, at, verdict.reason, approved]);
+      return approved;
     }
     await tx.query(`UPDATE submissions SET status = 'PENDING_REVIEW', ai_attempts = ai_attempts + 1, updated_at = $2 WHERE submission_id = $1`, [submissionId, at]);
     return 'PENDING_REVIEW';
@@ -209,7 +227,10 @@ export async function review(db: Queryable, actorUserId: number, submissionId: n
   if (p.userId === actorUserId) throw forbidden('You can\'t review your own evidence; another admin must do it.');
   if (s.status === 'SUPERSEDED') throw conflict('This evidence was replaced by a newer upload.');
   const outcome = String(input.outcome ?? '');
-  if (!['ACHIEVED', 'BELOW_TARGET', 'REJECTED'].includes(outcome)) throw validation('Choose: target reached, below target, or rejected.');
+  // One of several screenshots a day: approve (its number counts towards the day) or decline. Otherwise the day's result.
+  if (s.part ? !['APPROVED', 'REJECTED'].includes(outcome) : !['ACHIEVED', 'BELOW_TARGET', 'REJECTED'].includes(outcome)) {
+    throw validation(s.part ? 'Choose: approve or decline.' : 'Choose: target reached, below target, or rejected.');
+  }
   const ctx = await challengeContext(db, challengeId, now);
   const target = ctx.cfgOn(s.day).activity.dailyTarget;
   let value: number | null = null;
@@ -217,11 +238,12 @@ export async function review(db: Queryable, actorUserId: number, submissionId: n
     value = Number(input.value);
     if (!Number.isSafeInteger(value) || value < 0) throw validation('Enter the total shown in the screenshot.');
     if (outcome === 'ACHIEVED' && value < target) throw validation(`${value} is below the target of ${target}.`);
+    if (s.part && value > 10_000_000) throw validation('That number is too large.');
     if (outcome === 'BELOW_TARGET' && value >= target) throw validation(`${value} reaches the target of ${target}.`);
   }
   const reason = String(input.reason ?? '').trim();
   // Changing a decision - directly, or by deciding an appeal against it - always needs a reason.
-  const override = s.status === 'ACHIEVED' || s.status === 'BELOW_TARGET' || s.status === 'REJECTED' || !!s.appealed_at;
+  const override = s.status === 'ACHIEVED' || s.status === 'BELOW_TARGET' || s.status === 'REJECTED' || s.status === 'APPROVED' || !!s.appealed_at;
   if ((outcome === 'REJECTED' || override) && reason.length < 5) throw validation(override ? 'Give a reason for changing a decision (at least 5 characters).' : 'Give a reason for rejecting (at least 5 characters).');
   if (override && !s.appealed_at && s.status === outcome && s.final_value === value) return;
 
@@ -275,6 +297,7 @@ const submissionOf = (s: Record<string, unknown>) => ({
   submissionId: Number(s.submission_id), participantId: Number(s.participant_id), day: s.day, fileId: Number(s.file_id), receivedAt: (s.received_at as Date).toISOString(),
   claimedValue: s.claimed_value, status: s.status, finalValue: s.final_value, source: s.source, correctionReason: s.correction_reason,
   appealNote: s.appeal_note, decisionReason: s.decision_reason, decidedAt: s.decided_at ? (s.decided_at as Date).toISOString() : null,
+  part: !!s.part,
 });
 
 /** One submission with its history: for its owner or a reviewer. */

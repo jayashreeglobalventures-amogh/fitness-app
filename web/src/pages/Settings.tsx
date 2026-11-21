@@ -88,11 +88,18 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
           <Text ctx={ctx} p={['activity', 'metric']} label="Metric key" hint="lowercase, e.g. steps" />
           <Num ctx={ctx} p={['activity', 'dailyTarget']} label="Daily target" />
         </div>
-        <Select ctx={{ ...ctx, disabled: ctx.disabled || started }} p={['periods', 'weekStartsOn']} label="Weeks start on" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))} />
+        <Select ctx={{ ...ctx, disabled: ctx.disabled || started }} p={['periods', 'weekStartsOn']} label="Weeks start on" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))}
+          hint={started ? '🔒 Locked now the challenge has started: changing it would reshuffle every week, and with them contributions, fines and rest-day allowances.' : 'Can be changed until the first day of the challenge.'} />
       </Section>
 
       <Section title="Evidence and verification">
         <Area ctx={ctx} p={['submission', 'instructions']} label="Instructions shown to participants" />
+        <Check ctx={ctx} p={['submission', 'multiplePerDay', 'enabled']} label="Allow several screenshots a day (e.g. phone + watch)" />
+        {get(c, ['submission', 'multiplePerDay', 'enabled']) === true && (
+          <Select ctx={ctx} p={['submission', 'multiplePerDay', 'combine']} label="How they count"
+            options={{ SUM: 'Add them up (different devices or apps)', HIGHEST: 'Use the highest (the same app\'s running total)' }}
+            hint="Each screenshot is checked on its own (approve / decline). The day is met as soon as the approved total reaches the target; otherwise it is decided at midnight. The same picture can't be added twice." />
+        )}
         <p className="muted small">Deadline: midnight at the end of each day ({c.basics.timeZone}). Late evidence never counts for an earlier day.</p>
         <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or Claude if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
         <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the reading is at least this sure (0.5–1)" step={0.01} />
@@ -177,7 +184,8 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
             <Rupees ctx={money} p={['finance', 'finePerMissedDay']} label="Fine per missed day (₹)" />
             <Select ctx={money} p={['finance', 'dueWeekday']} label="Due every" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))} />
             <Num ctx={money} p={['finance', 'graceDays']} label="Grace days before 'overdue'" />
-            <Select ctx={money} p={['finance', 'unusedFinePool']} label="Fine-pool money left at the end of a week" options={{ REFUND: 'Refunded to the participant', PRIZE_POOL: 'Goes to the prize pool', YEAR_END_POOL: 'Goes to a separate year-end pool' }} />
+            <Select ctx={money} p={['finance', 'unusedFinePool']} label="Fine-pool money left at the end of a week" options={{ CARRY_FORWARD: 'Carried to next week (they pay only the top-up)', REFUND: 'Refunded to the participant at the end', PRIZE_POOL: 'Goes to the prize pool', YEAR_END_POOL: 'Goes to a separate year-end pool' }}
+              hint={get(c, ['finance', 'unusedFinePool']) === 'CARRY_FORWARD' ? 'E.g. ₹600 fine pool, 3 misses at ₹100: ₹300 carries over, so next week they pay ₹400 + ₹300 = ₹700. What is left after the last week is refunded.' : undefined} />
           </div>
           <h3 style={{ marginTop: 8 }}>Weeks with a different amount</h3>
           {c.finance.periodOverrides.map((o, i) => {

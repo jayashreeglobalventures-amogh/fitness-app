@@ -1,7 +1,7 @@
 // Weekend bonus activities: admins set one up for a weekend; participants submit evidence that weekend; admins approve.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Sub { bonusSubmissionId: number; displayName: string; mine: boolean; note: string | null; fileId: number | null; status: string; decisionReason: string | null }
@@ -69,7 +69,7 @@ function ActivityCard({ a, canManage, isParticipant, onChanged }: { a: Activity;
           <Field label="Reason (needed to reject or change a decision)"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
           {a.submissions.map((s) => (
             <div key={s.bonusSubmissionId} className="spread" style={{ padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-              <span><b>{s.displayName}</b> {s.note && <span className="small">· {s.note}</span>} {s.fileId && <a className="small" href={`/api/files/${s.fileId}`} target="_blank" rel="noreferrer">photo</a>}
+              <span><b>{s.displayName}</b> {s.note && <span className="small">· {s.note}</span>} {s.fileId && <ViewPhoto className="small" fileId={s.fileId} alt={`Bonus photo from ${s.displayName}`}>photo</ViewPhoto>}
                 <br /><span className={`badge ${TONE[s.status]}`}>{s.status.toLowerCase()}</span></span>
               {!s.mine && s.status !== 'WITHDRAWN' && <span className="row" style={{ gap: 4 }}>
                 {s.status !== 'APPROVED' && <button className="btn small primary" onClick={() => act(() => api.post(`/api/bonus-submissions/${s.bonusSubmissionId}/decide`, { approve: true, reason }))}>Approve</button>}

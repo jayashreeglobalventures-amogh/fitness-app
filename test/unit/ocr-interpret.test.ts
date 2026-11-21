@@ -105,3 +105,26 @@ describe('what must go to an admin', () => {
     expect(read(L('22 Nov', '8,214', 'Calories burned')).value).toBeNull();
   });
 });
+
+// Apple Fitness "Step Count" (week view, a day tapped): the total is labelled TOTAL, not "steps" (owner's report, 21 Nov
+// 2026 - a real screenshot read as nothing). Lines exactly as Tesseract read that screenshot.
+describe('Apple Fitness "Step Count" screen', () => {
+  const apple = (total: string, date: string, label = 'TOTAL') => L(['14:55 wo! ITE GB)', 48], ['<', 91], ['Step Count', 96], [label, 96], [total, 96], [date, 96],
+    ['5,000', 96], ['2,500', 93], ['0', 89], ['Mon Tue Wed Thu Fri Sat Sun', 96], ['© © 6 aa', 59], ['Summary Fitness+ Workout Sharing', 94], ['rr 2', 24]);
+
+  it('reads the total next to TOTAL and its date, ignoring the chart axis (5,000 / 2,500)', () => {
+    expect(read(apple('4,660', '17 Nov 2026'), '2026-11-17')).toMatchObject({ value: 4660, date: '2026-11-17', sourceApp: 'Apple Fitness', flags: [] });
+  });
+
+  it('another day\'s screenshot is not approved (date mismatch -> admin); the right day on target is', () => {
+    expect(approved(apple('8,120', '17 Nov 2026'), '2026-11-22')).toBe(false);
+    expect(approved(apple('8,120', '22 Nov 2026'), '2026-11-22')).toBe(true);
+    expect(approved(apple('4,660', '22 Nov 2026'), '2026-11-22')).toBe(false); // below target -> admin / missed
+  });
+
+  it('the week view before a bar is tapped shows DAILY AVERAGE: never taken as a day\'s total', () => {
+    const r = read(apple('6,850', '16-22 Nov 2026', 'DAILY AVERAGE'));
+    expect(r.value).toBeNull();
+    expect(r.flags).toContain('WEEKLY_OR_AVERAGE');
+  });
+});

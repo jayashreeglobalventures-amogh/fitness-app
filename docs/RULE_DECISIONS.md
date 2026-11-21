@@ -146,6 +146,15 @@ Defaults applied where nothing was said:
 | Phone quiet hours | No phone notifications 23:00–07:00 IST; alerts wait in the app and go out at 7 if still unread |
 | AI later | The coach works out facts and a "writer" puts them into words. An AI writer can be selected later (COACH_WRITER); it would receive only these facts - no health data, no money details - and the templates take over if it fails |
 
+## Fine-pool carry-over, several screenshots, Today screen (owner, 21 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Fine-pool carry-over | New option "Carried to next week" (CARRY_FORWARD), used by Calamari: when a week closes, what's left in the person's fine pool is credited against their next week, so they pay ₹400 + only the top-up back to ₹600 (e.g. 3 misses ⇒ ₹700). After the last week (or after leaving) the leftover is refunded. Anyone who paid the full amount keeps the extra as credit for later weeks |
+| Several screenshots a day | Setting (off by default): each screenshot is read on its own (no target check), auto-approved if the date and number are clear, otherwise Approve / Decline by an admin. The day's total = approved ones added up (different devices) or the highest (same app). Met as soon as the total reaches the target; otherwise decided at midnight. The same picture can't be added twice; up to 10 a day |
+| Week start | Locked once the challenge has started (it would reshuffle weeks, money and rest days) - now explained on the setting |
+| Today screen | Rest-day planner above the calendar; "My money" rings beside the day's card (my share of the pot; this week's fine pool still mine vs moved to the group); screenshots open in an in-app viewer with ✕ (and Back) |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

@@ -26,6 +26,10 @@ const MONTH_RE = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|ju
 // A thousands-grouped number (8,214 / 8.214 / 8 214) or a plain 3-6 digit number.
 const NUM_RE = /(?<![\d.,:/])(\d{1,3}(?:[,.   ]\d{3})+|\d{3,6})(?![\d:]|[.,]\d)/g;
 const STEPS_RE = /\bsteps?\b/i;
+// A whole screen about steps (e.g. Apple Fitness / Health "Step Count"), where the number is labelled "TOTAL" instead.
+const STEP_SCREEN_RE = /\bstep\s*count\b|^\W*steps?\W*$/im;
+const TOTAL_LABEL_RE = /^\W*(total|daily total|today'?s? total)\W*$/i;
+const AVERAGE_LABEL_RE = /^\W*(daily\s+)?(avg|average)\W*$/i;
 const SUMMARY_RE = /\b(avg|average|daily average|weekly|this week|last week|per day|total this|month|monthly|week)\b/i;
 const GOAL_BEFORE_RE = /(goal|target|of|\/)\s*$/i;
 const UNIT_AFTER_RE = /^\s*(k?cal|kj|km|mi|miles?|m\b|min|mins|minutes|hrs?|hours?|bpm|%|floors?|ft|kg|lbs?)/i;
@@ -95,8 +99,15 @@ export function findTotals(lines: OcrLine[]): { candidates: Candidate[]; summary
   };
   const isLabelOnly = (text: string) => /^\W*steps?\W*$/i.test(text.trim());
   const isNumberOnly = (text: string) => numbersIn(text).length === 1 && text.replace(NUM_RE, '').replace(/[\s,.:|]/g, '').length <= 2;
+  const stepScreen = lines.some((l) => STEP_SCREEN_RE.test(l.text.trim()));
 
   lines.forEach((line, i) => {
+    // On a steps screen: a number right next to "TOTAL" is the day's total; next to "AVERAGE" it's a summary.
+    if (stepScreen && isNumberOnly(line.text.trim())) {
+      const near = [lines[i - 1]?.text ?? '', lines[i + 1]?.text ?? ''];
+      if (near.some((x) => AVERAGE_LABEL_RE.test(x))) summary = true;
+      else if (near.some((x) => TOTAL_LABEL_RE.test(x))) candidates.push({ value: numbersIn(line.text)[0]!.value, confidence: line.confidence, how: 'next-to-label' });
+    }
     const text = line.text.trim();
     if (!text) return;
     if (STEPS_RE.test(text) && SUMMARY_RE.test(text)) { summary = true; return; }
@@ -161,7 +172,7 @@ export function interpretOcr(lines: OcrLine[], ctx: ReadContext): Omit<Reading, 
   }
 
   const confidence = value !== null && date !== null ? Math.min(valueConf, dateConf) / 100 : Math.max(valueConf, dateConf) / 200;
-  const app = /google\s*fit/i.test(text) ? 'Google Fit' : /samsung\s*health/i.test(text) ? 'Samsung Health' : /fitbit/i.test(text) ? 'Fitbit'
+  const app = /fitness\+|\bstep\s*count\b/i.test(text) && !/google|samsung|fitbit/i.test(text) ? 'Apple Fitness' : /google\s*fit/i.test(text) ? 'Google Fit' : /samsung\s*health/i.test(text) ? 'Samsung Health' : /fitbit/i.test(text) ? 'Fitbit'
     : /\bhealth\b/i.test(text) && /\bsteps\b/i.test(text) ? 'Health' : /mi\s*fit|zepp/i.test(text) ? 'Mi Fitness / Zepp' : /garmin/i.test(text) ? 'Garmin' : null;
   return { readable: true, date, value, sourceApp: app, confidence: Math.round(confidence * 1000) / 1000, flags, notes: notes.join(' ') };
 }

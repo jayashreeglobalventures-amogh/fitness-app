@@ -3,7 +3,7 @@
 // payment details. Money never affects points.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Week {
@@ -221,7 +221,7 @@ function FinanceView({ v }: { v: ChallengeView }) {
         <div key={p.paymentId} className="card">
           <div className="spread"><b>{p.displayName} · week {p.periodNo} · {inr(p.amount)}</b><Badge s={p.status} /></div>
           <p className="small" style={{ margin: '6px 0' }}>{p.method === 'UPI' ? <>UTR <b style={{ userSelect: 'all' }}>{p.utr}</b></> : p.method.toLowerCase()} · paid {day(p.paidOn)}{p.note ? ` · ${p.note}` : ''}
-            {p.proofFileId && <> · <a href={`/api/files/${p.proofFileId}`} target="_blank" rel="noreferrer">screenshot</a></>}</p>
+            {p.proofFileId && <> · <ViewPhoto fileId={p.proofFileId} alt="Payment screenshot">screenshot</ViewPhoto></>}</p>
           {p.recordedByAdmin && <p className="small"><span className="badge info">recorded by an admin</span> needs a second admin to confirm</p>}
           {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : p.recordedByMe ? <p className="muted small">You recorded this: another admin must confirm it.</p> : (p.recordedByAdmin ? d.canCountersign : d.canConfirm) && (
             <div className="row">

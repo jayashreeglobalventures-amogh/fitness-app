@@ -72,6 +72,7 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
       <CoachCard challengeId={v.challengeId} />
       {s.pending > 0 && <p className="muted small">{s.pending} day{s.pending === 1 ? '' : 's'} waiting for verification; points for {s.pending === 1 ? 'it' : 'them'} follow the decision.</p>}
       {d.participant.participantId && <PointsCard participantId={d.participant.participantId} />}
+      {d.rules.restDays.enabled && <PlanRest v={v} d={d} onChanged={dash.reload} />}
 
       <div className="card">
         <h3>Calendar</h3>
@@ -79,7 +80,6 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
         <div className="legend">{['ACHIEVED', 'PENDING_VERIFICATION', 'MISSED_DEADLINE', 'REST', 'EXCUSED'].map((k) => <StatusBadge key={k} status={k} />)}</div>
       </div>
       {selected && <DayDetail info={d.days.find((x) => x.day === selected)!} d={d} onChanged={dash.reload} onClose={() => setSelected(null)} />}
-      {d.rules.restDays.enabled && <PlanRest v={v} d={d} onChanged={dash.reload} />}
     </>
   );
 }

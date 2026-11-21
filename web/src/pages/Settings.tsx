@@ -88,7 +88,8 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
           <Text ctx={ctx} p={['activity', 'metric']} label="Metric key" hint="lowercase, e.g. steps" />
           <Num ctx={ctx} p={['activity', 'dailyTarget']} label="Daily target" />
         </div>
-        <Select ctx={{ ...ctx, disabled: ctx.disabled || started }} p={['periods', 'weekStartsOn']} label="Weeks start on" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))} />
+        <Select ctx={{ ...ctx, disabled: ctx.disabled || started }} p={['periods', 'weekStartsOn']} label="Weeks start on" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))}
+          hint={started ? '🔒 Locked now the challenge has started: changing it would reshuffle every week, and with them contributions, fines and rest-day allowances.' : 'Can be changed until the first day of the challenge.'} />
       </Section>
 
       <Section title="Evidence and verification">

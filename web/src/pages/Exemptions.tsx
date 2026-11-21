@@ -1,7 +1,7 @@
 // Emergency / sick-day exemptions: request, vote, and (admins) decide.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, time, upload, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, time, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Req {
@@ -65,7 +65,7 @@ function RequestCard({ r, tz, onChanged }: { r: Req; tz: string; onChanged: () =
         <span className={`badge ${TONE[r.status] ?? ''}`}>{LABEL[r.status] ?? r.status}</span>
       </div>
       <p>{r.reason}</p>
-      {r.evidenceFileId && <p className="small"><a href={`/api/files/${r.evidenceFileId}`} target="_blank" rel="noreferrer">View evidence</a></p>}
+      {r.evidenceFileId && <p className="small"><ViewPhoto fileId={r.evidenceFileId} alt="Exemption evidence">View evidence</ViewPhoto></p>}
       {r.status === 'VOTING' && r.votingClosesAt && <p className="muted small">Voting closes {time(r.votingClosesAt, tz)} · {r.eligibleVoters} voters</p>}
       {r.tally && <p className="small">Votes: {r.tally.approve} approve · {r.tally.reject} reject</p>}
       {r.reviewReason && r.status === 'ADMIN_REVIEW' && <p className="small muted">{r.reviewReason}</p>}

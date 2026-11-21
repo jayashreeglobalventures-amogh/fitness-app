@@ -104,3 +104,37 @@ export async function squarePhoto(file: File, size = 512): Promise<File> {
     return new File([blob], 'photo.jpg', { type: 'image/jpeg' });
   } finally { URL.revokeObjectURL(url); }
 }
+
+/**
+ * Full-screen photo viewer with a close button (✕), for screenshots and evidence. Closes with ✕, a tap outside the
+ * photo, Escape, or the phone's Back gesture (it adds a history entry), so it never strands people outside the app.
+ */
+export function PhotoViewer({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+  useEffect(() => {
+    history.pushState({ photoViewer: true }, '');
+    const onPop = () => onClose();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') history.back(); };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const close = () => history.back(); // pops our entry -> onClose
+  return (
+    <div className="viewer" role="dialog" aria-modal="true" aria-label={alt} onClick={close}>
+      <button className="viewer-close" aria-label="Close" onClick={(e) => { e.stopPropagation(); close(); }}>✕</button>
+      <img src={src} alt={alt} onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
+/** A thumbnail or text link that opens a file in the in-app photo viewer. */
+export function ViewPhoto({ fileId, alt, children, className }: { fileId: number; alt: string; children?: ReactNode; className?: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={`linklike ${className ?? ''}`} onClick={() => setOpen(true)}>{children ?? 'View'}</button>
+      {open && <PhotoViewer src={`/api/files/${fileId}`} alt={alt} onClose={() => setOpen(false)} />}
+    </>
+  );
+}

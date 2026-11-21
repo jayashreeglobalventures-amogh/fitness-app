@@ -1,7 +1,7 @@
 // Admin review queue: the screenshot, what the AI read (and why it wasn't approved), and the decision.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, time, useLoad } from '../ui';
+import { day, ErrorBox, Field, Loading, time, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Result { method: string; model: string | null; extractedDate: string | null; extractedValue: number | null; sourceApp: string | null; confidence: number | null; flags: string[]; outcome: string; reason: string | null; at: string }
@@ -37,7 +37,7 @@ function ReviewCard({ it, tz, onDone }: { it: Item; tz: string; onDone: () => vo
     <div className="card">
       <div className="spread"><h3>{it.displayName} · {day(it.day)}</h3><span className="muted small">uploaded {time(it.receivedAt, tz)}</span></div>
       <div className="grid2">
-        <a href={`/api/files/${it.fileId}`} target="_blank" rel="noreferrer"><img className="shot" src={`/api/files/${it.fileId}`} alt={`Evidence from ${it.displayName}`} loading="lazy" /></a>
+        <ViewPhoto fileId={it.fileId} alt={`Evidence from ${it.displayName}`}><img className="shot" src={`/api/files/${it.fileId}`} alt={`Evidence from ${it.displayName}`} loading="lazy" /></ViewPhoto>
         <div>
           <dl className="kv">
             <dt>Target</dt><dd>{it.target.toLocaleString('en-IN')}</dd>

@@ -19,7 +19,7 @@ async function checkAllowed(db: Queryable, ctx: ChallengeContext, p: Participant
     [p.participantId, period.periodNo]);
   if (rows[0].in_period >= cfg.restDays.perPeriod) throw conflict(`You already have ${cfg.restDays.perPeriod} rest day${cfg.restDays.perPeriod === 1 ? '' : 's'} in week ${period.periodNo}.`);
   if (rows[0].total >= cfg.restDays.maxTotal) throw conflict(`You have used all ${cfg.restDays.maxTotal} rest days.`);
-  const sub = await db.query(`SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED'`, [p.participantId, day]);
+  const sub = await db.query(`SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status NOT IN ('SUPERSEDED','WITHDRAWN')`, [p.participantId, day]);
   if (sub.rows[0]) throw conflict('Evidence was already submitted for that day, so it can\'t become a rest day.');
   const ex = await db.query(`SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status IN ('VOTING','ADMIN_REVIEW','APPROVED') AND $2::date BETWEEN start_day AND end_day`, [p.participantId, day]);
   if (ex.rows[0]) throw conflict('That day is part of an exemption request.');

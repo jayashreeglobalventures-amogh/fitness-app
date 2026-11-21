@@ -155,6 +155,15 @@ Defaults applied where nothing was said:
 | Week start | Locked once the challenge has started (it would reshuffle weeks, money and rest days) - now explained on the setting |
 | Today screen | Rest-day planner above the calendar; "My money" rings beside the day's card (my share of the pot; this week's fine pool still mine vs moved to the group); screenshots open in an in-app viewer with ✕ (and Back) |
 
+## Removing a screenshot (owner, 21 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Until midnight | The person removes their own screenshot (Today card / calendar day): the day goes back to "not sent" (or its total drops) and they can upload another |
+| After midnight | "Ask to remove" with a reason: it appears in Review → Requests; an admin (not the person) approves - points and fines are recalculated - or declines with a reason |
+| The image | Removed = hidden, kept on record. If it's a private photo (the person ticks this), an admin can erase the image permanently; the record stays ("image erased"). Erased images stay in encrypted backups until those expire (up to 12 months) |
+| Records | Every removal, request, decision and erase is in the activity log |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

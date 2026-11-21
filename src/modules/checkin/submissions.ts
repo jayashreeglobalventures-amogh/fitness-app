@@ -64,10 +64,10 @@ async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantR
   let prev: { submission_id: string; status: string } | undefined;
   if (multi) {
     // Several screenshots a day: each one is an extra part; nothing is replaced.
-    const { rows: [c] } = await db.query(`SELECT count(*)::int AS n FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status <> 'REJECTED'`, [p.participantId, day]);
+    const { rows: [c] } = await db.query(`SELECT count(*)::int AS n FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status NOT IN ('REJECTED','WITHDRAWN')`, [p.participantId, day]);
     if (c.n >= MAX_PARTS_PER_DAY) throw conflict(`You can add up to ${MAX_PARTS_PER_DAY} screenshots a day.`);
   } else {
-    const live = await db.query(`SELECT submission_id, status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' AND NOT part FOR UPDATE`, [p.participantId, day]);
+    const live = await db.query(`SELECT submission_id, status FROM submissions WHERE participant_id = $1 AND day = $2 AND status NOT IN ('SUPERSEDED','WITHDRAWN') AND NOT part FOR UPDATE`, [p.participantId, day]);
     prev = live.rows[0];
     if (prev && prev.status === 'ACHIEVED') throw conflict('Your evidence for this day is already verified.');
     if (prev) await db.query(`UPDATE submissions SET status = 'SUPERSEDED', updated_at = $2 WHERE submission_id = $1`, [prev.submission_id, now]);
@@ -77,7 +77,7 @@ async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantR
   if (multi) {
     // The same picture twice on one day would count twice: refused.
     const same = await db.query(
-      `SELECT 1 FROM submissions s JOIN files f USING (file_id) WHERE s.participant_id = $1 AND s.day = $2 AND s.part AND s.status <> 'REJECTED' AND f.sha256 = $3 AND s.file_id <> $4`,
+      `SELECT 1 FROM submissions s JOIN files f USING (file_id) WHERE s.participant_id = $1 AND s.day = $2 AND s.part AND s.status NOT IN ('REJECTED','WITHDRAWN') AND f.sha256 = $3 AND s.file_id <> $4`,
       [p.participantId, day, file.sha256, file.fileId]);
     if (same.rows[0]) throw conflict('You already added this screenshot today. Add a different one (e.g. from another device).');
   }
@@ -226,6 +226,7 @@ export async function review(db: Queryable, actorUserId: number, submissionId: n
   const p = await participantById(db, Number(s.participant_id));
   if (p.userId === actorUserId) throw forbidden('You can\'t review your own evidence; another admin must do it.');
   if (s.status === 'SUPERSEDED') throw conflict('This evidence was replaced by a newer upload.');
+  if (s.status === 'WITHDRAWN') throw conflict('This screenshot was removed.');
   const outcome = String(input.outcome ?? '');
   // One of several screenshots a day: approve (its number counts towards the day) or decline. Otherwise the day's result.
   if (s.part ? !['APPROVED', 'REJECTED'].includes(outcome) : !['ACHIEVED', 'BELOW_TARGET', 'REJECTED'].includes(outcome)) {
@@ -316,7 +317,7 @@ export async function submissionDetail(db: Queryable, actorUserId: number, submi
 /** Whether a user may see a stored file: its owner, or a reviewer of the challenge the file is evidence in. */
 export async function canSeeFile(db: Queryable, userId: number, fileId: number): Promise<{ storageKey: string; mimeType: string; purpose: string } | null> {
   const f = (await db.query(`SELECT * FROM files WHERE file_id = $1`, [fileId])).rows[0];
-  if (!f) return null;
+  if (!f || f.erased_at) return null; // erased by an admin: gone for everyone
   const out = { storageKey: String(f.storage_key), mimeType: String(f.mime_type), purpose: String(f.purpose) };
   if (Number(f.owner_user_id) === userId) return out;
   const uses = await db.query(

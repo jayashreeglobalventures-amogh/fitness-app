@@ -35,6 +35,8 @@ const LABEL: Record<string, string> = {
   ANNOUNCEMENT_POSTED: 'posted an announcement', POST_REMOVED: 'removed a community post', COMMENT_REMOVED: 'removed a comment', COMMUNITY_MUTED: 'muted someone in the community', COMMUNITY_UNMUTED: 'unmuted someone in the community',
   PHONE_NOTIFICATIONS_ON: 'turned phone notifications on', PHONE_NOTIFICATIONS_OFF: 'turned phone notifications off',
   WHATSAPP_REMINDER: 'sent a WhatsApp reminder', WHATSAPP_GROUP_REMINDER: 'sent a WhatsApp reminder to the group',
+  EVIDENCE_WITHDRAWN: 'removed their own screenshot', EVIDENCE_REMOVAL_REQUESTED: 'asked to remove a screenshot', EVIDENCE_REMOVED_ON_REQUEST: 'removed a screenshot on request',
+  EVIDENCE_REMOVAL_DECLINED: 'declined a screenshot removal', EVIDENCE_IMAGE_ERASED: 'erased a screenshot image',
 };
 const label = (a: string) => LABEL[a] ?? a.toLowerCase().replaceAll('_', ' ');
 const isFailure = (a: string) => a.startsWith('SIGN_IN_') || a.endsWith('_REJECTED') || a.endsWith('_REMOVED') || a.includes('OVERRIDDEN') || a === 'USER_DISABLED' || a === 'COMMUNITY_MUTED';

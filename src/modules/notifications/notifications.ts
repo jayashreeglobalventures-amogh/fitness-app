@@ -56,8 +56,8 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     // As a participant: today's check-in, votes waiting for me.
     if (c.participant_id && c.p_status === 'ACTIVE' && live && daysBetween(c.joined_on, today) >= 0 && (!c.left_on || daysBetween(today, c.left_on) >= 0)) {
       const { rows: [t] } = await db.query(
-        `SELECT coalesce((SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status <> 'SUPERSEDED' AND NOT part),
-                         (SELECT 'PARTS' FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status <> 'REJECTED' LIMIT 1)) AS sub,
+        `SELECT coalesce((SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status NOT IN ('SUPERSEDED','WITHDRAWN') AND NOT part),
+                         (SELECT 'PARTS' FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status NOT IN ('REJECTED','WITHDRAWN') LIMIT 1)) AS sub,
                 EXISTS (SELECT 1 FROM rest_days WHERE participant_id = $1 AND day = $2 AND cancelled_at IS NULL) AS rest,
                 EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused`,
         [c.participant_id, today]);
@@ -155,6 +155,10 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
               (SELECT count(*) FROM bonus_submissions s JOIN bonus_activities a USING (activity_id) JOIN participants p ON p.participant_id = s.participant_id
                  WHERE a.challenge_id = $1 AND s.status = 'PENDING' AND p.user_id <> $2)::int AS bonuses`, [cid, userId, now]);
     if (w.reviews && can('submissions.review')) out.push({ id: `reviews:${cid}`, kind: 'action', title: `${c.name}: screenshots to review`, body: `${w.reviews} waiting for a decision.`, link: `/challenges/${cid}/review`, challengeId: cid, count: w.reviews });
+    if (can('submissions.review')) {
+      const { rows: [er] } = await db.query(`SELECT count(*)::int AS n FROM evidence_requests WHERE challenge_id = $1 AND status = 'PENDING'`, [cid]);
+      if (er.n) out.push({ id: `evreq:${cid}`, kind: 'action', title: `${c.name}: requests to remove screenshots`, body: `${er.n} waiting.`, link: `/challenges/${cid}/review`, challengeId: cid, count: er.n });
+    }
     if (w.exemptions && can('exemptions.review')) out.push({ id: `exadmin:${cid}`, kind: 'action', title: `${c.name}: exemption requests need an admin`, body: `${w.exemptions} waiting.`, link: `/challenges/${cid}/exemptions`, challengeId: cid, count: w.exemptions });
     if (can('payments.verify') || can('refunds.approve') || can('payments.countersign')) {
       const { rows: [m] } = await db.query(

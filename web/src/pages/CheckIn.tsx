@@ -1,7 +1,7 @@
 // Participant: today's goal, screenshot upload, rest day, progress and calendar.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad, ViewPhoto } from '../ui';
+import { Collapsible, day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
 import { CoachCard } from './Coach';
@@ -123,18 +123,18 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
     && d.summary.restDaysThisPeriod < d.rules.restDays.perPeriod && d.summary.restDaysUsed < d.rules.restDays.maxTotal;
 
   return (
-    <div className="card today">
-      <div className="spread">
-        <div><span className="muted small">Today · {day(t.day)}</span><div className="target">{t.target.toLocaleString('en-IN')} <span className="muted" style={{ fontSize: 16 }}>{t.unit}</span></div></div>
-        <div style={{ textAlign: 'right' }}><StatusBadge status={t.status} /><div className="muted small" style={{ marginTop: 6 }}>{left === 'closed' ? 'Deadline passed' : `Midnight deadline · ${left}`}</div></div>
-      </div>
+    <Collapsible id={`today-${v.challengeId}`} className="today" title={
+      <span className="spread" style={{ width: '100%' }}>
+        <span><span className="muted small" style={{ fontWeight: 400 }}>Today · {day(t.day)}</span><span className="target" style={{ display: 'block' }}>{t.target.toLocaleString('en-IN')} <span className="muted" style={{ fontSize: 16 }}>{t.unit}</span></span></span>
+        <span style={{ textAlign: 'right', fontWeight: 400 }}><StatusBadge status={t.status} /><span className="muted small" style={{ display: 'block', marginTop: 6 }}>{left === 'closed' ? 'Deadline passed' : `Midnight deadline · ${left}`}</span></span>
+      </span>}>
       <ErrorBox error={error} />
       {t.status === 'ACHIEVED' && <div className="alert ok" style={{ marginTop: 12 }}>Done for today: {t.submission?.finalValue?.toLocaleString('en-IN')} {t.unit}. 🎉</div>}
       {t.status === 'SUBMITTED' && <div className="alert" style={{ marginTop: 12 }}>Reading your screenshot…</div>}
       {t.status === 'PENDING_VERIFICATION' && <div className="alert" style={{ marginTop: 12 }}>{multi ? 'An admin will check a screenshot. You can add more until midnight.' : 'An admin will check your screenshot. You can upload a clearer one until midnight.'}</div>}
       {t.status === 'IN_PROGRESS' && <div className="alert" style={{ marginTop: 12 }}>{(t.submission?.finalValue ?? 0).toLocaleString('en-IN')} of {t.target.toLocaleString('en-IN')} {t.unit} so far. Add another screenshot (e.g. from your watch) before midnight.</div>}
-      {multi && parts.length > 0 && <Parts parts={parts} combine={d.rules.multiplePerDay.combine} unit={t.unit} />}
-      {!multi && t.submission?.fileId && <p className="small" style={{ marginTop: 8 }}><ViewPhoto fileId={t.submission.fileId} alt="My screenshot for today">View my screenshot</ViewPhoto></p>}
+      {multi && parts.length > 0 && <Parts parts={parts} combine={d.rules.multiplePerDay.combine} unit={t.unit} dayOver={left === 'closed'} onChanged={onChanged} />}
+      {!multi && t.submission?.fileId && <div className="small" style={{ marginTop: 8 }}><ViewPhoto fileId={t.submission.fileId} alt="My screenshot for today">View my screenshot</ViewPhoto> · <RemoveScreenshot submissionId={t.submission.submissionId} dayOver={left === 'closed'} onChanged={onChanged} /></div>}
       {(t.status === 'TARGET_MISSED' || t.status === 'REJECTED') && <div className="alert error" style={{ marginTop: 12 }}>{DAY_STATUS[t.status]!.label}{t.submission?.decisionReason ? `: ${t.submission.decisionReason}` : '.'} You can upload new evidence until midnight.</div>}
       {t.status === 'REST' && <div className="alert" style={{ marginTop: 12 }}>Rest day. Enjoy it. {beforeCutoff && <button className="btn small ghost" onClick={cancelRest}>Cancel rest day</button>}</div>}
       {t.status === 'EXCUSED' && <div className="alert" style={{ marginTop: 12 }}>Excused by an approved exemption. Get well soon.</div>}
@@ -158,20 +158,57 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
         </div>
       )}
       {restAllowed && !file && <button className="btn ghost small" style={{ marginTop: 10 }} onClick={rest}>Take today as a rest day (until {d.rules.restDays.declareBefore})</button>}
+    </Collapsible>
+  );
+}
+
+/**
+ * Remove my screenshot: directly until that day's midnight; afterwards by asking an admin. Either way it can be marked
+ * as a private photo, so an admin erases the image itself.
+ */
+function RemoveScreenshot({ submissionId, dayOver, onChanged }: { submissionId: number; dayOver: boolean; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [privatePhoto, setPrivatePhoto] = useState(false);
+  const [reason, setReason] = useState('');
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const go = async () => {
+    setError(null);
+    try {
+      if (dayOver) { await api.post(`/api/submissions/${submissionId}/removal-request`, { reason, eraseImage: privatePhoto }); setDone(true); }
+      else { await api.post(`/api/submissions/${submissionId}/withdraw`, { eraseImage: privatePhoto, reason: privatePhoto ? 'Private photo uploaded by mistake' : undefined }); onChanged(); }
+      setOpen(false);
+    } catch (e) { setError(e); }
+  };
+  if (done) return <span className="muted small">Sent to the admins.</span>;
+  if (!open) return <button type="button" className="linklike small" onClick={() => setOpen(true)}>{dayOver ? 'Ask to remove' : 'Remove'}</button>;
+  return (
+    <div className="section" style={{ marginTop: 6 }}>
+      <ErrorBox error={error} />
+      <p className="small" style={{ marginTop: 0 }}>{dayOver
+        ? 'This day is already decided, so an admin has to remove it (points and fines are then recalculated).'
+        : 'Remove this screenshot? Until midnight you can upload another one.'}</p>
+      {dayOver && <input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why should it be removed?" style={{ width: '100%' }} maxLength={500} />}
+      <label className="check small"><input type="checkbox" checked={privatePhoto} onChange={(e) => setPrivatePhoto(e.target.checked)} />
+        <span>It's a private photo - ask an admin to erase the image</span></label>
+      <div className="row" style={{ marginTop: 6 }}>
+        <button className="btn small danger" disabled={dayOver && reason.trim().length < 5} onClick={go}>{dayOver ? 'Send to an admin' : 'Remove it'}</button>
+        <button className="btn small ghost" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
     </div>
   );
 }
 
 const PART_LABEL: Record<string, string> = { PENDING_AI: 'reading…', PENDING_REVIEW: 'waiting for an admin', APPROVED: 'approved', REJECTED: 'declined' };
 /** Several screenshots a day: each one, its number and state, and the day's total. */
-function Parts({ parts, combine, unit }: { parts: NonNullable<DayInfo['parts']>; combine: 'SUM' | 'HIGHEST'; unit: string }) {
+function Parts({ parts, combine, unit, dayOver, onChanged }: { parts: NonNullable<DayInfo['parts']>; combine: 'SUM' | 'HIGHEST'; unit: string; dayOver: boolean; onChanged: () => void }) {
   const approved = parts.filter((p) => p.status === 'APPROVED').map((p) => p.value ?? 0);
   const total = approved.length ? (combine === 'SUM' ? approved.reduce((a, v) => a + v, 0) : Math.max(...approved)) : 0;
   return (
     <div className="parts">
       {parts.map((p, i) => (
         <div key={p.submissionId} className="spread small" style={{ padding: '4px 0' }}>
-          <ViewPhoto fileId={p.fileId} alt={`Screenshot ${i + 1}`}>Screenshot {i + 1}</ViewPhoto>
+          <span><ViewPhoto fileId={p.fileId} alt={`Screenshot ${i + 1}`}>Screenshot {i + 1}</ViewPhoto> <RemoveScreenshot submissionId={p.submissionId} dayOver={dayOver} onChanged={onChanged} /></span>
           <span><b>{p.value !== null && p.status === 'APPROVED' ? p.value.toLocaleString('en-IN') : '—'}</b> <span className={`badge ${p.status === 'APPROVED' ? 'ok' : p.status === 'REJECTED' ? 'danger' : ''}`}>{PART_LABEL[p.status] ?? p.status}</span></span>
         </div>
       ))}
@@ -220,6 +257,8 @@ function DayDetail({ info, d, onChanged, onClose }: { info: DayInfo; d: Dashboar
         {s.finalValue !== null && <><dt>Counted</dt><dd>{s.finalValue.toLocaleString('en-IN')}</dd></>}
         {s.decisionReason && <><dt>Note</dt><dd>{s.decisionReason}</dd></>}
       </dl>}
+      {s?.fileId && !(info.parts?.length) && <div className="small"><ViewPhoto fileId={s.fileId} alt={`My screenshot for ${info.day}`}>View screenshot</ViewPhoto> · <RemoveScreenshot submissionId={s.submissionId} dayOver={info.day < (d.today?.day ?? '9999')} onChanged={onChanged} /></div>}
+      {(info.parts?.length ?? 0) > 0 && <Parts parts={info.parts!} combine={d.rules.multiplePerDay.combine} unit={d.today?.unit ?? ''} dayOver={info.day < (d.today?.day ?? '9999')} onChanged={onChanged} />}
       {info.restDay && <p className="small muted">Rest day declared {time(info.restDay.declaredAt, d.timeZone)}{info.restDay.source === 'ADMIN_CORRECTION' ? ' (recorded by an admin)' : ''}.</p>}
       {canCancelRest && <button className="btn small" onClick={cancelRest}>Cancel this rest day</button>}
       {info.exemption && <p className="small muted">Exemption request: {info.exemption.status.toLowerCase().replace('_', ' ')}.</p>}

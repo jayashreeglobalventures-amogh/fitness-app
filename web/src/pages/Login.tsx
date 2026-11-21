@@ -22,6 +22,7 @@ export function LoginPage({ onSignedIn }: { onSignedIn: () => void }) {
         <Field label="Username"><input type="text" autoComplete="username" autoCapitalize="none" value={username} onChange={(e) => setUsername(e.target.value)} required /></Field>
         <Field label="Password"><input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></Field>
         <button className="btn primary" style={{ width: '100%' }} disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <p className="muted small" style={{ textAlign: 'center', marginBottom: 0 }}><a href="/privacy.html">Privacy policy</a></p>
       </form>
     </div>
   );

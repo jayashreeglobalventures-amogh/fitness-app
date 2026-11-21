@@ -200,3 +200,7 @@ button.link:hover { color: var(--text); }
 .stat span.muted { text-transform: none; letter-spacing: 0; }
 .post.removed { padding: 12px 16px; }
 .removed-content { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+
+/* Challenge tabs: wrap on wider screens so none are hidden; on phones they scroll, with a fade showing there's more. */
+@media (min-width: 700px) { .subnav { flex-wrap: wrap; overflow-x: visible; } }
+@media (max-width: 699px) { .subnav { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); } }

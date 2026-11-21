@@ -46,11 +46,11 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
     { key: 'bonus', label: 'Bonus', show: (isParticipant || can('bonus.manage')) && live && v.current.config.scoring.weekendBonus.enabled },
     { key: 'money', label: 'Money', show: live && (v.upcoming ?? v.current).config.finance.enabled && (isParticipant || can('finance.view') || can('finance.settings') || can('refunds.approve')) },
     { key: 'exemptions', label: 'Exemptions', show: (isParticipant || can('exemptions.review')) && live && (v.current.config.exemptions.enabled || can('exemptions.review')) },
-    { key: 'overview', label: 'Rules', show: true },
-    { key: 'demo', label: 'Demo', show: true },
-    { key: 'settings', label: 'Settings', show: isAdmin },
     { key: 'roster', label: 'Roster', show: isAdmin },
     { key: 'admins', label: 'Admins', show: isAdmin },
+    { key: 'settings', label: 'Settings', show: isAdmin },
+    { key: 'overview', label: 'Rules', show: true },
+    { key: 'demo', label: 'Demo', show: true },
   ].filter((s) => s.show);
   const fallback = sections[0]!.key;
   const active = section === 'default' ? fallback : sections.some((s) => s.key === section) ? section : fallback;
@@ -66,7 +66,8 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       <p className="muted small">{day(v.startsOn)} – {day(v.endsOn)} · {v.timeZone}</p>
       {sections.length > 1 && (
         <div className="subnav" role="tablist">
-          {sections.map((s) => <button key={s.key} aria-current={s.key === active} onClick={() => navigate(`/challenges/${id}/${s.key}`)}>{s.label}</button>)}
+          {sections.map((s) => <button key={s.key} aria-current={s.key === active} onClick={() => navigate(`/challenges/${id}/${s.key}`)}
+            ref={s.key === active ? (el) => el?.scrollIntoView({ block: 'nearest', inline: 'center' }) : undefined}>{s.label}</button>)}
         </div>
       )}
       {active === 'today' && <CheckInSection v={v} />}

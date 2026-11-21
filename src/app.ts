@@ -36,6 +36,7 @@ import * as users from './modules/identity/users.js';
 import * as profile from './modules/profile/profile.js';
 import { personCard } from './modules/profile/person.js';
 import * as health from './modules/health/health.js';
+import * as coach from './modules/coach/coach.js';
 import * as roster from './modules/roster/roster.js';
 
 export const COOKIE = 'fit_session';
@@ -361,6 +362,8 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
 
   // ---------- Points, leaderboard, weekend bonus ----------
   app.get('/api/challenges/:challengeId/leaderboard', authed((c) => leaderboard(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/challenges/:challengeId/coach', authed((c) => coach.myCoach(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/challenges/:challengeId/coach/at-risk', authed((c) => coach.atRisk(c.tx, c.user.userId, cid(c), c.now)));
   app.get('/api/participants/:participantId/points', authed((c) => breakdown(c.tx, c.user.userId, pid(c), c.now)));
   const aid = (c: Ctx) => id((c.req.params as { activityId: string }).activityId);
   const bsid = (c: Ctx) => id((c.req.params as { bonusSubmissionId: string }).bonusSubmissionId);

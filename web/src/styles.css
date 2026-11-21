@@ -204,3 +204,9 @@ button.link:hover { color: var(--text); }
 /* Challenge tabs: wrap on wider screens so none are hidden; on phones they scroll, with a fade showing there's more. */
 @media (min-width: 700px) { .subnav { flex-wrap: wrap; overflow-x: visible; } }
 @media (max-width: 699px) { .subnav { -webkit-mask-image: linear-gradient(to right, #000 88%, transparent); mask-image: linear-gradient(to right, #000 88%, transparent); } }
+
+/* Coach */
+.coach { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.coach-headline { font-size: 18px; font-weight: 800; margin: 10px 0 6px; }
+.coach-lines { margin: 0; padding-left: 18px; }
+.coach-lines li { margin: 4px 0; font-size: 14px; }

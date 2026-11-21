@@ -154,6 +154,12 @@ export const ChallengeConfigSchema = Type.Object({
     participantsCanPost: Type.Boolean(),   // false: only admins post (announcements); everyone can still react and comment
     photos: Type.Boolean(),
   }, { additionalProperties: false }),
+  coach: Type.Object({
+    weeklySummary: Type.Boolean(),         // a personal summary after each challenge week
+    eveningNudge: Type.Boolean(),          // a personal reminder in the evening if today's steps aren't in yet
+    nudgeTime: Type.String({ pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }),   // local time, e.g. "20:00"
+    atRiskAlerts: Type.Boolean(),          // tell admins who might need a hand (misses in a row, below the prize line)
+  }, { additionalProperties: false }),
   leaderboard: Type.Object({
     ranking: Type.Array(Type.Union(RANKING_KEYS.map((k) => Type.Literal(k))), { minItems: 1, maxItems: RANKING_KEYS.length }),
   }, { additionalProperties: false }),
@@ -176,6 +182,7 @@ export function normalizeConfig<T>(input: T): T {
   const c = structuredClone(input) as Record<string, any>;
   if (c.prizes && typeof c.prizes === 'object' && c.prizes.topThreeIneligible === undefined) c.prizes.topThreeIneligible = 'NEXT_ELIGIBLE';
   if (c.community === undefined && c.schemaVersion !== undefined) c.community = { enabled: true, participantsCanPost: true, photos: true };
+  if (c.coach === undefined && c.schemaVersion !== undefined) c.coach = { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true };
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

@@ -101,15 +101,24 @@ export async function sendTest(db: Queryable, send: PushSender, userId: number, 
 /**
  * One round of sending: for each person with phone notifications on, every unread alert not sent before goes out
  * (up to 3 separately; more become one summary). Phones that are gone (404/410) or keep failing are removed.
+ * Quiet hours: nothing is sent between 23:00 and 07:00 India time; alerts wait in the app and go out at 7 if still
+ * unread. Alerts marked push: false (the plain check-in reminder that appears at midnight) stay in the app only.
  */
+export const QUIET_FROM = 23, QUIET_UNTIL = 7;
+export function inQuietHours(now: Date): boolean {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', hourCycle: 'h23' }).format(now));
+  return h >= QUIET_FROM || h < QUIET_UNTIL;
+}
+
 export async function sendDue(db: Queryable, send: PushSender, now: Date): Promise<{ sent: number; removed: number }> {
   let sent = 0, removed = 0;
+  if (inQuietHours(now)) return { sent, removed };
   const { rows: people } = await db.query(
     `SELECT p.user_id FROM notification_prefs p JOIN users u USING (user_id)
       WHERE p.push_enabled AND u.status = 'ACTIVE' AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = p.user_id)`);
   for (const { user_id } of people) {
     const userId = Number(user_id);
-    const notices = (await myNotifications(db, userId, now)).filter((n) => !n.seen);
+    const notices = (await myNotifications(db, userId, now)).filter((n) => !n.seen && n.push !== false);
     const { rows: done } = await db.query(`SELECT push_key FROM push_sent WHERE user_id = $1`, [userId]);
     const already = new Set(done.map((r) => r.push_key as string));
     const fresh = notices.filter((n) => !already.has(n.seenKey!));

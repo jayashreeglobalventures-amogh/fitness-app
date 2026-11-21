@@ -221,6 +221,13 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         </>)}
       </Section>
 
+      <Section title="Coach">
+        <Check ctx={ctx} p={['coach', 'weeklySummary']} label="Weekly summary for each participant after every challenge week" />
+        <Check ctx={ctx} p={['coach', 'eveningNudge']} label="Evening nudge if today's steps aren't in yet" />
+        {c.coach.eveningNudge && <Text ctx={ctx} p={['coach', 'nudgeTime']} label="Nudge time (24-hour, local)" hint="e.g. 20:00. Phone notifications are never sent between 11 pm and 7 am." />}
+        <Check ctx={ctx} p={['coach', 'atRiskAlerts']} label="Tell admins who might need a hand (misses in a row, below the prize line)" />
+      </Section>
+
       <Section title="Leaderboard">
         <p className="muted small">Ranking order: ties are broken by the next item. A tie that remains is decided by an admin, with a recorded reason.</p>
         <Ranking ctx={ctx} />

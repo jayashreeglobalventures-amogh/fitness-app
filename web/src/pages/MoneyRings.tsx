@@ -1,12 +1,13 @@
 // Today tab: two small rings - my share of the group pot (what I've paid vs everything collected) and this week's fine
 // pool (still mine vs moved to the group by misses). Numbers are always written next to the rings.
 import { api } from '../api';
-import { useLoad } from '../ui';
+import { Collapsible, useLoad } from '../ui';
 
 interface MyMoney {
   weeks: { periodNo: number; startsOn: string; endsOn: string; finePool: number; fines: number; finePoolLeft: number; paid: number; creditUsed: number; status: string }[];
   payments: { amount: number; status: string }[];
   pools: { collected: number };
+  prizePool?: { total: number; fromContributions: number; fromFines: number };
   today: string;
 }
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -36,8 +37,7 @@ export function MoneyRings({ challengeId }: { challengeId: number }) {
   const pot = d.pools.collected;
   const week = d.weeks.find((w) => w.startsOn <= d.today && d.today <= w.endsOn && w.finePool > 0) ?? d.weeks.find((w) => w.finePool > 0);
   return (
-    <div className="card money-rings">
-      <h3 style={{ margin: '0 0 8px' }}>💰 My money</h3>
+    <Collapsible id={`money-${challengeId}`} title="💰 My money" className="money-rings">
       <div className="ring-row">
         <Ring part={myPaid} whole={pot} label={`My payments: ${inr(myPaid)} of ${inr(pot)} collected`} />
         <div className="small">
@@ -58,6 +58,17 @@ export function MoneyRings({ challengeId }: { challengeId: number }) {
           </div>
         </div>
       )}
-    </div>
+      {d.prizePool && d.prizePool.total > 0 && (
+        <div className="ring-row">
+          <Ring part={d.prizePool.fromFines} whole={d.prizePool.total} label={`Prize pool ${inr(d.prizePool.total)}: ${inr(d.prizePool.fromFines)} from fines, ${inr(d.prizePool.fromContributions)} from weekly contributions`} />
+          <div className="small">
+            <b>Prize pool</b>
+            <div><span className="dot" style={{ background: 'var(--ring-rest)' }} /> Weekly ₹ shares: {inr(d.prizePool.fromContributions)}</div>
+            <div><span className="dot" style={{ background: 'var(--accent)' }} /> From misses (fines): {inr(d.prizePool.fromFines)}</div>
+            <div className="muted">Total: {inr(d.prizePool.total)} (all weeks)</div>
+          </div>
+        </div>
+      )}
+    </Collapsible>
   );
 }

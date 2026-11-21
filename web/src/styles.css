@@ -227,3 +227,25 @@ button.linklike:hover { text-decoration: underline; }
 .money-rings .ring-row { display: flex; gap: 12px; align-items: center; padding: 6px 0; }
 .money-rings .ring-row + .ring-row { border-top: 1px solid var(--border); }
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+/* Collapsible cards */
+.collapsible-head { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.collapsible-title { font-weight: 800; font-size: 17px; }
+.chevron { color: var(--muted); font-size: 18px; }
+.collapsible-body { margin-top: 10px; }
+
+/* Race track (Team) */
+.race { display: flex; flex-direction: column; gap: 6px; }
+.lane { display: grid; grid-template-columns: minmax(60px, 92px) minmax(0, 1fr); align-items: center; gap: 8px; }
+.lane-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-track { position: relative; height: 34px; border-radius: 999px; background: repeating-linear-gradient(90deg, var(--surface-2) 0 18px, color-mix(in srgb, var(--surface-2) 70%, var(--bg)) 18px 36px);
+  border: 1px solid var(--border); margin-right: 22px; }
+.pace { position: absolute; top: -3px; bottom: -3px; border-left: 2px dashed var(--muted); opacity: .6; }
+.finish { position: absolute; right: -22px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+.runner { position: absolute; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; padding: 0; border: 2px solid var(--surface); border-radius: 50%;
+  background: var(--surface); cursor: pointer; display: grid; place-items: center; transition: left .4s ease; z-index: 1; }
+.runner:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.runner-status { position: absolute; right: -8px; bottom: -6px; font-size: 12px; line-height: 1; }
+.race-tip { position: absolute; bottom: calc(100% + 6px); width: 180px; z-index: 10; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / .35); pointer-events: none; }
+.race-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }

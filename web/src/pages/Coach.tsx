@@ -1,7 +1,7 @@
 // The coach's cards: "Your coach" (weekly summaries) on the Today tab, "Who might need a hand" on the Team tab.
 import { useState } from 'react';
 import { api } from '../api';
-import { useLoad } from '../ui';
+import { Collapsible, useLoad } from '../ui';
 import { waNumber } from './WhatsAppReminders';
 
 interface Week { periodNo: number; startsOn: string; endsOn: string; complete: boolean; headline: string; lines: string[] }
@@ -13,9 +13,9 @@ export function CoachCard({ challengeId }: { challengeId: number }) {
   const weeks = c.data.weeks;
   const w = weeks[Math.min(i, weeks.length - 1)]!;
   return (
-    <div className="card coach">
+    <Collapsible id={`coach-${challengeId}`} title="🧭 Your coach" className="coach">
       <div className="spread">
-        <h3 style={{ margin: 0 }}>🧭 Your coach</h3>
+        <span />
         {weeks.length > 1 && (
           <select value={i} onChange={(e) => setI(Number(e.target.value))} aria-label="Week" style={{ maxWidth: 170 }}>
             {weeks.map((x, k) => <option key={x.periodNo} value={k}>Week {x.periodNo}{x.complete ? '' : ' (so far)'}</option>)}
@@ -24,7 +24,7 @@ export function CoachCard({ challengeId }: { challengeId: number }) {
       </div>
       <p className="coach-headline">{w.headline}</p>
       <ul className="coach-lines">{w.lines.map((l, k) => <li key={k}>{l}</li>)}</ul>
-    </div>
+    </Collapsible>
   );
 }
 

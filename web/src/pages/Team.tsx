@@ -6,6 +6,7 @@ import { day, ErrorBox, Field, Loading, newRef, StatusBadge, upload, useLoad } f
 import { navigate } from '../router';
 import type { ChallengeView } from './Challenge';
 import { WhatsAppReminders } from './WhatsAppReminders';
+import { AtRiskCard } from './Coach';
 
 interface Person {
   participantId: number; userId: number; displayName: string; username: string; status: string;
@@ -41,6 +42,7 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
           {d.waiting.exemptions_review > 0 && <div>{d.waiting.exemptions_review} exemption request{d.waiting.exemptions_review === 1 ? '' : 's'} need an admin. <button className="btn small ghost" onClick={() => navigate(`/challenges/${v.challengeId}/exemptions`)}>Open</button></div>}
         </div>
       )}
+      {d.day === d.today && <AtRiskCard challengeId={v.challengeId} name={v.name} mobiles={new Map(d.people.map((p) => [p.participantId, p.mobile ?? null]))} />}
       {d.canRemind && d.day === d.today && <WhatsAppReminders challengeId={v.challengeId} name={v.name} day={d.day} people={d.people} timeZone={d.timeZone} onSent={o.reload} />}
       <div className="card table-wrap"><table>
         <thead><tr><th>Person</th><th>{d.day === d.today ? 'Today' : day(d.day)}</th><th>So far</th><th /></tr></thead>

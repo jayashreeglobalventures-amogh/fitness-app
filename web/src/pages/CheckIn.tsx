@@ -4,6 +4,7 @@ import { api } from '../api';
 import { day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad } from '../ui';
 import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
+import { CoachCard } from './Coach';
 
 interface DayInfo {
   day: string; status: string; periodNo: number | null;
@@ -68,6 +69,7 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
         {d.rules.restDays.enabled && <div className="stat"><span>Rest days</span><b>{s.restDaysUsed}/{d.rules.restDays.maxTotal}</b></div>}
         {s.excused > 0 && <div className="stat"><span>Excused</span><b>{s.excused}</b></div>}
       </div>
+      <CoachCard challengeId={v.challengeId} />
       {s.pending > 0 && <p className="muted small">{s.pending} day{s.pending === 1 ? '' : 's'} waiting for verification; points for {s.pending === 1 ? 'it' : 'them'} follow the decision.</p>}
       {d.participant.participantId && <PointsCard participantId={d.participant.participantId} />}
 

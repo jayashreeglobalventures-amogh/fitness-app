@@ -134,6 +134,18 @@ Defaults applied where nothing was said:
 | Enforcement | In the database: row-level security lets the app's connection read only the signed-in person's health rows; other people's data only via one function that applies their sharing. Values never go into the activity log, notifications, posts or AI |
 | Person page | Tapping a name (leaderboard, community) shows what that person shares with you - basic fields per their visibility, health per their health sharing |
 
+## Coach - rule-based (owner, 21 Nov 2026: free, no AI yet; AI can be plugged in later)
+
+| Topic | Rule |
+|---|---|
+| Weekly summary | After each challenge week, per participant (Today tab + an alert for 3 days): days done vs counted, compared with last week, average and best-day steps, streak, overall adherence vs the prize line (and how many successful days would reach it), points, weakest weekday, one realistic aim |
+| Evening nudge | From the challenge's nudge time (Calamari 20:00) if today's steps aren't in: a personal alert ("keep your 9-day streak going", "today's a fresh start") that goes to the phone. Before that, the plain check-in alert is in the app only |
+| Needs a hand | Admins see participants with 2+ misses in a row, or below the prize line after 5+ counted days, with the reason and a WhatsApp check-in button (Team tab + a daily alert) |
+| Numbers | Streaks and misses in a row are counted exactly as the points engine does (rest days and exemptions pause; stops at an undecided day) |
+| Settings | Settings → Coach: each part on/off, nudge time |
+| Phone quiet hours | No phone notifications 23:00–07:00 IST; alerts wait in the app and go out at 7 if still unread |
+| AI later | The coach works out facts and a "writer" puts them into words. An AI writer can be selected later (COACH_WRITER); it would receive only these facts - no health data, no money details - and the templates take over if it fails |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

@@ -134,6 +134,12 @@
     "participantsCanPost": true,
     "photos": true
   },
+  "coach": {
+    "weeklySummary": true,
+    "eveningNudge": true,
+    "nudgeTime": "20:00",
+    "atRiskAlerts": true
+  },
   "leaderboard": {
     "ranking": [
       "POINTS",

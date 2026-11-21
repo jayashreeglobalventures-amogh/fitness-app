@@ -8,6 +8,7 @@ import { accessFor } from '../identity/permissions.js';
 import { addDays, computePeriods } from '../../core/dates.js';
 import { contributionFor } from '../challenges/config.js';
 import { dueOn } from '../finance/finance.js';
+import { coachNotices } from '../coach/coach.js';
 
 export interface Notice {
   id: string;                    // stable, for "seen" state in the app
@@ -21,6 +22,8 @@ export interface Notice {
   seenKey?: string;
   /** Already seen by this person (opening Notifications marks everything listed as seen). */
   seen?: boolean;
+  /** false: in the app only, never sent to the phone (e.g. the plain daily check-in reminder that appears at midnight). */
+  push?: boolean;
 }
 
 export async function myNotifications(db: Queryable, userId: number, now: Date): Promise<Notice[]> {
@@ -48,6 +51,8 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     const today = localDay(now, c.time_zone);
     const live = c.status === 'PUBLISHED' && daysBetween(c.starts_on, today) >= 0 && daysBetween(today, c.ends_on) >= 0;
 
+    let notSubmittedToday = false;
+    let todayNotice: Notice | null = null;
     // As a participant: today's check-in, votes waiting for me.
     if (c.participant_id && c.p_status === 'ACTIVE' && live && daysBetween(c.joined_on, today) >= 0 && (!c.left_on || daysBetween(today, c.left_on) >= 0)) {
       const { rows: [t] } = await db.query(
@@ -56,8 +61,10 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
                 EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused`,
         [c.participant_id, today]);
       if (!t.sub && !t.rest && !t.excused) {
+        notSubmittedToday = true;
         const left = Math.max(0, Math.round((endOfDay(today, c.time_zone).getTime() - now.getTime()) / 3_600_000));
-        out.push({ id: `today:${cid}:${today}`, kind: 'action', title: `${c.name}: today's check-in`, body: `Upload today's screenshot before midnight (about ${left} h left).`, link: `/challenges/${cid}/today`, challengeId: cid });
+        // In the app only: it appears at midnight. The coach's evening nudge (below) is what goes to the phone.
+        todayNotice = { id: `today:${cid}:${today}`, kind: 'action', title: `${c.name}: today's check-in`, body: `Upload today's screenshot before midnight (about ${left} h left).`, link: `/challenges/${cid}/today`, challengeId: cid, push: false };
       } else if (t.sub === 'BELOW_TARGET' || t.sub === 'REJECTED') {
         out.push({ id: `todaybad:${cid}:${today}`, kind: 'warning', title: `${c.name}: today's evidence wasn't accepted`, body: 'You can upload new evidence until midnight.', link: `/challenges/${cid}/today`, challengeId: cid });
       }
@@ -106,6 +113,15 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     // As an admin: what waits for me (only what my role may do).
     const access = await accessFor(db, userId, cid);
     const can = (p: string) => access.permissions.has(p as never);
+
+    // The coach: evening nudge (replaces the plain check-in reminder), weekly summary, who might need a hand.
+    if (c.status === 'PUBLISHED' && (c.participant_id || can('roster.manage'))) {
+      const coach = await coachNotices(db, userId, cid, { participantId: c.participant_id && c.p_status === 'ACTIVE' ? Number(c.participant_id) : null,
+        canManageRoster: can('roster.manage'), notSubmittedToday }, now);
+      out.push(...coach.notices);
+      if (todayNotice && !coach.nudged) out.push(todayNotice);
+    } else if (todayNotice) out.push(todayNotice);
+
     if (!can('challenge.view_admin')) continue;
     if (can('challenge.config.edit')) {
       const check = validateConfig((await latestVersion(db, cid)).config);

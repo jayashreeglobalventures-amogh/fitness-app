@@ -139,3 +139,24 @@ export function ViewPhoto({ fileId, alt, children, className }: { fileId: number
     </>
   );
 }
+
+/**
+ * A card that can be folded away; remembers open/closed per section on this device (falls back to `defaultOpen`
+ * where storage isn't available, e.g. private browsing).
+ */
+export function Collapsible({ id, title, defaultOpen = true, className, children }: { id: string; title: ReactNode; defaultOpen?: boolean; className?: string; children: ReactNode }) {
+  const key = `fit:open:${id}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    try { const v = localStorage.getItem(key); return v === null ? defaultOpen : v === '1'; } catch { return defaultOpen; }
+  });
+  const toggle = () => setOpen((o) => { try { localStorage.setItem(key, o ? '0' : '1'); } catch { /* fine */ } return !o; });
+  return (
+    <div className={`card collapsible ${className ?? ''}`}>
+      <button type="button" className="collapsible-head" aria-expanded={open} onClick={toggle}>
+        <span className="collapsible-title">{title}</span>
+        <span className="chevron" aria-hidden="true">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && <div className="collapsible-body">{children}</div>}
+    </div>
+  );
+}

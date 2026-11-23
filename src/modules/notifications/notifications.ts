@@ -2,13 +2,14 @@
 // what needs the person's attention, with a link to where they act on it. Admin items only for what they may do.
 import type { Queryable } from '../../core/db.js';
 import { daysBetween, endOfDay, localDay } from '../../core/dates.js';
-import { latestVersion } from '../challenges/challenges.js';
-import { validateConfig } from '../challenges/config.js';
+import { latestVersion, versionOn, versions } from '../challenges/challenges.js';
+import { validateConfig, type ChallengeConfig } from '../challenges/config.js';
 import { accessFor } from '../identity/permissions.js';
 import { addDays, computePeriods } from '../../core/dates.js';
 import { contributionFor } from '../challenges/config.js';
 import { carriedInto, dueOn } from '../finance/finance.js';
 import { coachNotices } from '../coach/coach.js';
+import { prefsOf, type Category } from './prefs.js';
 
 export interface Notice {
   id: string;                    // stable, for "seen" state in the app
@@ -24,10 +25,34 @@ export interface Notice {
   seen?: boolean;
   /** false: in the app only, never sent to the phone (e.g. the plain daily check-in reminder that appears at midnight). */
   push?: boolean;
+  /** What kind of alert (each person can switch most kinds off; 'essential' ones always come). */
+  category?: Category;
+  /** An admin task: with the challenge's "round-up" delivery it reaches phones only at the round-up times. */
+  adminTask?: boolean;
+  /** When it may reach phones: the challenge's quiet hours and (admin tasks) round-up times, in its time zone. */
+  pushRules?: { timeZone: string; quietFrom: string; quietUntil: string; digestTimes?: string[] };
+}
+
+type AdminKind = 'reviews' | 'payments' | 'exemptions' | 'bonuses' | 'reports';
+/** Each alert's kind, from the start of its id. Anything not listed is essential. */
+const KIND_BY_PREFIX: Record<string, { category: Category; admin?: AdminKind }> = {
+  today: { category: 'stepReminders' }, nudge: { category: 'stepReminders' }, restremind: { category: 'restDayReminder' },
+  week: { category: 'weeklySummary' }, streak: { category: 'milestones' }, teamstreak: { category: 'teamStreak' },
+  paysoon: { category: 'payments' }, comments: { category: 'communityComments' }, posts: { category: 'communityPosts' }, atrisk: { category: 'atRisk' },
+  reviews: { category: 'adminTasks', admin: 'reviews' }, evreq: { category: 'adminTasks', admin: 'reviews' },
+  payments: { category: 'adminTasks', admin: 'payments' }, countersign: { category: 'adminTasks', admin: 'payments' }, refunds: { category: 'adminTasks', admin: 'payments' },
+  exadmin: { category: 'adminTasks', admin: 'exemptions' }, bonus: { category: 'adminTasks', admin: 'bonuses' }, reports: { category: 'adminTasks', admin: 'reports' },
+};
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+/** Minutes since local midnight in a time zone. */
+export function minutesIn(now: Date, timeZone: string): number {
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(now).split(':').map(Number) as [number, number];
+  return h * 60 + m;
 }
 
 export async function myNotifications(db: Queryable, userId: number, now: Date): Promise<Notice[]> {
   const out: Notice[] = [];
+  const cfgs = new Map<number, ChallengeConfig>();
   const isSuper = (await accessFor(db, userId, null)).platformRoles.includes('SUPER_ADMIN');
 
   // Invitations.
@@ -50,6 +75,11 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     const cid = Number(c.challenge_id);
     const today = localDay(now, c.time_zone);
     const live = c.status === 'PUBLISHED' && daysBetween(c.starts_on, today) >= 0 && daysBetween(today, c.ends_on) >= 0;
+    // The rules in force today (before the start: the first day's; after the end: the last day's).
+    const rulesDay = daysBetween(c.starts_on, today) < 0 ? c.starts_on : daysBetween(today, c.ends_on) < 0 ? c.ends_on : today;
+    const cfgNow = versionOn(await versions(db, cid), rulesDay).config;
+    cfgs.set(cid, cfgNow);
+    const nf = cfgNow.notifications;
 
     let notSubmittedToday = false;
     let todayNotice: Notice | null = null;
@@ -68,6 +98,39 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
         todayNotice = { id: `today:${cid}:${today}`, kind: 'action', title: `${c.name}: today's check-in`, body: `Upload today's screenshot before midnight (about ${left} h left).`, link: `/challenges/${cid}/today`, challengeId: cid, push: false };
       } else if (t.sub === 'BELOW_TARGET' || t.sub === 'REJECTED') {
         out.push({ id: `todaybad:${cid}:${today}`, kind: 'warning', title: `${c.name}: today's evidence wasn't accepted`, body: 'You can upload new evidence until midnight.', link: `/challenges/${cid}/today`, challengeId: cid });
+      }
+      const nowMin = minutesIn(now, c.time_zone);
+      // Morning: a rest day must be declared before the cut-off (only while the week still has one left).
+      if (live && nf.extras.restDayReminder && cfgNow.restDays.enabled && !t.sub && !t.rest && !t.excused) {
+        const cut = toMin(cfgNow.restDays.declareBefore);
+        const quietEnd = toMin(nf.quietHours.until);
+        if (nowMin >= Math.min(quietEnd, cut - 60) && nowMin < cut) {
+          const per = computePeriods(c.starts_on, c.ends_on, cfgNow.periods.weekStartsOn).find((x) => daysBetween(x.startsOn, today) >= 0 && daysBetween(today, x.endsOn) >= 0);
+          const { rows: [u] } = await db.query(`SELECT count(*)::int AS n FROM rest_days WHERE participant_id = $1 AND period_no = $2 AND cancelled_at IS NULL`, [c.participant_id, per?.periodNo ?? 0]);
+          if (u.n < cfgNow.restDays.perPeriod) {
+            out.push({ id: `restremind:${cid}:${today}`, kind: 'info', title: `${c.name}: taking a rest day today?`, body: `Declare it before ${cfgNow.restDays.declareBefore} - after that it can't be taken today.`, link: `/challenges/${cid}/today`, challengeId: cid });
+          }
+        }
+      }
+      // Evening: once my steps are in, how many still need to upload to keep the team streak going.
+      if (live && nf.extras.teamStreakAtRisk && cfgNow.scoring.teamStreak.enabled && t.sub && t.sub !== 'BELOW_TARGET' && t.sub !== 'REJECTED' && nowMin >= toMin(nf.extras.teamStreakTime)) {
+        const { rows: [m] } = await db.query(
+          `SELECT count(*)::int AS n FROM participants p
+            WHERE p.challenge_id = $1 AND p.status = 'ACTIVE' AND p.joined_on <= $2 AND (p.left_on IS NULL OR p.left_on >= $2)
+              AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.participant_id = p.participant_id AND s.day = $2 AND s.status NOT IN ('SUPERSEDED','WITHDRAWN','REJECTED','BELOW_TARGET'))
+              AND NOT EXISTS (SELECT 1 FROM rest_days r WHERE r.participant_id = p.participant_id AND r.day = $2 AND r.cancelled_at IS NULL)
+              AND NOT EXISTS (SELECT 1 FROM exemption_requests e WHERE e.participant_id = p.participant_id AND e.status = 'APPROVED' AND $2::date BETWEEN e.start_day AND e.end_day)`, [cid, today]);
+        if (m.n > 0) out.push({ id: `teamstreak:${cid}:${today}`, kind: 'info', title: `${c.name}: keep the team streak going 🔗`, body: `${m.n === 1 ? '1 person still needs' : `${m.n} people still need`} to upload today. A cheer on the community might help!`, link: `/community/${cid}`, challengeId: cid, count: m.n });
+      }
+      // 🔥 Personal streak milestones reached in the last 2 days.
+      if (nf.extras.streakMilestones) {
+        const { rows: ms } = await db.query(
+          `SELECT e.event_id, e.base_key, e.points FROM scoring_events e WHERE e.participant_id = $1 AND e.rule = 'PERSONAL_STREAK' AND e.kind = 'AWARD' AND e.day >= $2::date - 2
+              AND NOT EXISTS (SELECT 1 FROM scoring_events r WHERE r.reverses_event_id = e.event_id)`, [c.participant_id, today]);
+        for (const e of ms) {
+          const len = Number(String(e.base_key).split(':').pop()) || null;
+          out.push({ id: `streak:${e.event_id}`, kind: 'info', title: `${c.name}: 🔥 ${len ? `${len}-day streak!` : 'streak milestone!'}`, body: `Brilliant - ${e.points > 0 ? `+${e.points} points. ` : ''}Keep it going!`, link: `/challenges/${cid}/today`, challengeId: cid });
+        }
       }
       const votes = await db.query(
         `SELECT r.request_id, u.display_name FROM exemption_requests r JOIN participants p USING (participant_id) JOIN users u ON u.user_id = p.user_id
@@ -90,6 +153,17 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
           WHERE p.challenge_id = $1 AND p.author_user_id = $2 AND k.author_user_id <> $2 AND k.status = 'VISIBLE' AND k.created_at > $3::timestamptz - interval '7 days'`, [cid, userId, now]);
       if (cm.n) out.push({ id: `comments:${cid}`, kind: 'info', title: `${c.name}: comments on your posts`, body: `${cm.n} in the last week.`, link: `/community/${cid}`, challengeId: cid, count: cm.n });
     }
+    // New posts by others in the last day, grouped into one alert (each person opts in).
+    if ((c.participant_id || isSuper) && cfgNow.community.enabled && nf.community.newPosts) {
+      const { rows: [np] } = await db.query(
+        `SELECT count(*)::int AS n, max(post_id) AS last, (array_agg(u.display_name ORDER BY p.post_id DESC))[1:3] AS names
+           FROM posts p JOIN users u ON u.user_id = p.author_user_id
+          WHERE p.challenge_id = $1 AND p.kind <> 'ANNOUNCEMENT' AND p.status = 'VISIBLE' AND p.author_user_id <> $2 AND p.created_at > $3::timestamptz - interval '1 day'`, [cid, userId, now]);
+      if (np.n) {
+        const who = [...new Set(np.names as string[])].join(', ');
+        out.push({ id: `posts:${cid}:${np.last}`, kind: 'info', title: `${c.name}: ${np.n === 1 ? 'a new post' : `${np.n} new posts`} in the community`, body: `From ${who}.`, link: `/community/${cid}`, challengeId: cid, count: np.n });
+      }
+    }
 
     // As a participant: contributions due or overdue (money only; it never affects points).
     if (c.participant_id && c.status === 'PUBLISHED') {
@@ -108,8 +182,12 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
           const reported = here + used;
           credit = credit - used + Math.max(0, here - (amount - used));
           const due = dueOn(per, cfg.finance.dueWeekday);
-          if (daysBetween(due, today) < 0) continue;
           if (reported >= amount) continue;
+          if (daysBetween(today, due) === 1 && nf.extras.paymentDueReminder) { // the day before
+            out.push({ id: `paysoon:${cid}:${per.periodNo}`, kind: 'info', title: `${c.name}: week ${per.periodNo} contribution due tomorrow`,
+              body: `₹${((amount - reported) / 100).toLocaleString('en-IN')} by ${new Date(`${due}T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'short' })}.`, link: `/challenges/${cid}/money`, challengeId: cid });
+          }
+          if (daysBetween(due, today) < 0) continue;
           const overdue = daysBetween(addDays(due, cfg.finance.graceDays + 1), today) >= 0;
           out.push({ id: `pay:${cid}:${per.periodNo}`, kind: overdue ? 'warning' : 'action', title: `${c.name}: week ${per.periodNo} contribution ${overdue ? 'overdue' : 'due'}`,
             body: `₹${((amount - reported) / 100).toLocaleString('en-IN')} — pay by UPI, then enter the UTR in the app.`, link: `/challenges/${cid}/money`, challengeId: cid });
@@ -179,6 +257,31 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
     }
     if (w.bonuses && can('bonus.manage')) out.push({ id: `bonus:${cid}`, kind: 'action', title: `${c.name}: weekend bonuses to approve`, body: `${w.bonuses} waiting.`, link: `/challenges/${cid}/bonus`, challengeId: cid, count: w.bonuses });
   }
+  // Alerts from something happening (an admin decided my screenshot, a payment was confirmed, I moved up): one week.
+  const { rows: stored } = await db.query(
+    `SELECT n.* FROM user_notices n LEFT JOIN challenges c USING (challenge_id)
+      WHERE n.user_id = $1 AND n.created_at > $2::timestamptz - interval '7 days' AND (c.challenge_id IS NULL OR c.status <> 'ARCHIVED')
+      ORDER BY n.created_at DESC LIMIT 30`, [userId, now]);
+  for (const s of stored) out.push({ id: `n:${s.notice_key}`, kind: s.kind, title: s.title, body: s.body, link: s.link, challengeId: s.challenge_id ? Number(s.challenge_id) : null, category: s.category });
+
+  // Kinds, the challenge's switches (Settings → Notifications), then this person's own choices.
+  for (const n of out) {
+    const t = n.category ? null : KIND_BY_PREFIX[n.id.split(':')[0]!];
+    if (t) { n.category = t.category; if (t.admin) n.adminTask = true; }
+    n.category ??= 'essential';
+    const nf = n.challengeId ? cfgs.get(n.challengeId)?.notifications : undefined;
+    if (nf && t?.admin && !nf.adminAlerts[t.admin]) n.push = false;
+    if (nf && n.category === 'communityComments' && !nf.community.comments) n.push = false;
+    if (nf) n.pushRules = { timeZone: cfgs.get(n.challengeId!)!.basics.timeZone, quietFrom: nf.quietHours.from, quietUntil: nf.quietHours.until,
+      digestTimes: n.adminTask && nf.adminAlerts.delivery === 'DIGEST' ? nf.adminAlerts.digestTimes : undefined };
+  }
+  const prefs = await prefsOf(db, userId);
+  const muted = (n: Notice) => n.category !== 'essential' && n.category !== undefined && prefs[n.category] === false;
+  for (const n of out) if (muted(n)) n.push = false;
+  // Muted information disappears from the list too; muted tasks stay in the app (they still need doing).
+  const shown = out.filter((n) => !(muted(n) && n.kind === 'info'));
+  out.length = 0; out.push(...shown);
+
   const order = { action: 0, warning: 1, info: 2 } as const;
   for (const n of out) n.seenKey = `${n.id}|${n.count ?? ''}`.slice(0, 200);
   const seen = new Set((await db.query(`SELECT seen_key FROM notification_seen WHERE user_id = $1`, [userId])).rows.map((r) => r.seen_key as string));

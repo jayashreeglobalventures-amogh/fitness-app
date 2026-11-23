@@ -12,6 +12,7 @@ import { contributionFor } from '../challenges/config.js';
 import { challengeContext, participantById, participantDays, participantOf, type ChallengeContext } from '../checkin/days.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
 import { classify } from '../scoring/ledger.js';
+import { addNotice } from '../notifications/prefs.js';
 import { balances, money, type DesiredTx, type Line } from './engine.js';
 
 // ---------- the ledger ----------
@@ -209,6 +210,10 @@ export async function recordPayment(db: Queryable, mediaDir: string, actorUserId
   const r = await insertPayment(db, mediaDir, actorUserId, p, ctx, { ...input, note: [reason, String(input.note ?? '')].filter(Boolean).join(' · ') }, now, true, !own);
   await writeAudit(db, now, { actorUserId, challengeId: p.challengeId, action: own ? 'PAYMENT_RECORDED_BY_ADMIN' : 'PAYMENT_RECORDED_AND_CONFIRMED', entity: 'PAYMENT', entityId: r.paymentId,
     reason: reason || null, after: { participantId, confirmed: !own, amountPaise: Math.round(Number(String(input.amount).replace(/[,\s₹]/g, '')) * 100), periodNo: Number(input.periodNo) } });
+  if (!own) {
+    const { rows: [x] } = await db.query(`SELECT amount_paise, period_no FROM payments WHERE payment_id = $1`, [r.paymentId]);
+    await notifyConfirmed(db, ctx, p.userId, r.paymentId, Number(x.amount_paise), Number(x.period_no), now);
+  }
   return { ...r, confirmed: !own };
 }
 
@@ -237,6 +242,7 @@ export async function decidePayment(db: Queryable, actorUserId: number, paymentI
   await db.query(`UPDATE payments SET status = $2, decided_by = $3, decided_at = $4, decision_reason = $5, updated_at = $4 WHERE payment_id = $1`, [paymentId, status, actorUserId, now, reason || null]);
   await writeAudit(db, now, { actorUserId, challengeId: Number(pay.challenge_id), action: changing ? 'PAYMENT_DECISION_CHANGED' : confirm ? 'PAYMENT_CONFIRMED' : 'PAYMENT_REJECTED',
     entity: 'PAYMENT', entityId: paymentId, reason: reason || null, before: { status: pay.status }, after: { status, amountPaise: Number(pay.amount_paise), utr: pay.utr } });
+  if (confirm) await notifyConfirmed(db, await challengeContext(db, Number(pay.challenge_id), now), p.userId, paymentId, Number(pay.amount_paise), Number(pay.period_no), now);
 }
 
 export async function withdrawPayment(db: Queryable, userId: number, paymentId: number, now: Date): Promise<void> {
@@ -247,6 +253,13 @@ export async function withdrawPayment(db: Queryable, userId: number, paymentId: 
   if (pay.status !== 'SUBMITTED') throw conflict('Only a payment that hasn\'t been checked yet can be withdrawn.');
   await db.query(`UPDATE payments SET status = 'WITHDRAWN', updated_at = $2 WHERE payment_id = $1`, [paymentId, now]);
   await writeAudit(db, now, { actorUserId: userId, challengeId: Number(pay.challenge_id), action: 'PAYMENT_WITHDRAWN', entity: 'PAYMENT', entityId: paymentId });
+}
+
+/** Tells the participant their payment was confirmed (Settings → Notifications → "payment confirmed"). */
+async function notifyConfirmed(db: Queryable, ctx: ChallengeContext, userId: number, paymentId: number, amountPaise: number, periodNo: number, now: Date): Promise<void> {
+  if (!ctx.cfgOn(ctx.today < ctx.ch.startsOn ? ctx.ch.startsOn : ctx.today > ctx.ch.endsOn ? ctx.ch.endsOn : ctx.today).notifications.extras.paymentConfirmed) return;
+  await addNotice(db, { userId, challengeId: ctx.ch.challengeId, key: `paid:${paymentId}`, category: 'payments', kind: 'info',
+    title: `${ctx.ch.name}: payment confirmed ✅`, body: `₹${(amountPaise / 100).toLocaleString('en-IN')} for week ${periodNo}. Thank you!`, link: `/challenges/${ctx.ch.challengeId}/money` }, now);
 }
 
 // ---------- refunds (withdrawal etc.) ----------

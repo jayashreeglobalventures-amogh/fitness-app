@@ -173,6 +173,38 @@ export const ChallengeConfigSchema = Type.Object({
     nudgeTime: Type.String({ pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }),   // local time, e.g. "20:00"
     atRiskAlerts: Type.Boolean(),          // tell admins who might need a hand (misses in a row, below the prize line)
   }, { additionalProperties: false }),
+  // What goes to people's phones (and the Alerts list). Each person can still switch kinds off for themselves.
+  // (coach.eveningNudge / nudgeTime are the older single reminder; stepReminders replaced them, owner 23 Nov 2026.)
+  notifications: Type.Object({
+    stepReminders: Type.Object({
+      enabled: Type.Boolean(),             // remind people whose steps aren't in yet (not on rest / excused days)
+      times: Type.Array(Time, { minItems: 1, maxItems: 6 }),   // local times, e.g. ["12:00", "18:00", "21:00"]
+    }, { additionalProperties: false }),
+    adminAlerts: Type.Object({
+      reviews: Type.Boolean(),             // screenshots to review, requests to remove screenshots
+      payments: Type.Boolean(),            // payments to confirm / countersign, refunds to approve
+      exemptions: Type.Boolean(),
+      bonuses: Type.Boolean(),
+      reports: Type.Boolean(),             // community reports
+      delivery: Type.Union([Type.Literal('IMMEDIATE'), Type.Literal('DIGEST')]),
+      digestTimes: Type.Array(Time, { minItems: 1, maxItems: 4 }),  // DIGEST: phones get one round-up at these times
+    }, { additionalProperties: false }),
+    community: Type.Object({
+      newPosts: Type.Boolean(),            // allow "new posts" alerts (grouped); each person opts in
+      comments: Type.Boolean(),            // comments on my posts
+    }, { additionalProperties: false }),
+    quietHours: Type.Object({ from: Time, until: Time }, { additionalProperties: false }),   // nothing to phones in between
+    extras: Type.Object({
+      reviewOutcome: Type.Boolean(),       // "your screenshot was approved / declined" when an admin decides
+      streakMilestones: Type.Boolean(),    // 🔥 personal streak milestones
+      rankUp: Type.Boolean(),              // "you moved up to #3"
+      paymentConfirmed: Type.Boolean(),
+      paymentDueReminder: Type.Boolean(),  // the day before a contribution is due
+      restDayReminder: Type.Boolean(),     // morning: "declare a rest day before 10:00"
+      teamStreakAtRisk: Type.Boolean(),    // evening: "3 people still need to upload"
+      teamStreakTime: Time,
+    }, { additionalProperties: false }),
+  }, { additionalProperties: false }),
   leaderboard: Type.Object({
     ranking: Type.Array(Type.Union(RANKING_KEYS.map((k) => Type.Literal(k))), { minItems: 1, maxItems: RANKING_KEYS.length }),
   }, { additionalProperties: false }),
@@ -186,6 +218,17 @@ export const FINANCIAL_SECTIONS = ['finance', 'prizes'] as const;
 export interface ConfigIssue { path: string; message: string }
 export interface ConfigCheck { ok: boolean; errors: ConfigIssue[]; warnings: ConfigIssue[]; periods: Period[] }
 
+/** The notification settings a challenge starts with (or gets, if saved before they existed). */
+export function defaultNotifications(coach?: { eveningNudge?: boolean; nudgeTime?: string }): ChallengeConfig['notifications'] {
+  return {
+    stepReminders: { enabled: coach?.eveningNudge ?? true, times: [coach?.nudgeTime ?? '20:00'] },
+    adminAlerts: { reviews: true, payments: true, exemptions: true, bonuses: true, reports: true, delivery: 'IMMEDIATE', digestTimes: ['09:00', '18:00'] },
+    community: { newPosts: true, comments: true },
+    quietHours: { from: '23:00', until: '07:00' },
+    extras: { reviewOutcome: true, streakMilestones: true, rankUp: true, paymentConfirmed: true, paymentDueReminder: true, restDayReminder: false, teamStreakAtRisk: true, teamStreakTime: '19:00' },
+  };
+}
+
 /**
  * Settings saved before a field existed get that field's PRD default when read, so older challenges keep working.
  * (Calamari's own settings file states every value explicitly.)
@@ -197,6 +240,9 @@ export function normalizeConfig<T>(input: T): T {
   if (c.prizes && typeof c.prizes === 'object' && c.prizes.proRataByDays === undefined) c.prizes.proRataByDays = true;
   if (c.community === undefined && c.schemaVersion !== undefined) c.community = { enabled: true, participantsCanPost: true, photos: true };
   if (c.coach === undefined && c.schemaVersion !== undefined) c.coach = { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true };
+  // Notification settings arrived 23 Nov 2026: older settings get what they did before (one reminder at the coach's
+  // nudge time; every admin alert straight away; comments on, new-post alerts allowed but each person opts in).
+  if (c.notifications === undefined && c.schemaVersion !== undefined) c.notifications = defaultNotifications(c.coach);
   if (c.submission && typeof c.submission === 'object' && c.submission.multiplePerDay === undefined) c.submission.multiplePerDay = { enabled: false, combine: 'SUM' };
   const f = c.finance;
   if (f && typeof f === 'object') {
@@ -253,6 +299,20 @@ function semanticChecks(c: ChallengeConfig): ConfigCheck {
     const possible = c.restDays.perPeriod * periods.length;
     if (c.restDays.maxTotal > possible) warn('/restDays/maxTotal', `At most ${possible} rest days can actually be taken (${c.restDays.perPeriod} × ${periods.length} periods).`);
   }
+
+  const n = c.notifications;
+  for (const [path, list] of [['/notifications/stepReminders/times', n.stepReminders.times], ['/notifications/adminAlerts/digestTimes', n.adminAlerts.digestTimes]] as const) {
+    if (list.some((t) => !TIME_RE.test(t))) err(path, 'Use HH:MM (24-hour) for each time.');
+    else if (new Set(list).size !== list.length) err(path, 'The same time is listed twice.');
+  }
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const quiet = (t: string) => {
+    const [a, b, x] = [mins(n.quietHours.from), mins(n.quietHours.until), mins(t)];
+    return a === b ? false : a < b ? x >= a && x < b : x >= a || x < b;
+  };
+  if (n.stepReminders.enabled && n.stepReminders.times.some(quiet)) warn('/notifications/stepReminders/times', 'A reminder time is inside the quiet hours: it shows in the app but reaches phones only when the quiet hours end.');
+  if (n.adminAlerts.delivery === 'DIGEST' && n.adminAlerts.digestTimes.some(quiet)) warn('/notifications/adminAlerts/digestTimes', 'A round-up time is inside the quiet hours, so phones won\'t get that one.');
+  if (n.stepReminders.enabled && n.stepReminders.times.some((t) => mins(t) >= 24 * 60 - 15)) warn('/notifications/stepReminders/times', 'A reminder in the last 15 minutes before midnight leaves very little time to upload.');
 
   if (c.exemptions.enabled && c.exemptions.voting === null) warn('/exemptions/voting', 'Exemption voting is not configured yet: every exemption request will go to Admin review.');
 

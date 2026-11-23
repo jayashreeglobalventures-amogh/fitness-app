@@ -110,6 +110,17 @@ Defaults applied where nothing was said:
 | Sign-ins | Successful, failed and locked-out sign-ins and sign-outs are recorded. For an unknown username nothing typed is kept |
 | Errors | Unexpected server errors and failed background work are recorded (person, page, device) and kept 180 days |
 
+## Notification settings (owner, 23 Nov 2026 - "all of it", with the recommendations)
+
+| Topic | Rule |
+|---|---|
+| Who decides | The challenge decides what may be sent (Settings → Notifications, admins). Each person can then switch kinds off (Profile → Phone notifications → Choose what you get). Essentials always come: invitations, votes, announcements, contributions due/overdue, settings problems, final results |
+| Step reminders | Set by admins for everyone: up to 6 local times a day (Calamari: 20:00, as before). Only to people whose steps are not in and who are not resting or excused; each time is a new phone alert, the app lists only the latest. Optional morning rest-day reminder before the cut-off (off for Calamari) |
+| Admin alerts | On/off per kind (screenshots to review, payments, exemptions, bonuses, reports). Delivery straight away (Calamari) or as a round-up within the hour after set times. Switched off = not sent to phones; still listed under Alerts (they still need doing) |
+| Community | Comments on my posts (on). New posts: allowed, grouped into one alert per day; each person opts in (off unless they turn it on) |
+| New alerts | Screenshot approved/declined by an admin; 🔥 streak milestones; moved up the leaderboard (checked once each morning after the quiet hours); payment confirmed; contribution due tomorrow; evening team-streak alert to those whose steps are in (from 19:00) |
+| Muted kinds | Not sent to phones; information alerts also leave the Alerts list, tasks stay |
+
 ## WhatsApp reminders (owner, 21 Nov 2026: option 2 - free, sent by an admin)
 
 | Topic | Rule |
@@ -142,8 +153,8 @@ Defaults applied where nothing was said:
 | Evening nudge | From the challenge's nudge time (Calamari 20:00) if today's steps aren't in: a personal alert ("keep your 9-day streak going", "today's a fresh start") that goes to the phone. Before that, the plain check-in alert is in the app only |
 | Needs a hand | Admins see participants with 2+ misses in a row, or below the prize line after 5+ counted days, with the reason and a WhatsApp check-in button (Team tab + a daily alert) |
 | Numbers | Streaks and misses in a row are counted exactly as the points engine does (rest days and exemptions pause; stops at an undecided day) |
-| Settings | Settings → Coach: each part on/off, nudge time |
-| Phone quiet hours | No phone notifications 23:00–07:00 IST; alerts wait in the app and go out at 7 if still unread |
+| Settings | Settings → Coach: weekly summary and "who might need a hand" on/off. Step reminders moved to Settings → Notifications (23 Nov 2026) |
+| Phone quiet hours | Per challenge (Settings → Notifications; Calamari 23:00–07:00 in its time zone); alerts wait in the app and go out when they end, if still unread. Alerts not tied to a challenge use 23:00–07:00 IST |
 | AI later | The coach works out facts and a "writer" puts them into words. An AI writer can be selected later (COACH_WRITER); it would receive only these facts - no health data, no money details - and the templates take over if it fails |
 
 ## Fine-pool carry-over, several screenshots, Today screen (owner, 21 Nov 2026)

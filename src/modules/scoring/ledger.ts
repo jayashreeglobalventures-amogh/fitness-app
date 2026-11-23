@@ -99,6 +99,7 @@ export interface Standing {
   rank: number; tied: boolean; participantId: number; displayName: string; status: string; points: number; adherencePct: number | null;
   successfulDays: number; longestStreak: number; currentStreak: number; finalScoreOn: string | null; eligible: boolean; me?: boolean;
   photoFileId?: number | null; // shown only if the viewer may see it (checked when the image is requested)
+  userId?: number;
 }
 
 /** Ranking per the challenge's leaderboard settings; identical rows share a rank and are flagged as tied. */
@@ -128,6 +129,11 @@ export async function leaderboard(db: Queryable, userId: number, challengeId: nu
   const access = await accessFor(db, userId, challengeId);
   const me = await db.query(`SELECT participant_id FROM participants WHERE challenge_id = $1 AND user_id = $2`, [challengeId, userId]);
   if (!access.permissions.has('challenge.view_admin') && !me.rows[0]) throw forbidden();
+  return standingsOf(db, challengeId, now, me.rows[0] ? Number(me.rows[0].participant_id) : null);
+}
+
+/** The ranked standings (no access check: callers check, or it is the scheduler). */
+export async function standingsOf(db: Queryable, challengeId: number, now: Date, meParticipantId: number | null = null) {
   const { facts: f } = await reconcile(db, challengeId, now);
   const totals = await db.query(
     `SELECT participant_id, sum(points)::int AS points, max(day) FILTER (WHERE points <> 0) AS last_change FROM scoring_events WHERE challenge_id = $1 AND participant_id IS NOT NULL GROUP BY participant_id`, [challengeId]);
@@ -140,7 +146,7 @@ export async function leaderboard(db: Queryable, userId: number, challengeId: nu
     const eligible = !['DISQUALIFIED', 'REMOVED', 'WITHDRAWN'].includes(p.status) && s.adherencePct !== null && s.adherencePct >= cfg.prizes.qualificationAdherencePct;
     return { participantId: p.participantId, displayName: p.displayName, status: p.status, points: t ? Number(t.points) : 0, adherencePct: s.adherencePct,
       successfulDays: s.achieved, longestStreak: st.longestStreak, currentStreak: st.currentStreak, finalScoreOn: t?.last_change ?? null, eligible,
-      me: me.rows[0] ? Number(me.rows[0].participant_id) === p.participantId : false, photoFileId: p.photoFileId, userId: p.userId };
+      me: meParticipantId === p.participantId, photoFileId: p.photoFileId, userId: p.userId };
   });
   return {
     standings: rank(rows, cfg.leaderboard.ranking), ranking: cfg.leaderboard.ranking, qualificationAdherencePct: cfg.prizes.qualificationAdherencePct,

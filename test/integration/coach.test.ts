@@ -118,7 +118,9 @@ describe('who might need a hand (admins)', () => {
   });
 
   it('each part can be switched off in Settings', async () => {
-    const cfg = { ...calamariConfig(), coach: { weeklySummary: false, eveningNudge: false, nudgeTime: '20:00', atRiskAlerts: false } };
+    const base = calamariConfig();
+    const cfg = { ...base, coach: { weeklySummary: false, eveningNudge: false, nudgeTime: '20:00', atRiskAlerts: false },
+      notifications: { ...base.notifications, stepReminders: { enabled: false, times: ['20:00'] } } }; // step reminders moved to Notifications
     h.setNow('2026-11-29T06:30:00Z');
     expect((await sa.put(`/api/challenges/${id}/config`, { config: cfg, reason: 'Coach off for now', effectiveFrom: '2026-11-30' })).status).toBe(200);
     h.setNow('2026-11-30T15:00:00Z');

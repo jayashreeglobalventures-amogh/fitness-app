@@ -233,9 +233,42 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
 
       <Section title="Coach">
         <Check ctx={ctx} p={['coach', 'weeklySummary']} label="Weekly summary for each participant after every challenge week" />
-        <Check ctx={ctx} p={['coach', 'eveningNudge']} label="Evening nudge if today's steps aren't in yet" />
-        {c.coach.eveningNudge && <Text ctx={ctx} p={['coach', 'nudgeTime']} label="Nudge time (24-hour, local)" hint="e.g. 20:00. Phone notifications are never sent between 11 pm and 7 am." />}
         <Check ctx={ctx} p={['coach', 'atRiskAlerts']} label="Tell admins who might need a hand (misses in a row, below the prize line)" />
+        <p className="muted small">Reminders to upload steps are under Notifications.</p>
+      </Section>
+
+      <Section title="Notifications">
+        <p className="muted small" style={{ marginTop: 0 }}>What may go to people's phones (everything also shows under Alerts in the app). Each person can switch kinds off for themselves in Profile → Notifications.</p>
+        <h4>Reminders to upload steps</h4>
+        <Check ctx={ctx} p={['notifications', 'stepReminders', 'enabled']} label="Remind people whose steps aren't in yet (not on rest or excused days)" />
+        {c.notifications.stepReminders.enabled && <Times ctx={ctx} p={['notifications', 'stepReminders', 'times']} label="Reminder times (local)" max={6} />}
+        <Check ctx={ctx} p={['notifications', 'extras', 'restDayReminder']} label={`Morning reminder to declare a rest day before ${c.restDays.declareBefore}`} />
+        <h4>Admin alerts</h4>
+        <Check ctx={ctx} p={['notifications', 'adminAlerts', 'reviews']} label="Screenshots to review (and requests to remove one)" />
+        <Check ctx={ctx} p={['notifications', 'adminAlerts', 'payments']} label="Payments to confirm and refunds to approve" />
+        <Check ctx={ctx} p={['notifications', 'adminAlerts', 'exemptions']} label="Exemption requests" />
+        <Check ctx={ctx} p={['notifications', 'adminAlerts', 'bonuses']} label="Weekend bonuses to approve" />
+        <Check ctx={ctx} p={['notifications', 'adminAlerts', 'reports']} label="Community reports" />
+        <Select ctx={ctx} p={['notifications', 'adminAlerts', 'delivery']} label="How admin alerts reach phones" options={{ IMMEDIATE: 'Straight away', DIGEST: 'As a round-up at set times' }}
+          hint="Switched-off kinds still show under Alerts in the app (they still need doing) - they just don't buzz phones." />
+        {c.notifications.adminAlerts.delivery === 'DIGEST' && <Times ctx={ctx} p={['notifications', 'adminAlerts', 'digestTimes']} label="Round-up times (local)" max={4} />}
+        <h4>Community</h4>
+        <Check ctx={ctx} p={['notifications', 'community', 'comments']} label="Comments on my posts" />
+        <Check ctx={ctx} p={['notifications', 'community', 'newPosts']} label="New posts (grouped into one alert; each person turns it on for themselves)" />
+        <h4>Good news and reminders</h4>
+        <Check ctx={ctx} p={['notifications', 'extras', 'reviewOutcome']} label="Tell people when an admin approves or declines their screenshot" />
+        <Check ctx={ctx} p={['notifications', 'extras', 'streakMilestones']} label="🔥 Personal streak milestones" />
+        <Check ctx={ctx} p={['notifications', 'extras', 'rankUp']} label="Moving up the leaderboard (checked each morning)" />
+        <Check ctx={ctx} p={['notifications', 'extras', 'paymentConfirmed']} label="Payment confirmed" />
+        <Check ctx={ctx} p={['notifications', 'extras', 'paymentDueReminder']} label="Contribution due tomorrow" />
+        <Check ctx={ctx} p={['notifications', 'extras', 'teamStreakAtRisk']} label="Evening: tell people who've uploaded how many still need to, to keep the team streak" />
+        {c.notifications.extras.teamStreakAtRisk && <TimeIn ctx={ctx} p={['notifications', 'extras', 'teamStreakTime']} label="From (local time)" />}
+        <h4>Quiet hours</h4>
+        <div className="grid2">
+          <TimeIn ctx={ctx} p={['notifications', 'quietHours', 'from']} label="Nothing to phones from" />
+          <TimeIn ctx={ctx} p={['notifications', 'quietHours', 'until']} label="Until" />
+        </div>
+        <p className="muted small">Alerts that come up during quiet hours wait in the app and reach phones when the quiet hours end.</p>
       </Section>
 
       <Section title="Leaderboard">
@@ -307,6 +340,24 @@ function NullableDate({ ctx, p, label }: { ctx: Ctx; p: Path; label: string }) {
 }
 function TimeIn({ ctx, p, label }: { ctx: Ctx; p: Path; label: string }) {
   return <Field label={label}><input type="time" style={style(ctx, p)} disabled={ctx.disabled} value={String(get(ctx.c, p) ?? '')} onChange={(e) => ctx.upd(p)(e.target.value)} /></Field>;
+}
+/** A short list of times (e.g. reminder times): change, remove, add. */
+function Times({ ctx, p, label, max }: { ctx: Ctx; p: Path; label: string; max: number }) {
+  const list = (get(ctx.c, p) as string[]) ?? [];
+  const put = (next: string[]) => ctx.upd(p)(next);
+  return (
+    <Field label={label}>
+      <div className="row" style={{ gap: 8 }}>
+        {list.map((t, i) => (
+          <span key={i} className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
+            <input type="time" style={{ ...style(ctx, p), width: 'auto' }} disabled={ctx.disabled} value={t} onChange={(e) => put(list.map((x, j) => (j === i ? e.target.value : x)))} />
+            {list.length > 1 && !ctx.disabled && <button type="button" className="btn ghost small" aria-label={`Remove ${t}`} onClick={() => put(list.filter((_, j) => j !== i))}>✕</button>}
+          </span>
+        ))}
+        {list.length < max && !ctx.disabled && <button type="button" className="btn ghost small" onClick={() => put([...list, '21:00'].sort())}>+ Add a time</button>}
+      </div>
+    </Field>
+  );
 }
 function Select({ ctx, p, label, options, hint, nullable }: { ctx: Ctx; p: Path; label: string; options: Record<string, string>; hint?: string; nullable?: boolean }) {
   return <Field label={label} hint={hint}><select style={style(ctx, p)} disabled={ctx.disabled} value={String(get(ctx.c, p) ?? '')} onChange={(e) => ctx.upd(p)(nullable && e.target.value === '' ? null : e.target.value)}>

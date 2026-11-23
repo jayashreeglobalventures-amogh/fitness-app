@@ -96,3 +96,20 @@ describe('challenge configuration', () => {
     expect(changedSections(a, b)).toEqual(['finance']);
   });
 });
+
+describe('notification settings', () => {
+  it('reminder times must be distinct; times inside quiet hours are flagged; older settings get the old behaviour', () => {
+    const c = calamari();
+    c.notifications.stepReminders.times = ['12:00', '12:00'];
+    expect(validateConfig(c).errors.map((e) => e.path)).toContain('/notifications/stepReminders/times');
+    c.notifications.stepReminders.times = ['06:30', '20:00'];
+    const r = validateConfig(c);
+    expect(r.ok).toBe(true);
+    expect(r.warnings.map((w) => w.path)).toContain('/notifications/stepReminders/times');
+    const old = calamari() as Partial<ChallengeConfig>;
+    delete old.notifications;
+    old.coach = { weeklySummary: true, eveningNudge: true, nudgeTime: '19:30', atRiskAlerts: true };
+    const v = validateConfig(old);
+    expect(v.ok).toBe(true);
+  });
+});

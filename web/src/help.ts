@@ -27,9 +27,23 @@ export const TOPICS: Topic[] = [
     body: [
       '**Alerts** (bottom bar) lists what needs your attention: today\'s check-in, payments due, votes, announcements, the coach\'s weekly summary. Opening an alert marks just that one as read; **Mark all as read** clears them all.',
       'To get them on your phone: **Profile → Phone notifications → Turn on**, allow it when the phone asks, then **Send a test**. **Turn off** stops them on all your phones.',
-      { list: ['**Quiet hours:** nothing is sent between **11 pm and 7 am**; alerts wait and arrive at 7 if still unread.',
+      { list: ['**Quiet hours:** nothing is sent during the challenge\'s quiet hours (Calamari: **11 pm to 7 am**); alerts wait and arrive when they end, if still unread.',
         'The lock screen shows only a short title, never your details.',
-        'The plain "today\'s check-in" alert stays in the app; the coach\'s **evening nudge** (8 pm if your steps aren\'t in) is what reaches your phone.'] },
+        'The plain "today\'s check-in" alert stays in the app; the **step reminders** (at the times the admins set, only if your steps aren\'t in) are what reach your phone.'] },
+      '**Choose what you get:** Profile → Phone notifications → **Choose what you get**. Switch off kinds you don\'t want (step reminders, rest-day reminder, screenshot decisions, streaks and leaderboard moves, team streak, weekly summary, payments, comments) - or switch **new community posts** on (off unless you choose it). Invitations, votes, announcements and payments due always come.',
+      { list: ['**Screenshot decided:** when an admin approves or declines your screenshot.', '**🔥 Streaks and moving up:** streak milestones, and each morning if you moved up the leaderboard.',
+        '**Team streak:** in the evening, once your steps are in, how many still need to upload.', '**Payments:** the day before a contribution is due, and when your payment is confirmed.'], },
+    ] },
+  { id: 'notification-settings', group: 'For admins', audience: ['admin'], title: 'Notification settings for a challenge', keywords: 'notifications reminders times digest round-up quiet hours admin alerts community posts',
+    body: [
+      '**Calamari → Settings → Notifications** decides what may go to phones for this challenge (everything also shows under Alerts in the app).',
+      { list: ['**Reminders to upload steps:** one or more times a day (up to 6), only to people whose steps aren\'t in and who aren\'t resting or excused. Plus an optional morning **rest-day reminder** before the cut-off.',
+        '**Admin alerts:** switch each kind on or off (screenshots to review, payments, exemptions, bonuses, reports) and choose **straight away** or a **round-up** at set times (e.g. 9:00 and 18:00). Switched-off kinds still show under Alerts.',
+        '**Community:** comments on people\'s posts; **new posts** grouped into one alert - each person turns that on for themselves.',
+        '**Good news and reminders:** screenshot decisions, streak milestones, leaderboard moves, payment confirmed, contribution due tomorrow, and the evening team-streak alert (from a time you choose).',
+        '**Quiet hours:** nothing reaches phones in between; alerts wait until they end.'] },
+      { example: ['Reminders at **12:00, 18:00 and 21:30** → someone who hasn\'t uploaded gets three nudges; someone who uploaded at 11 gets none.', 'Admin alerts as a round-up at **9:00 and 18:00** → a screenshot sent at 13:00 shows in Alerts at once and buzzes admins\' phones at 18:00.'], title: 'Examples' },
+      { tip: 'Each person can still switch kinds off in Profile → Phone notifications → Choose what you get.' },
     ] },
 
   // ---------- Daily check-in ----------

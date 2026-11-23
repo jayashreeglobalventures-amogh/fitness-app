@@ -14,6 +14,7 @@ import { requestContext } from './core/audit.js';
 import { withTx } from './core/db.js';
 import * as activity from './modules/admin/activity.js';
 import * as push from './modules/notifications/push.js';
+import * as notifPrefs from './modules/notifications/prefs.js';
 import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
 import * as exemptions from './modules/checkin/exemptions.js';
@@ -265,6 +266,8 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.get('/api/me/push', authed(async ({ tx, user }) => push.pushSettings(tx, user.userId, (await push.vapidKeys(tx, vapidSubject)).publicKey)));
   app.post('/api/me/push/enable', authed(({ tx, user, now, req }) => push.enable(tx, user.userId, body(req).subscription as never, String(req.headers['user-agent'] ?? ''), now)));
   app.post('/api/me/push/disable', authed(({ tx, user, now }) => push.disable(tx, user.userId, now)));
+  app.get('/api/me/notification-prefs', authed(({ tx, user }) => notifPrefs.myPrefs(tx, user.userId)));
+  app.put('/api/me/notification-prefs', authed(({ tx, user, now, req }) => notifPrefs.setPrefs(tx, user.userId, body(req), now)));
   app.post('/api/me/push/test', authed(async ({ tx, user, now }) =>
     push.sendTest(tx, pushSender ?? push.webPushSender(await push.vapidKeys(tx, vapidSubject)), user.userId, now)));
 

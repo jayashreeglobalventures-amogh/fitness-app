@@ -116,6 +116,46 @@ export function PhoneNotifications() {
           On for: {state.devices.map((d) => `${deviceName(d.device)}${d.endpoint === thisDevice ? ' (this one)' : ''}`).join(', ')}. "Turn off" stops them on all of these.
         </p>
       )}
+      <NotificationKinds />
     </div>
+  );
+}
+
+interface Kind { key: string; label: string; group: 'participant' | 'community' | 'admin'; on: boolean }
+const GROUP_LABEL = { participant: 'My challenge', community: 'Community', admin: 'If you are an admin' } as const;
+
+/** Which kinds of alerts I want (within what each challenge sends). Saved as soon as a switch is flipped. */
+function NotificationKinds() {
+  const [kinds, setKinds] = useState<Kind[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => { api.get<{ kinds: Kind[]; isAdmin: boolean }>('/api/me/notification-prefs').then((r) => { setKinds(r.kinds); setIsAdmin(r.isAdmin); }, setError); }, []);
+  const flip = async (k: Kind) => {
+    setError(null);
+    setKinds((ks) => ks!.map((x) => (x.key === k.key ? { ...x, on: !k.on } : x)));
+    try { setKinds((await api.put<{ kinds: Kind[] }>('/api/me/notification-prefs', { [k.key]: !k.on })).kinds); }
+    catch (e) { setError(e); setKinds((ks) => ks!.map((x) => (x.key === k.key ? k : x))); }
+  };
+  if (!kinds) return error ? <ErrorBox error={error} /> : null;
+  return (
+    <details style={{ marginTop: 12 }}>
+      <summary className="small"><b>Choose what you get</b></summary>
+      <p className="muted small">Switched-off kinds don't reach your phone (tasks still show under Alerts). Invitations, votes, announcements and payments due always come.</p>
+      <ErrorBox error={error} />
+      {(isAdmin ? ['participant', 'community', 'admin'] as const : ['participant', 'community'] as const).map((g) => (
+        <div key={g} style={{ marginTop: 8 }}>
+          <div className="muted small" style={{ textTransform: 'uppercase', letterSpacing: '.5px' }}>{GROUP_LABEL[g]}</div>
+          {kinds.filter((k) => k.group === g).map((k) => (
+            <label key={k.key} className="switch" style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', gap: 12, whiteSpace: 'normal' }}>
+              <span className="small">{k.label}</span>
+              <span className="row" style={{ gap: 0 }}>
+                <input type="checkbox" role="switch" checked={k.on} onChange={() => void flip(k)} aria-label={k.label} />
+                <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>
+              </span>
+            </label>
+          ))}
+        </div>
+      ))}
+    </details>
   );
 }

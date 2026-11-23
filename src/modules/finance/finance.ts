@@ -349,7 +349,7 @@ async function statementOf(db: Queryable, ctx: ChallengeContext, participantId: 
     return {
       periodNo: per.periodNo, startsOn: per.startsOn, endsOn: per.endsOn, dueOn: dueDay, overdueFrom,
       due: rupees(due), paid: rupees(paid), pending: rupees(pending), status, creditUsed: rupees(fromEarlier),
-      finePool: fullDue ? rupees(c.finePool) : 0, fines: rupees(-Number(fines.find((f) => f.period_no === per.periodNo)?.amount ?? 0)),
+      mainPool: fullDue ? rupees(c.mainPool) : 0, finePool: fullDue ? rupees(c.finePool) : 0, fines: rupees(-Number(fines.find((f) => f.period_no === per.periodNo)?.amount ?? 0)),
       unused: rupees(Number(unused.find((f) => f.period_no === per.periodNo)?.amount ?? 0)), unusedTo: carried.from.has(per.periodNo) ? 'CARRY_FORWARD' : cfg.finance.unusedFinePool === 'CARRY_FORWARD' ? 'REFUND' : cfg.finance.unusedFinePool,
       carriedTo: carried.from.get(per.periodNo) ?? null, carriedIn: rupees(carriedIn), fullDue: rupees(fullDue),
       finePoolLeft: rupees(-(b.get(`FINE_POOL:${participantId}:${per.periodNo}`) ?? 0)),
@@ -376,8 +376,44 @@ export async function myMoney(db: Queryable, userId: number, challengeId: number
       WHERE t.challenge_id = $1 AND t.type = 'FINE' AND l.account = 'MAIN_POOL'`, [challengeId]);
   const pools = poolsOf(bal);
   const fromFines = rupees(Number(fx.fines));
-  return { ...(await statementOf(db, ctx, p.participantId)), pools, prizePool: { total: pools.prizePool, fromFines, fromContributions: Math.max(0, Math.round((pools.prizePool - fromFines) * 100) / 100) },
+  const { rows: everyone } = await db.query(`SELECT participant_id FROM participants WHERE challenge_id = $1`, [challengeId]);
+  const statements: Statement[] = [];
+  for (const r of everyone) statements.push(await statementOf(db, ctx, Number(r.participant_id))); // one client: one query at a time
+  const mine = statements[everyone.findIndex((r) => Number(r.participant_id) === p.participantId)] ?? await statementOf(db, ctx, p.participantId);
+  const soFar = collectedSoFar(statements, ctx.today, pools.prizePool);
+  return { ...mine, pools, soFar, dueNow: collectedSoFar([mine], ctx.today, 0).dueNow,
+    prizePool: { total: soFar.prizePool, fromFines: soFar.fromFines, fromContributions: soFar.fromContributions,
+      allWeeks: { total: pools.prizePool, fromFines, fromContributions: Math.max(0, Math.round((pools.prizePool - fromFines) * 100) / 100) } },
     today: ctx.today, finance: ctx.cfgOn(ctx.today < ctx.ch.startsOn ? ctx.ch.startsOn : ctx.today).finance };
+}
+
+type Statement = Awaited<ReturnType<typeof statementOf>>;
+
+/**
+ * Money actually received so far (confirmed payments), as opposed to the ledger totals, which book every week of the
+ * challenge up front. Each week's payment fills that week's prize-pool share first, then its fine pool; a fine moves
+ * real money to the prize pool only as far as the fine pool holds paid money (incl. money carried over from before).
+ * `dueNow` is what is unpaid for weeks whose due date has come.
+ */
+export function collectedSoFar(statements: Statement[], today: string, prizePoolTotal: number) {
+  const r2 = (x: number) => Math.round(x * 100) / 100;
+  let contributions = 0, fines = 0, unusedToPrize = 0, inFinePools = 0, dueNow = 0;
+  for (const s of statements) {
+    for (const w of s.weeks) {
+      if (!w.fullDue) continue;
+      const mainPaid = Math.min(w.paid, w.mainPool);
+      let cash = Math.max(0, w.paid - mainPaid) + w.carriedIn;
+      const f = Math.min(w.fines, cash); cash -= f;
+      const u = w.unusedTo === 'PRIZE_POOL' ? Math.min(w.unused, cash) : 0;
+      contributions += mainPaid; fines += f; unusedToPrize += u;
+      inFinePools += Math.min(w.finePoolLeft, cash);
+      if (w.dueOn <= today) dueNow += Math.max(0, w.due - w.paid);
+    }
+  }
+  // After the final settlement the prize pool has been paid out; never show more than it still holds.
+  const total = Math.min(r2(contributions + fines + unusedToPrize), prizePoolTotal);
+  const fromFines = Math.min(r2(fines + unusedToPrize), total);
+  return { prizePool: total, fromFines, fromContributions: r2(total - fromFines), inFinePools: r2(inFinePools), dueNow: r2(dueNow) };
 }
 
 function poolsOf(bal: Map<string, number>) {
@@ -403,10 +439,10 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
   const { rows: verifiers } = await db.query(
     `SELECT user_id FROM challenge_roles WHERE challenge_id = $1 AND role = 'FINANCE_ADMIN' UNION SELECT user_id FROM platform_roles WHERE role = 'SUPER_ADMIN'`, [challengeId]);
   const verifierIds = new Set(verifiers.map((v) => Number(v.user_id)));
-  const rows = [];
+  const rows = []; const statements: Statement[] = [];
   for (const r of people) {
-    const s = await statementOf(db, ctx, Number(r.participant_id));
-    rows.push({ participantId: Number(r.participant_id), displayName: r.display_name, status: r.status, owed: s.owed, refundDue: s.refundDue, isMe: Number(r.user_id) === userId,
+    const s = await statementOf(db, ctx, Number(r.participant_id)); statements.push(s);
+    rows.push({ participantId: Number(r.participant_id), displayName: r.display_name, status: r.status, owed: s.owed, dueNow: collectedSoFar([s], ctx.today, 0).dueNow, refundDue: s.refundDue, isMe: Number(r.user_id) === userId,
       paid: Math.round(s.weeks.reduce((a, w) => a + w.paid - w.creditUsed, 0) * 100) / 100, fines: s.weeks.reduce((a, w) => a + w.fines, 0),
       overdueWeeks: s.weeks.filter((w) => w.status === 'OVERDUE').map((w) => w.periodNo), checking: s.weeks.filter((w) => w.status === 'CHECKING').map((w) => w.periodNo) });
   }
@@ -434,7 +470,7 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
       ok: cents(pools.stillOwed + pools.collected) === Number(chk.due) - Number(chk.carried) - Number(chk.paid_out) - Number(chk.set_off) },
   ];
   return {
-    pools, checks, participants: rows, periods: ctx.periods, today: ctx.today,
+    pools, soFar: collectedSoFar(statements, ctx.today, pools.prizePool), checks, participants: rows, periods: ctx.periods, today: ctx.today,
     canConfirm: access.permissions.has('payments.verify'), canCountersign: access.permissions.has('payments.countersign') || access.permissions.has('payments.verify'),
     canProposeRefund: access.permissions.has('payouts.prepare'), canApproveRefund: access.permissions.has('refunds.approve'),
     payments: pays.map((x) => ({ paymentId: Number(x.payment_id), participantId: Number(x.participant_id), displayName: x.display_name, mine: Number(x.user_id) === userId,

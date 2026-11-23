@@ -5,6 +5,7 @@ import { Avatar, ErrorBox, Field, Loading, PROFILE_VIS, upload, useLoad, Visibil
 import { PhotoCropper } from '../PhotoCropper';
 import { PhoneNotifications } from '../PhoneNotifications';
 import { AppearanceCard } from '../theme';
+import { HealthSyncCard } from '../HealthSync';
 
 type F = 'fullName' | 'mobile' | 'email' | 'birthDate' | 'gender' | 'location' | 'about';
 interface Profile { userId: number; username: string; displayName: string; fields: Record<F, string | null>; visibility: Record<F, string>; photoFileId: number | null; photoVisibility: string }
@@ -32,6 +33,7 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
       <h1>My profile</h1>
       <p className="muted small">@{p.username} · Everything except your display name is private unless you choose otherwise.</p>
       <PhotoCard p={p} onChanged={(np) => { setP(np); onChanged(); }} />
+      <HealthSyncCard />
       <AppearanceCard />
       <PhoneNotifications />
       <div className="card">

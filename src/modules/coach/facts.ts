@@ -24,6 +24,7 @@ export interface WeekFacts {
   weakestWeekday: string | null; // a weekday with at least 2 misses and the most misses
   daysLeft: number;
   target: number;
+  todayDone?: boolean;          // today is already met (or a rest / excused day)
 }
 
 export interface NudgeFacts { challengeName: string; streak: number; hoursLeft: number; target: number; missedYesterday: boolean }
@@ -98,8 +99,10 @@ export function weekFacts(ctx: ChallengeContext, days: DayInfo[], period: Period
     const a = prev.filter((d) => SUCCESS.has(d.status)).length;
     if (prev.length) previous = { periodNo: prevPeriod.periodNo, achieved: a, eligible: a + prev.filter((d) => MISSED.has(d.status)).length };
   }
-  const withSteps = happened.filter((d) => SUCCESS.has(d.status) && d.submission?.finalValue != null);
-  const best = withSteps.reduce<DayInfo | null>((b, d) => (!b || d.submission!.finalValue! > b.submission!.finalValue! ? d : b), null);
+  // The day's count: a screenshot's number or steps synced from Apple Health (not doubted), whichever is higher.
+  const stepsOf = (d: DayInfo) => Math.max(d.submission?.finalValue ?? -1, d.sync && !d.sync.doubted ? d.sync.steps : -1);
+  const withSteps = happened.filter((d) => SUCCESS.has(d.status) && stepsOf(d) >= 0);
+  const best = withSteps.reduce<DayInfo | null>((b, d) => (!b || stepsOf(d) > stepsOf(b) ? d : b), null);
   // Weakest weekday over the whole challenge so far.
   const missByDay = new Map<string, number>();
   for (const d of pastDays(days, today)) if (MISSED.has(d.status)) missByDay.set(weekday(d.day), (missByDay.get(weekday(d.day)) ?? 0) + 1);
@@ -119,8 +122,9 @@ export function weekFacts(ctx: ChallengeContext, days: DayInfo[], period: Period
     achieved: count((d) => SUCCESS.has(d.status)), missed: count((d) => MISSED.has(d.status)),
     rest: count((d) => d.status === 'REST'), excused: count((d) => d.status === 'EXCUSED'), pending: inWeek.filter((d) => PENDING.has(d.status)).length,
     previous,
-    stepsAverage: withSteps.length ? Math.round(withSteps.reduce((s, d) => s + d.submission!.finalValue!, 0) / withSteps.length) : null,
-    bestDay: best ? { day: best.day, steps: best.submission!.finalValue! } : null,
+    stepsAverage: withSteps.length ? Math.round(withSteps.reduce((s, d) => s + stepsOf(d), 0) / withSteps.length) : null,
+    bestDay: best ? { day: best.day, steps: stepsOf(best) } : null,
+    todayDone: ['ACHIEVED', 'REST', 'EXCUSED'].includes(days.find((d) => d.day === today)?.status ?? ''),
     streak: st.current, bestStreak: st.best,
     adherencePct: adh.pct, qualificationPct: cfg.prizes.qualificationAdherencePct, daysToQualify,
     points: points.byPeriod.get(period.periodNo) ?? 0, pointsTotal: points.total,

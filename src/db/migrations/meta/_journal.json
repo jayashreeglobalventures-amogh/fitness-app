@@ -92,6 +92,13 @@
       "when": 1796688000000,
       "tag": "0012_notification_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1796774400000,
+      "tag": "0013_health_sync",
+      "breakpoints": true
     }
   ]
 }

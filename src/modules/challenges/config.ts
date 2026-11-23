@@ -63,6 +63,9 @@ export const ChallengeConfigSchema = Type.Object({
       enabled: Type.Boolean(),
       combine: Type.Union([Type.Literal('SUM'), Type.Literal('HIGHEST')]),
     }, { additionalProperties: false }),
+    // Steps sent straight from the iPhone Health app (Apple Shortcut), as well as screenshots (owner, 23 Nov 2026).
+    // A synced count that reaches the target meets the day on its own; an admin can doubt it and ask for a screenshot.
+    healthSync: Type.Object({ enabled: Type.Boolean() }, { additionalProperties: false }),
   }, { additionalProperties: false }),
   verification: Type.Object({
     mode: Type.Union([Type.Literal('AI_ASSISTED'), Type.Literal('MANUAL')]),
@@ -244,6 +247,7 @@ export function normalizeConfig<T>(input: T): T {
   // nudge time; every admin alert straight away; comments on, new-post alerts allowed but each person opts in).
   if (c.notifications === undefined && c.schemaVersion !== undefined) c.notifications = defaultNotifications(c.coach);
   if (c.submission && typeof c.submission === 'object' && c.submission.multiplePerDay === undefined) c.submission.multiplePerDay = { enabled: false, combine: 'SUM' };
+  if (c.submission && typeof c.submission === 'object' && c.submission.healthSync === undefined) c.submission.healthSync = { enabled: true };
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

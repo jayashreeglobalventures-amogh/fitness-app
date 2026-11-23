@@ -81,16 +81,19 @@ export interface DayInfo {
   /** Several screenshots a day: each one, in upload order (empty otherwise). */
   parts?: DayPart[];
   combine?: 'SUM' | 'HIGHEST' | null;
+  /** Steps synced from Apple Health that day (latest), if any. */
+  sync?: { steps: number; syncedAt: string; doubted: boolean; doubtReason: string | null } | null;
   restDay: { restDayId: number; declaredAt: string; source: string } | null;
   exemption: { requestId: number; status: string } | null;
 }
 
 /** Every challenge day for one participant. */
 export async function participantDays(db: Queryable, ctx: ChallengeContext, p: ParticipantRow, now: Date): Promise<DayInfo[]> {
-  const [subs, rests, exs] = await Promise.all([
+  const [subs, rests, exs, syncs] = await Promise.all([
     db.query(`SELECT * FROM submissions WHERE participant_id = $1 AND status NOT IN ('SUPERSEDED','WITHDRAWN')`, [p.participantId]),
     db.query(`SELECT * FROM rest_days WHERE participant_id = $1 AND cancelled_at IS NULL`, [p.participantId]),
     db.query(`SELECT * FROM exemption_requests WHERE participant_id = $1 AND status IN ('VOTING','ADMIN_REVIEW','APPROVED') ORDER BY request_id`, [p.participantId]),
+    db.query(`SELECT * FROM health_syncs WHERE participant_id = $1`, [p.participantId]),
   ]);
   const subOf = new Map(subs.rows.filter((r) => !r.part).map((r) => [String(r.day), r]));
   const partsOf = new Map<string, Record<string, any>[]>();
@@ -98,6 +101,7 @@ export async function participantDays(db: Queryable, ctx: ChallengeContext, p: P
     partsOf.set(String(r.day), [...(partsOf.get(String(r.day)) ?? []), r]);
   }
   const restOf = new Map(rests.rows.map((r) => [String(r.day), r]));
+  const syncOf = new Map(syncs.rows.map((r) => [String(r.day), r]));
   const out: DayInfo[] = [];
   for (let d = ctx.ch.startsOn; daysBetween(d, ctx.ch.endsOn) >= 0; d = addDays(d, 1)) {
     const s = subOf.get(d);
@@ -115,6 +119,13 @@ export async function participantDays(db: Queryable, ctx: ChallengeContext, p: P
     else if (s) status = ({ PENDING_AI: 'SUBMITTED', PENDING_REVIEW: 'PENDING_VERIFICATION', ACHIEVED: 'ACHIEVED', BELOW_TARGET: 'TARGET_MISSED', REJECTED: 'REJECTED' } as const)[s.status as 'ACHIEVED'];
     else if (daysBetween(ctx.today, d) > 0) status = 'UPCOMING';
     else status = now < endOfDay(d, ctx.ch.timeZone) ? 'NOT_SUBMITTED' : 'MISSED_DEADLINE';
+    // Steps synced from Apple Health (unless an admin doubted them): reaching the target meets the day, whatever the
+    // screenshots say; below it, a day without evidence is in progress until midnight, then missed.
+    const sy = syncOf.get(d);
+    if (sy && !sy.doubted_at && !['NOT_PARTICIPATING', 'EXCUSED', 'REST', 'ACHIEVED', 'UPCOMING'].includes(status)) {
+      if (sy.steps >= ctx.cfgOn(d).activity.dailyTarget) status = 'ACHIEVED';
+      else if (status === 'NOT_SUBMITTED' || status === 'MISSED_DEADLINE') status = now < endOfDay(d, ctx.ch.timeZone) ? 'IN_PROGRESS' : 'TARGET_MISSED';
+    }
     const last = parts.at(-1);
     out.push({
       day: d, status, periodNo: periodOf(ctx.periods, d)?.periodNo ?? null,
@@ -126,6 +137,7 @@ export async function participantDays(db: Queryable, ctx: ChallengeContext, p: P
       parts: parts.map((x) => ({ submissionId: Number(x.submission_id), status: x.status, value: x.final_value, receivedAt: x.received_at.toISOString(), fileId: Number(x.file_id),
         decisionReason: x.decision_reason, appealed: !!x.appealed_at })),
       combine: multi ? multi.combine : null,
+      sync: sy ? { steps: sy.steps, syncedAt: sy.synced_at.toISOString(), doubted: !!sy.doubted_at, doubtReason: sy.doubt_reason ?? null } : null,
       restDay: r ? { restDayId: Number(r.rest_day_id), declaredAt: r.declared_at.toISOString(), source: r.source } : null,
       exemption: approved ? { requestId: Number(approved.request_id), status: 'APPROVED' } : pending ? { requestId: Number(pending.request_id), status: pending.status } : null,
     });

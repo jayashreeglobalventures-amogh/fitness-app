@@ -12,6 +12,7 @@ interface DayInfo {
   day: string; status: string; periodNo: number | null;
   submission: { submissionId: number; status: string; finalValue: number | null; claimedValue: number | null; receivedAt: string; decisionReason: string | null; appealed: boolean; fileId?: number } | null;
   parts?: { submissionId: number; status: string; value: number | null; receivedAt: string; fileId: number; decisionReason: string | null }[];
+  sync?: { steps: number; syncedAt: string; doubted: boolean; doubtReason: string | null } | null;
   restDay: { restDayId: number; declaredAt: string; source: string } | null;
   exemption: { requestId: number; status: string } | null;
 }
@@ -130,10 +131,11 @@ function TodayCard({ v, d, left, onChanged }: { v: ChallengeView; d: Dashboard; 
         <span style={{ textAlign: 'right', fontWeight: 400 }}><StatusBadge status={t.status} /><span className="muted small" style={{ display: 'block', marginTop: 6 }}>{left === 'closed' ? 'Deadline passed' : `Midnight deadline · ${left}`}</span></span>
       </span>}>
       <ErrorBox error={error} />
-      {t.status === 'ACHIEVED' && <div className="alert ok" style={{ marginTop: 12 }}>Done for today: {t.submission?.finalValue?.toLocaleString('en-IN')} {t.unit}. 🎉</div>}
+      {t.status === 'ACHIEVED' && <div className="alert ok" style={{ marginTop: 12 }}>Done for today: {countedOf(t, t.target).value?.toLocaleString('en-IN')} {t.unit}{countedOf(t, t.target).synced ? ' (from Apple Health)' : ''}. 🎉</div>}
       {t.status === 'SUBMITTED' && <div className="alert" style={{ marginTop: 12 }}>Reading your screenshot…</div>}
       {t.status === 'PENDING_VERIFICATION' && <div className="alert" style={{ marginTop: 12 }}>{multi ? 'An admin will check a screenshot. You can add more until midnight.' : 'An admin will check your screenshot. You can upload a clearer one until midnight.'}</div>}
-      {t.status === 'IN_PROGRESS' && <div className="alert" style={{ marginTop: 12 }}>{(t.submission?.finalValue ?? 0).toLocaleString('en-IN')} of {t.target.toLocaleString('en-IN')} {t.unit} so far. Add another screenshot (e.g. from your watch) before midnight.</div>}
+      {t.status === 'IN_PROGRESS' && <div className="alert" style={{ marginTop: 12 }}>{(countedOf(t, t.target).value ?? 0).toLocaleString('en-IN')} of {t.target.toLocaleString('en-IN')} {t.unit} so far. {countedOf(t, t.target).synced ? 'Keep going - your Shortcut sends the latest count, or upload a screenshot before midnight.' : 'Add another screenshot (e.g. from your watch) before midnight.'}</div>}
+      <SyncLine info={t} unit={t.unit} tz={d.timeZone} />
       {multi && parts.length > 0 && <Parts parts={parts} combine={d.rules.multiplePerDay.combine} unit={t.unit} dayOver={left === 'closed'} onChanged={onChanged} />}
       {!multi && t.submission?.fileId && <div className="small" style={{ marginTop: 8 }}><ViewPhoto fileId={t.submission.fileId} alt="My screenshot for today">View my screenshot</ViewPhoto> · <RemoveScreenshot submissionId={t.submission.submissionId} dayOver={left === 'closed'} onChanged={onChanged} /></div>}
       {(t.status === 'TARGET_MISSED' || t.status === 'REJECTED') && <div className="alert error" style={{ marginTop: 12 }}>{DAY_STATUS[t.status]!.label}{t.submission?.decisionReason ? `: ${t.submission.decisionReason}` : '.'} You can upload new evidence until midnight.</div>}
@@ -262,6 +264,22 @@ export function achievementPost(o: { challenge: string; dayNo: number; totalDays
   return lines.join('\n');
 }
 
+/** The number that counts for a day: steps synced from Apple Health when they meet the target (or there's nothing else), else the screenshot's. */
+export function countedOf(info: DayInfo, target: number): { value: number | null; synced: boolean } {
+  const sy = info.sync && !info.sync.doubted ? info.sync : null;
+  const shot = info.submission?.finalValue ?? null;
+  if (sy && (sy.steps >= target || shot === null || sy.steps > shot)) return { value: sy.steps, synced: true };
+  return { value: shot, synced: false };
+}
+
+/** A line about the day's synced steps (or an admin's request for a screenshot instead). */
+function SyncLine({ info, unit, tz }: { info: DayInfo; unit: string; tz: string }) {
+  const sy = info.sync;
+  if (!sy) return null;
+  if (sy.doubted) return <div className="alert warn small" style={{ marginTop: 10 }}>⚠️ An admin asked for a screenshot of your {sy.steps.toLocaleString('en-IN')} synced {unit}{sy.doubtReason ? ` (${sy.doubtReason})` : ''}. Upload one, or send it to an admin.</div>;
+  return <p className="small muted" style={{ marginTop: 8, marginBottom: 0 }}>📱 From Apple Health: <b>{sy.steps.toLocaleString('en-IN')}</b> {unit} · synced {time(sy.syncedAt, tz)}</p>;
+}
+
 function DayDetail({ v, info, d, onChanged, onClose }: { v: ChallengeView; info: DayInfo; d: Dashboard; onChanged: () => void; onClose: () => void }) {
   const [note, setNote] = useState('');
   const [error, setError] = useState<unknown>(null);
@@ -278,13 +296,14 @@ function DayDetail({ v, info, d, onChanged, onClose }: { v: ChallengeView; info:
   const target = v.current.config.activity.dailyTarget;
   const unit = v.current.config.activity.unit;
   const streak = info.status === 'ACHIEVED' ? streakOn(d.days, info.day) : 0;
+  const counted = countedOf(info, target);
   const shotId = info.parts?.length ? info.parts.filter((p) => p.status === 'APPROVED').at(-1)?.fileId ?? null : s?.fileId ?? null;
   const share = () => {
-    const body = achievementPost({ challenge: v.name, dayNo, totalDays, date: day(info.day), steps: s?.finalValue ?? null, target, unit, streak });
+    const body = achievementPost({ challenge: v.name, dayNo, totalDays, date: day(info.day), steps: counted.value, target, unit, streak });
     try { sessionStorage.setItem(`fit:community-draft:${v.challengeId}`, JSON.stringify({ body, fileId: shotId })); } catch { /* storage blocked: the post opens empty */ }
     navigate(`/community/${v.challengeId}`);
   };
-  const summary = info.status === 'ACHIEVED' ? `Target met${s?.finalValue != null ? ` with ${s.finalValue.toLocaleString('en-IN')} ${unit}` : ''}. 🎉`
+  const summary = info.status === 'ACHIEVED' ? `Target met${counted.value != null ? ` with ${counted.value.toLocaleString('en-IN')} ${unit}` : ''}. 🎉`
     : info.status === 'TARGET_MISSED' ? `Below the target${s?.finalValue != null ? `: ${s.finalValue.toLocaleString('en-IN')} of ${target.toLocaleString('en-IN')} ${unit}` : ''}.`
       : info.status === 'MISSED_DEADLINE' ? 'No screenshot arrived before midnight.'
         : info.status === 'REST' ? 'Rest day. 😴' : info.status === 'EXCUSED' ? 'Excused by an approved exemption.'
@@ -296,7 +315,8 @@ function DayDetail({ v, info, d, onChanged, onClose }: { v: ChallengeView; info:
       <dl className="kv">
         <dt>Day</dt><dd>{dayNo} of {totalDays}</dd>
         <dt>Target</dt><dd>{target.toLocaleString('en-IN')} {unit}</dd>
-        {s?.finalValue != null && <><dt>Counted</dt><dd>{s.finalValue.toLocaleString('en-IN')} {unit}</dd></>}
+        {counted.value != null && <><dt>Counted</dt><dd>{counted.value.toLocaleString('en-IN')} {unit}{counted.synced ? ' · 📱 Apple Health' : ''}</dd></>}
+        {info.sync && <><dt>Synced</dt><dd>{info.sync.steps.toLocaleString('en-IN')} {unit} · {time(info.sync.syncedAt, d.timeZone)}{info.sync.doubted ? ' · ⚠️ admin asked for a screenshot' : ''}</dd></>}
         {s && <><dt>Uploaded</dt><dd>{time(s.receivedAt, d.timeZone)}</dd></>}
         {streak >= 2 && <><dt>Streak</dt><dd>🔥 {streak} days in a row</dd></>}
         {s?.decisionReason && <><dt>Note</dt><dd>{s.decisionReason}</dd></>}

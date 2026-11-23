@@ -3,7 +3,7 @@ import type { ChallengeConfig } from '../../src/modules/challenges/config.js';
 import { allocatePrizes, split, type StandingIn } from '../../src/modules/settlement/engine.js';
 
 // Calamari (owner, 20 Nov 2026): 70% to qualifiers equally, 30% to the top three 50/30/20, next eligible moves up.
-const prizes: ChallengeConfig['prizes'] = { qualificationAdherencePct: 80, qualificationPoolPct: 70, topThreePct: 30, topThreeSplitPct: [50, 30, 20], distribution: 'EQUAL', topThreeIneligible: 'NEXT_ELIGIBLE', payoutDate: '2027-01-01' };
+const prizes: ChallengeConfig['prizes'] = { qualificationAdherencePct: 80, qualificationPoolPct: 70, topThreePct: 30, topThreeSplitPct: [50, 30, 20], distribution: 'EQUAL', topThreeIneligible: 'NEXT_ELIGIBLE', proRataByDays: true, payoutDate: '2027-01-01' };
 const rs = (n: number) => Math.round(n * 100);
 let id = 0;
 const S = (name: string, rank: number, eligible = true, points = 300, tied = false): StandingIn => ({ participantId: ++id, displayName: name, rank, tied, points, adherencePct: eligible ? 90 : 70, eligible });
@@ -91,5 +91,39 @@ describe('prizes (Calamari settings)', () => {
   it('incomplete prize settings stop the allocation', () => {
     const r = allocatePrizes([S('A', 1)], rs(100), { ...prizes, topThreeSplitPct: null });
     expect(r.issues[0]!.kind).toBe('PRIZE_SETTINGS_INCOMPLETE');
+  });
+
+  describe('late joiners (pro-rata by days taken part; owner, 23 Nov 2026)', () => {
+    const late = (name: string, rank: number, daysIn: number) => ({ ...S(name, rank), daysIn, daysTotal: 40 });
+    const full = (name: string, rank: number) => ({ ...S(name, rank), daysIn: 40, daysTotal: 40 });
+
+    it('the qualifier pool is shared by days: someone in for 26 of 40 days gets 26/40 of a full share', () => {
+      const r = allocatePrizes([full('A', 1), full('B', 2), full('C', 3), full('D', 4), late('E', 5, 26)], rs(10000), prizes);
+      // 70% = ₹7,000 over 40+40+40+40+26 = 186 day-shares
+      expect(Math.abs(by(r, 'D').qualification - (rs(7000) * 40) / 186)).toBeLessThanOrEqual(1); // to the paisa (shares add up exactly)
+      expect(Math.abs(by(r, 'E').qualification - (rs(7000) * 26) / 186)).toBeLessThanOrEqual(1);
+      expect(sum(r)).toBe(rs(10000));
+      expect(r.notes.some((n) => n.includes('E 26/40 days'))).toBe(true);
+    });
+
+    it('a late joiner who wins 1st gets 26/40 of it; the rest joins the qualifier pool', () => {
+      const r = allocatePrizes([late('E', 1, 26), full('A', 2), full('B', 3), full('C', 4)], rs(10000), prizes);
+      expect(by(r, 'E').place).toBe(1);
+      expect(by(r, 'E').topThree).toBe(Math.floor((rs(1500) * 26) / 40)); // ₹975 of ₹1,500
+      expect(r.qualificationPool).toBe(rs(7000) + rs(1500) - Math.floor((rs(1500) * 26) / 40)); // + ₹525
+      expect(sum(r)).toBe(rs(10000));
+    });
+
+    it('nobody joined late: exactly as before', () => {
+      const a = allocatePrizes([full('A', 1), full('B', 2), full('C', 3), full('D', 4), full('E', 5)], rs(10000), prizes);
+      const b = allocatePrizes([S('A', 1), S('B', 2), S('C', 3), S('D', 4), S('E', 5)], rs(10000), prizes);
+      expect(a.allocations.map((x) => x.total)).toEqual(b.allocations.map((x) => x.total));
+    });
+
+    it('switched off in Settings: everyone shares equally, places paid in full', () => {
+      const r = allocatePrizes([late('E', 1, 26), full('A', 2), full('B', 3), full('C', 4)], rs(10000), { ...prizes, proRataByDays: false });
+      expect(by(r, 'E').topThree).toBe(rs(1500));
+      expect(by(r, 'E').qualification).toBe(by(r, 'A').qualification);
+    });
   });
 });

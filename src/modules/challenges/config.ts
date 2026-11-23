@@ -157,6 +157,9 @@ export const ChallengeConfigSchema = Type.Object({
     // A top-three place held by someone not eligible: NEXT_ELIGIBLE (the next eligible person moves up) or
     // TO_QUALIFICATION_POOL (that place's money joins the pool shared by all qualifiers).
     topThreeIneligible: Type.Union([Type.Literal('NEXT_ELIGIBLE'), Type.Literal('TO_QUALIFICATION_POOL')]),
+    // Late joiners (owner, 23 Nov 2026): prizes in proportion to the days they took part - their share of the qualifier
+    // pool is weighted by days, a top-three prize is scaled by days, and the scaled-off part joins the qualifier pool.
+    proRataByDays: Type.Boolean(),
     payoutDate: Nullable(Day),
   }, { additionalProperties: false }),
   community: Type.Object({
@@ -191,6 +194,7 @@ export function normalizeConfig<T>(input: T): T {
   if (!input || typeof input !== 'object') return input;
   const c = structuredClone(input) as Record<string, any>;
   if (c.prizes && typeof c.prizes === 'object' && c.prizes.topThreeIneligible === undefined) c.prizes.topThreeIneligible = 'NEXT_ELIGIBLE';
+  if (c.prizes && typeof c.prizes === 'object' && c.prizes.proRataByDays === undefined) c.prizes.proRataByDays = true;
   if (c.community === undefined && c.schemaVersion !== undefined) c.community = { enabled: true, participantsCanPost: true, photos: true };
   if (c.coach === undefined && c.schemaVersion !== undefined) c.coach = { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true };
   if (c.submission && typeof c.submission === 'object' && c.submission.multiplePerDay === undefined) c.submission.multiplePerDay = { enabled: false, combine: 'SUM' };

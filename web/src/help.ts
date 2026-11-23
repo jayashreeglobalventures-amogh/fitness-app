@@ -89,6 +89,8 @@ export const TOPICS: Topic[] = [
       '**Adherence** = successful days ÷ days that counted (rest days and exemptions don\'t count). Calamari\'s prize line is **80%**.',
       { list: ['**70%** of the prize pool is shared **equally** by everyone at 80% or above.', '**30%** goes to the top three: **50% / 30% / 20%**. Someone below 80% can\'t take a top-three place - the next eligible person moves up.'] },
       { example: ['Prize pool ₹20,000: ₹14,000 shared by 10 qualifiers = ₹1,400 each; top three get ₹3,000 / ₹1,800 / ₹1,200 on top.'], title: 'Example' },
+      '**Joined late?** Prizes are in proportion to the days you took part (Calamari: 40 days). Your qualifier share is weighted by your days, and a top-three prize is scaled the same way - the rest goes to the other qualifiers. Your weekly contributions were already only for the weeks you took part.',
+      { example: ['Joined on day 15 → took part 26 of 40 days (65%): your qualifier share counts as 26/40 of a full share; winning 1st place (₹3,000) pays ₹1,950, and ₹1,050 goes to the qualifiers.'], title: 'Late joiner example' },
     ] },
   { id: 'coach', group: 'Points & progress', audience: ['everyone'], title: 'Your coach', keywords: 'coach weekly summary nudge aim',
     body: ['After each week you get a short summary on the Today tab (and an alert): days done, compared with last week, steps, streak, adherence vs the prize line, points, and one realistic aim. If your steps aren\'t in by the evening (Calamari: 8 pm) you get a personal nudge. Admins can switch parts off in **Settings → Coach**.'] },

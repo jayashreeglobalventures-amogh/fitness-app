@@ -46,10 +46,26 @@ export async function revokeKey(db: Queryable, userId: number, now: Date): Promi
 
 /** Reads "8214", "8,214", "8214.0" or 8214. */
 function parseSteps(v: unknown): number | null {
-  const s = String(v ?? '').trim().replace(/[,\s]/g, '');
-  if (!/^\d+(\.\d+)?$/.test(s)) return null;
-  const n = Math.round(Number(s));
+  // Also "8,214 steps" / "8214 count" (how a Health quantity can be written as text).
+  const m = /^\s*([\d,]+(?:\.\d+)?)\s*(?:steps?|count)?\s*$/i.exec(String(v ?? ''));
+  if (!m) return null;
+  const n = Math.round(Number(m[1]!.replace(/,/g, '')));
   return n >= 0 && n <= 200_000 ? n : null;
+}
+
+/**
+ * The calendar day of the Health sample, as the Shortcut writes it - e.g. "2026-11-23T00:00:00+05:30",
+ * "23 Nov 2026 at 12:00 AM" or "Nov 23, 2026 at 00:00". null if it can't be read (then it isn't checked).
+ */
+export function sampleDay(v: unknown): string | null {
+  const s = String(v ?? '').trim();
+  if (!s) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const t = Date.parse(s.replace(/\s+at\s+/i, ' ').replace(/ /g, ' '));
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t); // written without a time zone: read back the same calendar date
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**
@@ -75,6 +91,9 @@ export async function receiveSteps(db: Queryable, keyRaw: string | undefined, bo
     const day = localDay(now, r.time_zone);
     const ctx = await challengeContext(db, cid, now);
     if (daysBetween(ctx.ch.startsOn, day) < 0 || daysBetween(day, ctx.ch.endsOn) < 0) continue;
+    // The Shortcut sends the day of its latest Health total: if that isn't today, there are no steps today yet.
+    const from = sampleDay(b.date);
+    if (from && from !== day) { out.push(`${ctx.ch.name}: no steps in your Health app for today yet (the latest are from ${dayLabel(from)}) - nothing saved.`); continue; }
     const p: ParticipantRow = { participantId: Number(r.participant_id), challengeId: cid, userId: Number(r.user_id), status: r.status, joinedOn: r.joined_on, leftOn: r.left_on };
     if (!participatesOn(p, day)) continue;
     const cfg = ctx.cfgOn(day);

@@ -46,7 +46,8 @@ self.addEventListener('fetch', (e) => {
     return;
   }
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then((res) => { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('/', copy)); return res; })
+    // Only the app's own page is kept for offline use (not a downloaded file such as the Apple Shortcut).
+    e.respondWith(fetch(req).then((res) => { if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put('/', copy)); } return res; })
       .catch(() => caches.match('/').then((hit) => hit || caches.match('/offline.html'))));
   }
 });

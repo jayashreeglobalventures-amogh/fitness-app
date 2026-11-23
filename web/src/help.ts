@@ -50,9 +50,9 @@ export const TOPICS: Topic[] = [
   { id: 'apple-health', group: 'Daily check-in', audience: ['everyone', 'admin'], title: 'Steps straight from Apple Health (iPhone)', keywords: 'apple health iphone shortcut sync automatic steps key automation watch',
     body: [
       'On iPhone, an **Apple Shortcut** can send today\'s steps from the Health app to Fitness - no screenshot needed. Screenshots still work too.',
-      { steps: ['**Profile → 📱 Steps from Apple Health → Get my sync key** and copy it (it is shown once).',
-        'Follow **Set up the Shortcut** on that card (about 2 minutes): Find Health Samples (Steps, today, group by day) → Calculate Statistics (Sum) → Get Contents of URL (POST, your key) → Show Notification.',
-        'In Shortcuts → **Automation**, run it daily at e.g. **23:30** with **Run Immediately**. Add an evening time too if you like - each sync replaces the last.'] },
+      { steps: ['On your iPhone: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and the Shortcut opens.',
+        'Tap **Set Up Shortcut**, paste the key, then **Add Shortcut**. Run it once and tap **Allow** for Steps.',
+        'Shortcuts → **Automation → + → Time of Day → 23:30, Daily, Run Immediately → Send steps to Fitness**. Add an evening time too if you like - each sync replaces the last.'] },
       { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',
         'On a **rest day** nothing is sent. Steps only count for the day they are sent, before midnight.',
         '**Admins** see 📱 and the number in **Team**. **Doubt** stops it counting and asks the person for a screenshot (an admin records it with Correct if the day is over); **Accept** makes it count again.'] },

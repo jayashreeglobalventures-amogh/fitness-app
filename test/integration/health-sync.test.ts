@@ -135,3 +135,19 @@ describe('an admin doubts a synced number', () => {
     expect((await day(asha, '2026-11-25')).sync).toBeNull();
   });
 });
+
+describe('what the Shortcut sends', () => {
+  it('a count from an earlier day is ignored; "8,214 steps" and iPhone-written dates are understood', async () => {
+    const k = (await ravi.post('/api/me/sync-key')).body.data.key;
+    h.setNow(ist('2026-11-26', '09:00'));
+    const cfg = calamariConfig(); cfg.verification.mode = 'MANUAL'; // syncing back on
+    expect((await sa.put(`/api/challenges/${id}/config`, { config: cfg, reason: 'Syncing back on', effectiveFrom: '2026-11-27' })).status).toBe(200);
+    h.setNow(ist('2026-11-27', '07:30'));
+    const stale = await sync(k, { steps: '5,000', date: 'Nov 26, 2026 at 12:00 AM' });
+    expect(stale.body).toBe('Calamari: no steps in your Health app for today yet (the latest are from 26 Nov) - nothing saved.');
+    expect((await day(ravi, '2026-11-27')).sync).toBeNull();
+    h.setNow(ist('2026-11-27', '21:00'));
+    expect((await sync(k, { steps: '8,214 steps', date: '27 Nov 2026 at 00:00' })).body).toContain('8,214 steps saved for 27 Nov');
+    expect((await sync(k, { steps: 8300, date: '2026-11-27T00:00:00+05:30' })).body).toContain('8,300');
+  });
+});

@@ -47,3 +47,15 @@ All commands run on the VPS as `deploy-fitness` in the environment's directory
 
 Never: drop or truncate the database, delete the volumes (`docker compose down -v`), or edit an applied migration.
 Corrections to challenge data are made in the app (audited), not in SQL.
+
+## The Apple Health Shortcut (one-tap setup)
+
+Participants add a ready-made Shortcut from Profile → Steps from Apple Health → "Set up on this iPhone". The file is
+`web/public/send-steps-to-fitness.shortcut`, built and signed on a Mac signed in to iCloud (iPhones only add signed
+shortcuts; signing can't run on the server):
+
+    npm run shortcut                      # production address (https://fitness.amogh.systems)
+    npm run shortcut -- https://<other>   # another address, e.g. for a test build
+
+Commit the file and deploy. Rebuild only if the address or the Shortcut's steps change. Without the file, the card
+falls back to the manual steps.

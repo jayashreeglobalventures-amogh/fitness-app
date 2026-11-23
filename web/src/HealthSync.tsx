@@ -8,7 +8,8 @@ import { Collapsible, day, ErrorBox } from './ui';
 
 interface Status { key: { hint: string; createdAt: string; lastUsedAt: string | null } | null; recent: { challenge: string; day: string; steps: number; syncedAt: string; doubted: boolean }[] }
 
-const SHORTCUT = '/send-steps-to-fitness.shortcut';
+/** The Shortcut built for this app's own address (production and test each have theirs; see scripts/build-shortcut.ts). */
+const SHORTCUT = `/shortcuts/${location.host}.shortcut`;
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 function Copy({ text, label }: { text: string; label: string }) {

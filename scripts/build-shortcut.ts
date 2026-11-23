@@ -1,19 +1,22 @@
 // Builds the "Send steps to Fitness" Apple Shortcut, signs it with macOS's own `shortcuts sign` (iPhones only add
 // signed shortcuts), and puts it in web/public so the app can offer it: Profile → Steps from Apple Health →
-// "Set up on this iPhone". Run on a Mac signed in to iCloud:  npm run shortcut -- https://fitness.amogh.systems
+// "Set up on this iPhone". Run on a Mac signed in to iCloud (with iCloud Drive on):  npm run shortcut
+// (builds one file per app - production and test - each pointing at its own address; or pass one https address).
 //
 // The Shortcut: asks once for the person's sync key (an import question) → Find Health Samples (Steps, grouped by
 // day, latest first, 1) → Calculate Statistics (Sum) → POST {steps, date} to /api/health-sync with the key →
 // shows the reply as a notification. The server ignores a count whose date isn't today.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
-const origin = (process.argv[2] ?? 'https://fitness.amogh.systems').replace(/\/+$/, '');
-if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin)) { console.error(`Give the app's https address, e.g. https://fitness.amogh.systems (got ${origin})`); process.exit(1); }
-const out = process.argv[3] ?? 'web/public/send-steps-to-fitness.shortcut';
+const ORIGINS = ['https://fitness.amogh.systems', 'https://fitness-test.amogh.systems']; // production, test
+const targets = (process.argv[2] ? [process.argv[2]] : ORIGINS).map((o) => o.replace(/\/+$/, ''));
+for (const o of targets) if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o)) { console.error(`Give the app's https address, e.g. https://fitness.amogh.systems (got ${o})`); process.exit(1); }
+/** Each app offers the Shortcut built for its own address: web/public/shortcuts/<host>.shortcut */
+const fileFor = (o: string) => `web/public/shortcuts/${new URL(o).host}.shortcut`;
 
 // ---------- a tiny XML plist writer ----------
 type P = string | number | boolean | P[] | { [k: string]: P };
@@ -46,6 +49,7 @@ const dict = (items: [string, P][]): P => ({
   WFSerializationType: 'WFDictionaryFieldValue',
 });
 
+function build(origin: string, out: string): void {
 const id = { key: randomUUID().toUpperCase(), samples: randomUUID().toUpperCase(), sum: randomUUID().toUpperCase(), send: randomUUID().toUpperCase() };
 const actions: P[] = [
   // 0: the sync key (filled in once, when the person adds the Shortcut)
@@ -98,3 +102,7 @@ try {
   process.exit(1);
 }
 console.log(`Signed shortcut for ${origin} → ${out}`);
+}
+
+mkdirSync('web/public/shortcuts', { recursive: true });
+for (const o of targets) build(o, fileFor(o));

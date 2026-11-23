@@ -1,7 +1,8 @@
 // Participant: today's goal, screenshot upload, rest day, progress and calendar.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { Collapsible, day, DAY_STATUS, ErrorBox, Field, Loading, newRef, StatusBadge, time, upload, useLoad, ViewPhoto } from '../ui';
+import { navigate } from '../router';
+import { Collapsible, day, DAY_STATUS, ErrorBox, Field, Loading, Modal, newRef, StatusBadge, time, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
 import { CoachCard } from './Coach';
@@ -86,7 +87,7 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
         <Calendar days={d.days} today={t?.day ?? null} onPick={setSelected} />
         <div className="legend">{['ACHIEVED', 'PENDING_VERIFICATION', 'MISSED_DEADLINE', 'REST', 'EXCUSED'].map((k) => <StatusBadge key={k} status={k} />)}</div>
       </div>
-      {selected && <DayDetail info={d.days.find((x) => x.day === selected)!} d={d} onChanged={dash.reload} onClose={() => setSelected(null)} />}
+      {selected && <DayDetail v={v} info={d.days.find((x) => x.day === selected)!} d={d} onChanged={dash.reload} onClose={() => setSelected(null)} />}
     </>
   );
 }
@@ -237,7 +238,31 @@ function Calendar({ days, today, onPick }: { days: DayInfo[]; today: string | nu
   );
 }
 
-function DayDetail({ info, d, onChanged, onClose }: { info: DayInfo; d: Dashboard; onChanged: () => void; onClose: () => void }) {
+/** Successful days in a row up to and including `upTo` (rest days and exemptions pause it; a miss resets it). */
+function streakOn(days: DayInfo[], upTo: string): number {
+  let n = 0;
+  for (const x of days) {
+    if (x.day > upTo) break;
+    if (x.status === 'ACHIEVED') n++;
+    else if (x.status === 'TARGET_MISSED' || x.status === 'REJECTED' || x.status === 'MISSED_DEADLINE') n = 0;
+  }
+  return n;
+}
+
+/** A cheerful post about a successful day, for the participant to edit or post as it is. */
+export function achievementPost(o: { challenge: string; dayNo: number; totalDays: number; date: string; steps: number | null; target: number; unit: string; streak: number }): string {
+  const cheers = ['Another one in the bag! 🎉', 'Done and dusted! ✅', 'Target smashed! 💥', 'Steps done, feeling great! 😄', 'One more day closer to the finish line! 🏁'];
+  const lines = [`${cheers[(o.dayNo + (o.steps ?? 0)) % cheers.length] ?? cheers[0]} Day ${o.dayNo} of ${o.totalDays} in ${o.challenge}.`];
+  if (o.steps !== null) {
+    const pct = Math.round((o.steps / o.target) * 100);
+    lines.push(`👟 ${o.steps.toLocaleString('en-IN')} ${o.unit} on ${o.date}${pct >= 110 ? ` - ${pct}% of the ${o.target.toLocaleString('en-IN')} target 💪` : ` - target of ${o.target.toLocaleString('en-IN')} reached 💪`}`);
+  }
+  if (o.streak >= 2) lines.push(`🔥 ${o.streak}-day streak and counting!`);
+  lines.push('Who\'s walking with me tomorrow? 🚶‍♀️🚶‍♂️');
+  return lines.join('\n');
+}
+
+function DayDetail({ v, info, d, onChanged, onClose }: { v: ChallengeView; info: DayInfo; d: Dashboard; onChanged: () => void; onClose: () => void }) {
   const [note, setNote] = useState('');
   const [error, setError] = useState<unknown>(null);
   const s = info.submission;
@@ -248,15 +273,37 @@ function DayDetail({ info, d, onChanged, onClose }: { info: DayInfo; d: Dashboar
   const cancelRest = async () => { try { await api.post(`/api/rest-days/${info.restDay!.restDayId}/cancel`); onChanged(); onClose(); } catch (e) { setError(e); } };
   // Shown for today and later; the server enforces the cut-off time in the challenge's time zone.
   const canCancelRest = info.restDay && info.status === 'REST' && info.day >= (d.today?.day ?? '');
+  const dayNo = Math.round((Date.parse(`${info.day}T00:00:00Z`) - Date.parse(`${v.startsOn}T00:00:00Z`)) / 86_400_000) + 1;
+  const totalDays = Math.round((Date.parse(`${v.endsOn}T00:00:00Z`) - Date.parse(`${v.startsOn}T00:00:00Z`)) / 86_400_000) + 1;
+  const target = v.current.config.activity.dailyTarget;
+  const unit = v.current.config.activity.unit;
+  const streak = info.status === 'ACHIEVED' ? streakOn(d.days, info.day) : 0;
+  const shotId = info.parts?.length ? info.parts.filter((p) => p.status === 'APPROVED').at(-1)?.fileId ?? null : s?.fileId ?? null;
+  const share = () => {
+    const body = achievementPost({ challenge: v.name, dayNo, totalDays, date: day(info.day), steps: s?.finalValue ?? null, target, unit, streak });
+    try { sessionStorage.setItem(`fit:community-draft:${v.challengeId}`, JSON.stringify({ body, fileId: shotId })); } catch { /* storage blocked: the post opens empty */ }
+    navigate(`/community/${v.challengeId}`);
+  };
+  const summary = info.status === 'ACHIEVED' ? `Target met${s?.finalValue != null ? ` with ${s.finalValue.toLocaleString('en-IN')} ${unit}` : ''}. 🎉`
+    : info.status === 'TARGET_MISSED' ? `Below the target${s?.finalValue != null ? `: ${s.finalValue.toLocaleString('en-IN')} of ${target.toLocaleString('en-IN')} ${unit}` : ''}.`
+      : info.status === 'MISSED_DEADLINE' ? 'No screenshot arrived before midnight.'
+        : info.status === 'REST' ? 'Rest day. 😴' : info.status === 'EXCUSED' ? 'Excused by an approved exemption.'
+          : info.status === 'UPCOMING' ? 'Still to come.' : DAY_STATUS[info.status]?.label ?? info.status;
   return (
-    <div className="card">
-      <div className="spread"><h3>{day(info.day)}</h3><div className="row"><StatusBadge status={info.status} /><button className="btn small ghost" onClick={onClose} aria-label="Close">✕</button></div></div>
+    <Modal title={<span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{day(info.day)} <StatusBadge status={info.status} /></span>} onClose={onClose}>
       <ErrorBox error={error} />
-      {s && <dl className="kv">
-        <dt>Uploaded</dt><dd>{time(s.receivedAt, d.timeZone)}</dd>
-        {s.finalValue !== null && <><dt>Counted</dt><dd>{s.finalValue.toLocaleString('en-IN')}</dd></>}
-        {s.decisionReason && <><dt>Note</dt><dd>{s.decisionReason}</dd></>}
-      </dl>}
+      <p style={{ marginTop: 0 }}><b>{summary}</b></p>
+      <dl className="kv">
+        <dt>Day</dt><dd>{dayNo} of {totalDays}</dd>
+        <dt>Target</dt><dd>{target.toLocaleString('en-IN')} {unit}</dd>
+        {s?.finalValue != null && <><dt>Counted</dt><dd>{s.finalValue.toLocaleString('en-IN')} {unit}</dd></>}
+        {s && <><dt>Uploaded</dt><dd>{time(s.receivedAt, d.timeZone)}</dd></>}
+        {streak >= 2 && <><dt>Streak</dt><dd>🔥 {streak} days in a row</dd></>}
+        {s?.decisionReason && <><dt>Note</dt><dd>{s.decisionReason}</dd></>}
+      </dl>
+      {info.status === 'ACHIEVED' && v.current.config.community.enabled && (
+        <button className="btn primary" style={{ width: '100%', margin: '4px 0 10px' }} onClick={share}>📣 Post to the community</button>
+      )}
       {s?.fileId && !(info.parts?.length) && <div className="small"><ViewPhoto fileId={s.fileId} alt={`My screenshot for ${info.day}`}>View screenshot</ViewPhoto> · <RemoveScreenshot submissionId={s.submissionId} dayOver={info.day < (d.today?.day ?? '9999')} onChanged={onChanged} /></div>}
       {(info.parts?.length ?? 0) > 0 && <Parts parts={info.parts!} combine={d.rules.multiplePerDay.combine} unit={d.today?.unit ?? ''} dayOver={info.day < (d.today?.day ?? '9999')} onChanged={onChanged} />}
       {info.restDay && <p className="small muted">Rest day declared {time(info.restDay.declaredAt, d.timeZone)}{info.restDay.source === 'ADMIN_CORRECTION' ? ' (recorded by an admin)' : ''}.</p>}
@@ -269,7 +316,7 @@ function DayDetail({ info, d, onChanged, onClose }: { info: DayInfo; d: Dashboar
         </div>
       )}
       {s?.appealed && s.status !== 'PENDING_REVIEW' && <p className="small muted">You appealed this decision.</p>}
-    </div>
+    </Modal>
   );
 }
 

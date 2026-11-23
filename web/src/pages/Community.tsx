@@ -93,6 +93,25 @@ function Composer({ challengeId, feed, onPosted }: { challengeId: number; feed: 
   const ach = useLoad(() => (kind === 'ACHIEVEMENT' ? api.get<Achievement[]>(`/api/challenges/${challengeId}/my-achievements`) : Promise.resolve([])), [kind, challengeId]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
   const pick = (f: File | null) => { setFile(f); setPreview(f ? URL.createObjectURL(f) : null); };
+  const box = useRef<HTMLTextAreaElement>(null);
+  // A draft handed over from the calendar ("Post to the community"): its text and that day's screenshot.
+  useEffect(() => {
+    let draft: { body?: string; fileId?: number | null } | null = null;
+    try {
+      const raw = sessionStorage.getItem(`fit:community-draft:${challengeId}`);
+      if (raw) { draft = JSON.parse(raw); sessionStorage.removeItem(`fit:community-draft:${challengeId}`); }
+    } catch { /* no storage: nothing to prefill */ }
+    if (!draft || !feed.can.post) return;
+    setKind('POST');
+    setBody(draft.body ?? '');
+    setTimeout(() => { box.current?.scrollIntoView({ block: 'center' }); box.current?.focus(); }, 50);
+    if (draft.fileId && feed.can.photos) {
+      fetch(`/api/files/${draft.fileId}`, { credentials: 'same-origin' })
+        .then((r) => (r.ok ? r.blob() : null))
+        .then((b) => { if (b) pick(new File([b], 'my-steps.jpg', { type: b.type || 'image/jpeg' })); })
+        .catch(() => undefined);
+    }
+  }, [challengeId]); // eslint-disable-line react-hooks/exhaustive-deps
   const submit = async () => {
     setBusy(true); setError(null);
     try {
@@ -117,7 +136,7 @@ function Composer({ challengeId, feed, onPosted }: { challengeId: number; feed: 
               {(ach.data ?? []).map((a) => <option key={a.eventId} value={a.eventId}>{ACH_LABEL[a.rule]?.(a) ?? a.rule} · {a.day} · +{a.points} pts</option>)}
             </select>
       )}
-      <textarea rows={kind === 'ACHIEVEMENT' ? 2 : 3} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} style={{ width: '100%' }}
+      <textarea ref={box} rows={Math.min(10, Math.max(kind === 'ACHIEVEMENT' ? 2 : 3, body.split('\n').length + 1))} maxLength={2000} value={body} onChange={(e) => setBody(e.target.value)} style={{ width: '100%' }}
         placeholder={kind === 'ANNOUNCEMENT' ? 'Announcement to everyone in this challenge (it is pinned to the top)…' : kind === 'ACHIEVEMENT' ? 'Add a few words (optional)' : 'Share your walk, a tip or some encouragement…'} />
       {preview && <div style={{ position: 'relative', marginTop: 8 }}><img src={preview} alt="" className="post-photo" /><button className="btn small ghost" style={{ position: 'absolute', top: 6, right: 6 }} onClick={() => pick(null)}>Remove</button></div>}
       <div className="spread" style={{ marginTop: 8 }}>

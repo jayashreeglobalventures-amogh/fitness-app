@@ -95,7 +95,7 @@ export const TOPICS: Topic[] = [
   { id: 'coach', group: 'Points & progress', audience: ['everyone'], title: 'Your coach', keywords: 'coach weekly summary nudge aim',
     body: ['After each week you get a short summary on the Today tab (and an alert): days done, compared with last week, steps, streak, adherence vs the prize line, points, and one realistic aim. If your steps aren\'t in by the evening (Calamari: 8 pm) you get a personal nudge. Admins can switch parts off in **Settings → Coach**.'] },
   { id: 'today-tab', group: 'Points & progress', audience: ['everyone'], title: 'The Today tab', keywords: 'today card calendar my money rings collapsible',
-    body: ['Today\'s card (upload, status, deadline), **My money** (your share of the pot, this week\'s fine pool, the prize pool), your numbers, **Your coach**, points, the rest-day planner and the calendar. Tap a section title to fold it away - it stays folded on this phone. Tap a calendar day for its details.'] },
+    body: ['Tap a **calendar day** for a pop-up summary (status, steps, upload time, streak, day number). On a day you met the target, **📣 Post to the community** opens Community with a ready-made post and that day\'s screenshot - edit it or post it as it is.', 'Today\'s card (upload, status, deadline), **My money** (your share of the pot, this week\'s fine pool, the prize pool), your numbers, **Your coach**, points, the rest-day planner and the calendar. Tap a section title to fold it away - it stays folded on this phone. Tap a calendar day for its details.'] },
 
   // ---------- Money ----------
   { id: 'paying', group: 'Money', audience: ['everyone'], title: 'Paying your weekly contribution', keywords: 'pay upi utr qr contribution weekly due overdue',

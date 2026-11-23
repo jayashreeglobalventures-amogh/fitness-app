@@ -38,6 +38,28 @@ export async function adminOverview(db: Queryable, actorUserId: number, challeng
   return { day, today: ctx.today, periods: ctx.periods, counts, people, waiting: pend.rows[0], canRemind, timeZone: ctx.ch.timeZone };
 }
 
+/**
+ * The race track for everyone in the challenge (participants and admins): only what the track draws - names, today's
+ * day status and the running counts. No mobiles, usernames or reminders.
+ */
+export async function raceView(db: Queryable, actorUserId: number, challengeId: number, now: Date): Promise<unknown> {
+  const access = await accessFor(db, actorUserId, challengeId);
+  const me = await db.query(`SELECT 1 FROM participants WHERE challenge_id = $1 AND user_id = $2`, [challengeId, actorUserId]);
+  if (!access.permissions.has('challenge.view_admin') && !me.rows[0]) throw forbidden();
+  const ctx = await challengeContext(db, challengeId, now);
+  const day = daysBetween(ctx.ch.startsOn, ctx.today) < 0 ? ctx.ch.startsOn : daysBetween(ctx.today, ctx.ch.endsOn) < 0 ? ctx.ch.endsOn : ctx.today;
+  const { rows } = await db.query(
+    `SELECT p.*, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ORDER BY u.display_name`, [challengeId]);
+  const people = [];
+  for (const r of rows) {
+    const p: ParticipantRow = { participantId: Number(r.participant_id), challengeId, userId: Number(r.user_id), status: r.status, joinedOn: r.joined_on, leftOn: r.left_on, displayName: r.display_name };
+    const days = await participantDays(db, ctx, p, now);
+    const d = days.find((x) => x.day === day);
+    people.push({ participantId: p.participantId, displayName: r.display_name, status: p.status, day: d ? { status: d.status } : null, summary: summarize(days, ctx) });
+  }
+  return { today: ctx.today, people };
+}
+
 /** The latest WhatsApp reminder per participant for a day (from the activity log). */
 async function remindersOn(db: Queryable, challengeId: number, day: string): Promise<Map<number, { at: string; by: string }>> {
   const { rows } = await db.query(

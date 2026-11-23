@@ -5,6 +5,7 @@ import { Avatar, day, ErrorBox, Loading, useLoad } from '../ui';
 import type { ChallengeView } from './Challenge';
 import { navigate } from '../router';
 import { PersonModal } from './Person';
+import { RaceForEveryone } from './RaceTrack';
 
 interface Standing { rank: number; tied: boolean; participantId: number; userId: number; displayName: string; photoFileId?: number | null; status: string; points: number; adherencePct: number | null; successfulDays: number; longestStreak: number; currentStreak: number; eligible: boolean; me: boolean }
 interface Board { standings: Standing[]; ranking: string[]; qualificationAdherencePct: number; team: { currentStreak: number; longestStreak: number; breaks: { day: string; previousStreak: number; responsible: number[]; restartOn: string }[] }; asOf: string }
@@ -24,6 +25,8 @@ export function LeaderboardSection({ v }: { v: ChallengeView }) {
   const name = (pid: number) => d.standings.find((s) => s.participantId === pid)?.displayName ?? '—';
   return (
     <>
+      {/* Admins have the race on the Team tab; everyone else sees it here. */}
+      {!v.myPermissions.includes('challenge.view_admin') && <RaceForEveryone challengeId={v.challengeId} startsOn={v.startsOn} endsOn={v.endsOn} />}
       <div className="stats" style={{ marginBottom: 12 }}>
         <div className="stat"><span>Team streak</span><b>{d.team.currentStreak} day{d.team.currentStreak === 1 ? '' : 's'}</b></div>
         <div className="stat"><span>Best team streak</span><b>{d.team.longestStreak}</b></div>

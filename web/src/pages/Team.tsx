@@ -11,7 +11,7 @@ import { RaceTrack } from './RaceTrack';
 
 interface Person {
   participantId: number; userId: number; displayName: string; username: string; status: string;
-  day: { status: string; submission: { finalValue: number | null } | null } | null;
+  day: { status: string; submission: { finalValue: number | null } | null; sync?: { steps: number; syncedAt: string; doubted: boolean } | null } | null;
   summary: { achieved: number; missed: number; rest: number; excused: number; pending: number; adherencePct: number | null; restDaysUsed: number };
   mobile?: string | null; reminded?: { at: string; by: string } | null;
 }
@@ -51,7 +51,8 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
         <tbody>{d.people.map((p) => (
           <tr key={p.participantId}>
             <td><b>{p.displayName}</b>{p.status !== 'ACTIVE' && <><br /><span className="badge warn">{p.status.toLowerCase()}</span></>}</td>
-            <td>{p.day ? <StatusBadge status={p.day.status} /> : '—'}{p.day?.submission?.finalValue != null && <div className="muted small">{p.day.submission.finalValue.toLocaleString('en-IN')}</div>}</td>
+            <td>{p.day ? <StatusBadge status={p.day.status} /> : '—'}{p.day?.submission?.finalValue != null && <div className="muted small">{p.day.submission.finalValue.toLocaleString('en-IN')}</div>}
+              {p.day?.sync && <SyncCell p={p} day={d.day} canDecide={canCorrect && p.userId !== me.userId} onDone={o.reload} />}</td>
             <td className="small">{p.summary.achieved}✓ {p.summary.missed}✗{p.summary.rest ? ` ${p.summary.rest} rest` : ''}{p.summary.excused ? ` ${p.summary.excused} excused` : ''}<br />
               <span className="muted">{p.summary.adherencePct === null ? '—' : `${p.summary.adherencePct}%`}</span></td>
             <td>{canCorrect && p.userId !== me.userId && <button className="btn small ghost" onClick={() => setOpen(open === p.participantId ? null : p.participantId)}>Correct</button>}</td>
@@ -96,5 +97,24 @@ function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeV
       <Field label="Note (optional)"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent on the WhatsApp group" /></Field>
       <button className="btn primary" disabled={busy || !dayPick || (kind === 'evidence' && !file)} onClick={send}>{kind === 'evidence' && steps.trim() ? 'Save and approve' : 'Save'}</button>
     </Modal>
+  );
+}
+
+/** Steps synced from Apple Health for the chosen day; an admin can doubt them (ask for a screenshot) or accept them again. */
+function SyncCell({ p, day: d, canDecide, onDone }: { p: Person; day: string; canDecide: boolean; onDone: () => void }) {
+  const [error, setError] = useState<unknown>(null);
+  const sy = p.day!.sync!;
+  const act = async (doubt: boolean) => {
+    setError(null);
+    try { await api.post(`/api/participants/${p.participantId}/health-sync/doubt`, { day: d, doubt }); onDone(); } catch (e) { setError(e); }
+  };
+  return (
+    <div className="small" style={{ marginTop: 4 }}>
+      <span className={sy.doubted ? 'muted' : ''} style={sy.doubted ? { textDecoration: 'line-through' } : undefined}>📱 {sy.steps.toLocaleString('en-IN')}</span>
+      {canDecide && (sy.doubted
+        ? <button type="button" className="btn ghost small" style={{ marginLeft: 6 }} onClick={() => void act(false)} title="Count the synced steps again">Accept</button>
+        : <button type="button" className="btn ghost small" style={{ marginLeft: 6 }} onClick={() => void act(true)} title={`Ask ${p.displayName} for a screenshot; the synced number stops counting`}>Doubt</button>)}
+      {error ? <ErrorBox error={error} /> : null}
+    </div>
   );
 }

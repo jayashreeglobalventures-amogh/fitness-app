@@ -89,8 +89,11 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
         `SELECT coalesce((SELECT status FROM submissions WHERE participant_id = $1 AND day = $2 AND status NOT IN ('SUPERSEDED','WITHDRAWN') AND NOT part),
                          (SELECT 'PARTS' FROM submissions WHERE participant_id = $1 AND day = $2 AND part AND status NOT IN ('REJECTED','WITHDRAWN') LIMIT 1)) AS sub,
                 EXISTS (SELECT 1 FROM rest_days WHERE participant_id = $1 AND day = $2 AND cancelled_at IS NULL) AS rest,
-                EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused`,
+                EXISTS (SELECT 1 FROM exemption_requests WHERE participant_id = $1 AND status = 'APPROVED' AND $2::date BETWEEN start_day AND end_day) AS excused,
+                (SELECT steps FROM health_syncs WHERE participant_id = $1 AND day = $2 AND doubted_at IS NULL) AS synced`,
         [c.participant_id, today]);
+      // Steps synced from Apple Health that reach the target count as done (no reminders).
+      if (t.synced != null && t.synced >= cfgNow.activity.dailyTarget) t.sub ??= 'SYNCED';
       if (!t.sub && !t.rest && !t.excused) {
         notSubmittedToday = true;
         const left = Math.max(0, Math.round((endOfDay(today, c.time_zone).getTime() - now.getTime()) / 3_600_000));
@@ -118,8 +121,9 @@ export async function myNotifications(db: Queryable, userId: number, now: Date):
           `SELECT count(*)::int AS n FROM participants p
             WHERE p.challenge_id = $1 AND p.status = 'ACTIVE' AND p.joined_on <= $2 AND (p.left_on IS NULL OR p.left_on >= $2)
               AND NOT EXISTS (SELECT 1 FROM submissions s WHERE s.participant_id = p.participant_id AND s.day = $2 AND s.status NOT IN ('SUPERSEDED','WITHDRAWN','REJECTED','BELOW_TARGET'))
+              AND NOT EXISTS (SELECT 1 FROM health_syncs h WHERE h.participant_id = p.participant_id AND h.day = $2 AND h.doubted_at IS NULL AND h.steps >= $3)
               AND NOT EXISTS (SELECT 1 FROM rest_days r WHERE r.participant_id = p.participant_id AND r.day = $2 AND r.cancelled_at IS NULL)
-              AND NOT EXISTS (SELECT 1 FROM exemption_requests e WHERE e.participant_id = p.participant_id AND e.status = 'APPROVED' AND $2::date BETWEEN e.start_day AND e.end_day)`, [cid, today]);
+              AND NOT EXISTS (SELECT 1 FROM exemption_requests e WHERE e.participant_id = p.participant_id AND e.status = 'APPROVED' AND $2::date BETWEEN e.start_day AND e.end_day)`, [cid, today, cfgNow.activity.dailyTarget]);
         if (m.n > 0) out.push({ id: `teamstreak:${cid}:${today}`, kind: 'info', title: `${c.name}: keep the team streak going 🔗`, body: `${m.n === 1 ? '1 person still needs' : `${m.n} people still need`} to upload today. A cheer on the community might help!`, link: `/community/${cid}`, challengeId: cid, count: m.n });
       }
       // 🔥 Personal streak milestones reached in the last 2 days.

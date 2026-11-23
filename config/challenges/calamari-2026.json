@@ -32,7 +32,8 @@
     "multiplePerDay": {
       "enabled": false,
       "combine": "SUM"
-    }
+    },
+    "healthSync": { "enabled": true }
   },
   "verification": {
     "mode": "AI_ASSISTED",

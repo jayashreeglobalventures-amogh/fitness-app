@@ -189,3 +189,12 @@ Defaults applied where nothing was said:
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).
 Also: what a **suspended** participant's days count as (today they still count).
+
+## Steps from Apple Health (owner, 23 Nov 2026 - Shortcuts, keep both routes)
+
+| Topic | Rule |
+|---|---|
+| How | An Apple Shortcut on the person's iPhone reads today's steps from the Health app and sends them with their personal sync key (Profile → Steps from Apple Health). Only the key's SHA-256 is stored; it is shown once; a new key replaces the old; "Stop syncing" turns it off |
+| Both routes | Screenshots work as before. Setting: Evidence → "Also accept steps sent from the iPhone Health app" (on for Calamari) |
+| Counting | One synced number per person per day, replaced by each newer sync, for the day it is sent (challenge time zone). Reaching the target meets the day on its own - even over a declined screenshot. Below it: in progress until midnight, then missed unless a screenshot meets it. Nothing is saved on a rest day |
+| Trust | Admins see 📱 and the number in Team. Doubt = it stops counting and the person is asked for a screenshot (recorded by an admin with Correct if the day is over); Accept = counts again. Both in the activity log |

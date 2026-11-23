@@ -47,6 +47,18 @@ export const TOPICS: Topic[] = [
     ] },
 
   // ---------- Daily check-in ----------
+  { id: 'apple-health', group: 'Daily check-in', audience: ['everyone', 'admin'], title: 'Steps straight from Apple Health (iPhone)', keywords: 'apple health iphone shortcut sync automatic steps key automation watch',
+    body: [
+      'On iPhone, an **Apple Shortcut** can send today\'s steps from the Health app to Fitness - no screenshot needed. Screenshots still work too.',
+      { steps: ['**Profile → 📱 Steps from Apple Health → Get my sync key** and copy it (it is shown once).',
+        'Follow **Set up the Shortcut** on that card (about 2 minutes): Find Health Samples (Steps, today, group by day) → Calculate Statistics (Sum) → Get Contents of URL (POST, your key) → Show Notification.',
+        'In Shortcuts → **Automation**, run it daily at e.g. **23:30** with **Run Immediately**. Add an evening time too if you like - each sync replaces the last.'] },
+      { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',
+        'On a **rest day** nothing is sent. Steps only count for the day they are sent, before midnight.',
+        '**Admins** see 📱 and the number in **Team**. **Doubt** stops it counting and asks the person for a screenshot (an admin records it with Correct if the day is over); **Accept** makes it count again.'] },
+      { tip: 'Check the number matches your Health app the first time. If your watch and phone both count steps, "Group By: Day" stops them being counted twice.' },
+      { tip: 'Lost your phone or shared the key by mistake? Profile → Make a new key (the old one stops working) or Stop syncing.' },
+    ] },
   { id: 'upload', group: 'Daily check-in', audience: ['everyone'], title: 'Uploading today\'s screenshot', keywords: 'screenshot upload steps evidence deadline midnight date total today',
     body: [
       'Each day, upload a screenshot of your step total **before midnight** (India time): **Challenges → Calamari → Today → Upload today\'s screenshot**. Evidence counts only for the day it is uploaded.',

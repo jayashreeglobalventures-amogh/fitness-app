@@ -57,7 +57,7 @@ export const templateWriter: CoachWriter = {
       if (f.missed === 0 && counted > 0) lines.push(`🎯 Aim for next week: keep it going - ${n(f.target)} steps every day.`);
       else if (f.missed > 0) lines.push(`🎯 Aim for next week: ${aim}. Set a daily walk time and send your screenshot as soon as you hit ${n(f.target)}.`);
     } else if (!f.complete && f.daysLeft > 0) {
-      lines.push(`🎯 Today: ${n(f.target)} steps, screenshot before midnight.`);
+      lines.push(f.todayDone ? `🎯 Today: done ✅ - see you tomorrow.` : `🎯 Today: ${n(f.target)} steps, in before midnight.`);
     }
     return { headline, lines };
   },

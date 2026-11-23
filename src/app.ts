@@ -15,6 +15,7 @@ import { withTx } from './core/db.js';
 import * as activity from './modules/admin/activity.js';
 import * as push from './modules/notifications/push.js';
 import * as notifPrefs from './modules/notifications/prefs.js';
+import * as healthSync from './modules/checkin/healthsync.js';
 import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
 import * as exemptions from './modules/checkin/exemptions.js';
@@ -104,6 +105,9 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   // CSRF: a state-changing request must come from our own origin (browsers send Origin / Sec-Fetch-Site).
   app.addHook('onRequest', async (req, reply) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
+    // The Apple Shortcut's step sync: no cookies are used there (a personal sync key in the Authorization header),
+    // so a forged cross-site request has nothing to ride on.
+    if (req.method === 'POST' && req.url.split('?')[0] === '/api/health-sync' && !req.headers.cookie) return;
     const origin = req.headers.origin;
     const site = req.headers['sec-fetch-site'];
     if (origin !== config.publicOrigin && site !== 'same-origin') {
@@ -149,6 +153,22 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     }
     return { success: true, data: data ?? null };
   };
+
+  // ---------- Steps from Apple Health (Shortcut) ----------
+  // Plain-text reply: the Shortcut shows it as a notification.
+  app.post('/api/health-sync', async (req, reply) => {
+    const auth = String(req.headers.authorization ?? '');
+    const key = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : undefined;
+    reply.type('text/plain; charset=utf-8');
+    try {
+      const msg = await requestContext.run(origin(req), () => withTx(pool, (tx) => healthSync.receiveSteps(tx, key, req.body, String(req.headers['user-agent'] ?? ''), clock())));
+      return msg;
+    } catch (e) {
+      if ((e as { syncStatus?: number }).syncStatus === 401) return reply.code(401).send('This sync key is not valid any more. Open Fitness → Profile → Steps from Apple Health to get a new one.');
+      if (e instanceof AppError) return reply.code(e.status).send(e.message);
+      throw e;
+    }
+  });
 
   // ---------- Health ----------
   app.get('/healthz', async (_req, reply) => {
@@ -267,6 +287,10 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.post('/api/me/push/enable', authed(({ tx, user, now, req }) => push.enable(tx, user.userId, body(req).subscription as never, String(req.headers['user-agent'] ?? ''), now)));
   app.post('/api/me/push/disable', authed(({ tx, user, now }) => push.disable(tx, user.userId, now)));
   app.get('/api/me/notification-prefs', authed(({ tx, user }) => notifPrefs.myPrefs(tx, user.userId)));
+  app.get('/api/me/sync-key', authed(({ tx, user }) => healthSync.syncStatus(tx, user.userId)));
+  app.post('/api/me/sync-key', authed(({ tx, user, now }) => healthSync.createKey(tx, user.userId, now)));
+  app.post('/api/me/sync-key/revoke', authed(({ tx, user, now }) => healthSync.revokeKey(tx, user.userId, now)));
+  app.post('/api/participants/:participantId/health-sync/doubt', authed(({ tx, user, now, req }) => healthSync.doubtSync(tx, user.userId, Number((req.params as { participantId: string }).participantId), body(req), now)));
   app.put('/api/me/notification-prefs', authed(({ tx, user, now, req }) => notifPrefs.setPrefs(tx, user.userId, body(req), now)));
   app.post('/api/me/push/test', authed(async ({ tx, user, now }) =>
     push.sendTest(tx, pushSender ?? push.webPushSender(await push.vapidKeys(tx, vapidSubject)), user.userId, now)));

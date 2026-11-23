@@ -1,0 +1,191 @@
+// The Help content: every feature, who it's for, how to use it, with examples. Plain text (with **bold**) so the
+// Help page can search all of it. Keep in step with the app and docs/RULE_DECISIONS.md when features change.
+// Numbers quoted for Calamari are its settings as of 21 Nov 2026; each challenge's Rules tab is the source of truth.
+
+export type Audience = 'everyone' | 'admin' | 'finance' | 'super';
+export type Block = string | { list: string[] } | { steps: string[] } | { example: string[]; title?: string } | { tip: string };
+export interface Topic { id: string; group: string; audience: Audience[]; title: string; keywords?: string; body: Block[] }
+
+export const GROUPS = ['Getting started', 'Daily check-in', 'Points & progress', 'Money', 'Community & profile', 'For admins', 'For the finance manager', 'For Super Admins'];
+
+export const TOPICS: Topic[] = [
+  // ---------- Getting started ----------
+  { id: 'sign-in', group: 'Getting started', audience: ['everyone'], title: 'Signing in and your password', keywords: 'login password temporary account forgot',
+    body: [
+      'An admin creates your account and gives you a **username** and a **temporary password**. At your first sign-in you choose your own password (at least 10 characters).',
+      'Change it any time: **Profile → Change password**. Forgot it? Ask an admin to reset it - you get a new temporary password.',
+      { tip: 'After 5 wrong attempts sign-in is paused for 15 minutes for that username - just wait, or ask an admin.' },
+    ] },
+  { id: 'install', group: 'Getting started', audience: ['everyone'], title: 'Installing the app on your phone', keywords: 'home screen pwa iphone android install',
+    body: [
+      'Fitness is a web app you add to your Home Screen - no app store needed.',
+      { steps: ['**iPhone:** open the link in **Safari** → tap **Share** → **Add to Home Screen** → open Fitness from the icon.',
+        '**Android:** open the link in **Chrome** → tap **Install app** (or ⋮ → Add to Home screen).'] },
+      { tip: 'On iPhone, phone notifications only work in the installed app, not in Safari.' },
+    ] },
+  { id: 'notifications', group: 'Getting started', audience: ['everyone'], title: 'Phone notifications and Alerts', keywords: 'push notification alerts badge quiet hours test',
+    body: [
+      '**Alerts** (bottom bar) lists what needs your attention: today\'s check-in, payments due, votes, announcements, the coach\'s weekly summary. Opening an alert marks just that one as read; **Mark all as read** clears them all.',
+      'To get them on your phone: **Profile → Phone notifications → Turn on**, allow it when the phone asks, then **Send a test**. **Turn off** stops them on all your phones.',
+      { list: ['**Quiet hours:** nothing is sent between **11 pm and 7 am**; alerts wait and arrive at 7 if still unread.',
+        'The lock screen shows only a short title, never your details.',
+        'The plain "today\'s check-in" alert stays in the app; the coach\'s **evening nudge** (8 pm if your steps aren\'t in) is what reaches your phone.'] },
+    ] },
+
+  // ---------- Daily check-in ----------
+  { id: 'upload', group: 'Daily check-in', audience: ['everyone'], title: 'Uploading today\'s screenshot', keywords: 'screenshot upload steps evidence deadline midnight date total today',
+    body: [
+      'Each day, upload a screenshot of your step total **before midnight** (India time): **Challenges → Calamari → Today → Upload today\'s screenshot**. Evidence counts only for the day it is uploaded.',
+      'The app reads the number and date automatically. A clear screenshot of **today\'s date** that reaches the target is approved at once; anything unclear goes to an admin.',
+      { tip: 'Use a screen that shows the **date** under the total. iPhone: **Health → Steps → D** (or Fitness → Step Count). A card that shows only a time (like "21:54") can\'t be dated, so an admin has to check it.' },
+      { example: ['"TOTAL 9,120 · 22 Nov 2026" uploaded on 22 Nov → approved automatically (target 7,000).',
+        'A screenshot dated 17 Nov uploaded on 22 Nov → sent to an admin ("date mismatch").',
+        '"Daily average 6,850" (a week view) → never counted as a day; sent to an admin.'], title: 'Examples' },
+      'Changed your mind? Until midnight you can upload a better one (it replaces the last) - or remove it (see **Removing a screenshot**).',
+    ] },
+  { id: 'several', group: 'Daily check-in', audience: ['everyone'], title: 'Several screenshots a day (if your challenge allows it)', keywords: 'multiple screenshots add up highest phone watch total in progress',
+    body: [
+      'If **Settings → Evidence → Allow several screenshots a day** is on, each upload is added to the day instead of replacing the last. Each one is checked on its own; your Today card lists them with the total.',
+      { list: ['**Add them up** - for different devices (phone + watch).', '**Use the highest** - for one app\'s running total during the day.'] },
+      'The day is **met** as soon as the approved total reaches the target; otherwise it shows **In progress** until midnight, then it is decided.',
+      { example: ['Add them up: phone 1,000 + watch 6,500 = **7,500** → met.', 'Use the highest: 3,000 at noon and 7,400 at night from the same app → **7,400**, not 10,400.'], title: 'Examples' },
+      { tip: 'The same picture can\'t be added twice in a day. Up to 10 screenshots a day.' },
+    ] },
+  { id: 'remove', group: 'Daily check-in', audience: ['everyone', 'admin'], title: 'Removing a screenshot', keywords: 'delete undo remove withdraw private photo erase wrong photo',
+    body: [
+      '**Until that day\'s midnight:** tap **Remove** next to your screenshot (Today card, or the day in the calendar). The day goes back to "not sent" and you can upload another.',
+      '**After midnight** the day is decided, so tap **Ask to remove**, give a reason, and an admin decides in **Review → Requests to remove screenshots**. If approved, points and fines are recalculated.',
+      '**Private photo by mistake?** Tick "It\'s a private photo" - an admin then erases the image permanently (the record that a screenshot existed stays).',
+      { example: ['Uploaded a gallery photo at 9 pm → Remove → upload the right one before midnight.', 'Noticed the next morning → Ask to remove: "Wrong photo, it\'s my friend\'s phone" → an admin approves → that day counts as missed (unless corrected with the right evidence).'], title: 'Examples' },
+    ] },
+  { id: 'rest-days', group: 'Daily check-in', audience: ['everyone'], title: 'Rest days', keywords: 'rest day break holiday 10 am cancel weekly allowance',
+    body: [
+      'Calamari allows **1 rest day per week** and **6 in total**, declared **before 10:00** on the day (or planned ahead). A rest day costs nothing: no fine, no points, it doesn\'t break your streak and doesn\'t count against your adherence.',
+      { steps: ['Today: **Today → Take today as a rest day** (before 10:00).', 'Another day: **Today → Plan a rest day** (above the calendar).', 'Cancel it before its 10:00 cut-off if you change your mind.'] },
+      { tip: 'A day that already has a screenshot can\'t become a rest day.' },
+    ] },
+  { id: 'exemptions', group: 'Daily check-in', audience: ['everyone', 'admin'], title: 'Sick-day / emergency exemptions', keywords: 'exemption sick emergency vote illness travel excused',
+    body: [
+      'For illness or an emergency: **Exemptions → Request**, choose the day(s), give a reason and optional evidence.',
+      'Depending on the challenge, other participants **vote** or an admin decides; a tie goes to an admin. An approved exemption means: no fine, no points, the days don\'t count against adherence, your streak pauses, and it doesn\'t use a rest day.',
+      { tip: 'Admins can override a decision with a reason; everything is recorded.' },
+    ] },
+  { id: 'appeal', group: 'Daily check-in', audience: ['everyone'], title: 'Asking an admin to look again (appeal)', keywords: 'appeal declined rejected below target look again',
+    body: ['If a screenshot was declined or counted below target, open that day in the **calendar** → **Ask an admin to look again**, and say why. One appeal per decision; it returns to the admins\' Review queue.'] },
+
+  // ---------- Points & progress ----------
+  { id: 'points', group: 'Points & progress', audience: ['everyone'], title: 'Points, streaks and penalties (Calamari)', keywords: 'points streak penalty miss comeback team bonus weekend score',
+    body: [
+      'Points are worked out by the app from your days - nobody types them in. Calamari:',
+      { list: ['**+10** for each successful day (7,000+ steps).', '**−15** for each missed day.',
+        '**+20** at a 7, 14, 21, 28 and 35-day personal streak.', '**+10** comeback: 3 good days in a row after 2+ misses (up to 3 times).',
+        '**+10** team streak every 8 days the whole team succeeds.', '**+10** weekend bonus activity (once per weekend).'] },
+      'Rest days and approved exemptions pause streaks rather than breaking them. The **Rules** tab always shows the exact numbers for your challenge.',
+      { example: ['Mon ✓ Tue ✓ Wed ✗ Thu ✓ → +10 +10 −15 +10 = **+15**, streak 1.'], title: 'Example' },
+    ] },
+  { id: 'leaderboard', group: 'Points & progress', audience: ['everyone'], title: 'Leaderboard and prizes', keywords: 'leaderboard rank prize adherence 80% top three qualify tie',
+    body: [
+      'Ranking: points, then adherence, successful days, longest streak, then who got there first. Tap a name to see what that person shares.',
+      '**Adherence** = successful days ÷ days that counted (rest days and exemptions don\'t count). Calamari\'s prize line is **80%**.',
+      { list: ['**70%** of the prize pool is shared **equally** by everyone at 80% or above.', '**30%** goes to the top three: **50% / 30% / 20%**. Someone below 80% can\'t take a top-three place - the next eligible person moves up.'] },
+      { example: ['Prize pool ₹20,000: ₹14,000 shared by 10 qualifiers = ₹1,400 each; top three get ₹3,000 / ₹1,800 / ₹1,200 on top.'], title: 'Example' },
+    ] },
+  { id: 'coach', group: 'Points & progress', audience: ['everyone'], title: 'Your coach', keywords: 'coach weekly summary nudge aim',
+    body: ['After each week you get a short summary on the Today tab (and an alert): days done, compared with last week, steps, streak, adherence vs the prize line, points, and one realistic aim. If your steps aren\'t in by the evening (Calamari: 8 pm) you get a personal nudge. Admins can switch parts off in **Settings → Coach**.'] },
+  { id: 'today-tab', group: 'Points & progress', audience: ['everyone'], title: 'The Today tab', keywords: 'today card calendar my money rings collapsible',
+    body: ['Today\'s card (upload, status, deadline), **My money** (your share of the pot, this week\'s fine pool, the prize pool), your numbers, **Your coach**, points, the rest-day planner and the calendar. Tap a section title to fold it away - it stays folded on this phone. Tap a calendar day for its details.'] },
+
+  // ---------- Money ----------
+  { id: 'paying', group: 'Money', audience: ['everyone'], title: 'Paying your weekly contribution', keywords: 'pay upi utr qr contribution weekly due overdue',
+    body: [
+      'Calamari is **₹1,000 a week**: ₹400 to the prize pool and ₹600 into your own fine pool. Due on **Sunday**; after a 2-day grace it shows as overdue (it never affects points).',
+      { steps: ['**Money** tab → scan the QR or use the UPI ID shown.', 'Pay in your UPI app, then tap **I\'ve paid this week** and enter the **UTR / reference** and date.', 'The finance manager confirms it; the week turns **Paid**.'] },
+      { tip: 'Paid more than needed? The extra counts towards your next weeks automatically.' },
+    ] },
+  { id: 'fine-pool', group: 'Money', audience: ['everyone', 'finance'], title: 'Fines and the fine pool (carry-over)', keywords: 'fine pool carry forward refund top up 700 600 miss',
+    body: [
+      'Each missed day moves **₹100** from your fine pool to the prize pool (never more than is in your pool that week). With **Carried to next week** (Calamari), what\'s left in your fine pool stays yours and you only pay the top-up next week. After the last week, what\'s left is refunded.',
+      { example: ['Week 1: no misses → ₹600 left → week 2 you pay **₹400**.', 'Week 1: 3 misses (₹300 to the prize pool) → ₹300 left → week 2 you pay ₹400 + ₹300 = **₹700**.', 'Week 1: 7 misses → pool empty → week 2 you pay the full **₹1,000**.'], title: 'Examples' },
+      'The Money tab shows each week: contribution, what was carried over, fines and what\'s left.',
+    ] },
+
+  // ---------- Community & profile ----------
+  { id: 'community', group: 'Community & profile', audience: ['everyone', 'admin'], title: 'Community feed', keywords: 'post comment reaction announcement report moderation mute pin achievement',
+    body: [
+      'Each challenge has its own feed: posts with photos, reactions, comments and replies, and announcements from admins (pinned). **Share an achievement** posts a streak or comeback straight from your points.',
+      'Something wrong? **⋯ → Report**. Admins can pin, remove (with a reason - the author is told why and can delete it) or mute someone for a few days.',
+    ] },
+  { id: 'profile', group: 'Community & profile', audience: ['everyone'], title: 'Your profile and privacy', keywords: 'profile photo privacy visibility mobile email',
+    body: ['**Profile**: photo (crop and zoom), name, mobile, email and more - each with its own "who can see it": only me, my challenge members, or everyone in the app. Tap someone\'s name to see what they share.', 'Read the full **Privacy policy** from the sign-in screen or Profile.'] },
+  { id: 'health', group: 'Community & profile', audience: ['everyone', 'super'], title: 'Health profile', keywords: 'health weight height bmi consent share private support access',
+    body: [
+      'Optional: **Profile → Health profile**. Nothing is stored until you give consent. Record height, weight (BMI is worked out), waist, body fat and resting heart rate as dated entries with progress charts; set goals and fitness level.',
+      'Everything is **private by default**. Choose per item: only me, my challenge admins, my challenge members, or everyone. Super Admins and the finance manager see nothing unless you share it or grant **support access** (1-72 hours, every view logged).',
+      'You can withdraw consent or **delete all** your health data at any time.',
+    ] },
+
+  // ---------- For admins ----------
+  { id: 'admins-tab', group: 'For admins', audience: ['admin'], title: 'Admins and the finance manager', keywords: 'admin role two admins finance manager handover appoint',
+    body: [
+      '**Calamari → Admins.** A challenge needs **at least 2 admins** (so nothing depends on one person); any admin can add more. One admin\'s money requests are approved by another.',
+      'There is exactly **one finance manager**. To change it, an admin starts a **handover**: the checks show the money held and anything pending; the new manager confirms the amount received and that the accounts are settled, then enters their own UPI/QR.',
+    ] },
+  { id: 'people-roster', group: 'For admins', audience: ['admin'], title: 'Accounts, roster and invitations', keywords: 'people account create invite roster participant join mobile',
+    body: [
+      '**People** (bottom bar): create accounts with a username and the person\'s **mobile number** (needed for WhatsApp reminders). Share the temporary password shown once.',
+      '**Calamari → Roster → Invite** adds people to the challenge; they accept the rules in the app to join.',
+    ] },
+  { id: 'review', group: 'For admins', audience: ['admin'], title: 'Reviewing screenshots (Approve / Decline)', keywords: 'review approve decline flags date mismatch below target queue',
+    body: [
+      '**Calamari → Review** lists screenshots the app couldn\'t approve on its own, with what it read and why (flags). Check the photo, correct the number if needed, then **Approve** or **Decline** (a reason is required). The app decides met or missed from the approved number.',
+      { list: ['**Date mismatch** - the screenshot shows another day.', '**Date not visible** - e.g. only a time like "21:54".', '**Weekly or average** - a week view or a daily average, not one day\'s total.', '**Duplicate image** - the same picture was used before.', '**Low confidence / unreadable** - hard to read.'] },
+      'You can\'t review your own screenshots. **Requests to remove screenshots** also appear here (approve, optionally erasing a private photo, or decline with a note).',
+      { tip: 'Tap a screenshot to open it full-screen; ✕ or Back closes it. Each card folds away.' },
+    ] },
+  { id: 'correct', group: 'For admins', audience: ['admin'], title: 'Correct (record evidence or a rest day for someone)', keywords: 'correct correction whatsapp record evidence rest day original time admin',
+    body: [
+      'For evidence or a rest day that reached you another way (e.g. **WhatsApp**), recorded with its **original time**. **Calamari → Team → Correct** next to the person (never on your own row - another admin corrects your days).',
+      { steps: ['**Record evidence:** pick the challenge day, enter when it was **originally sent** (it must be on that day, before midnight), attach the screenshot and a reason.',
+        '**Record rest day:** pick the day, optionally when they declared it, and a reason. Weekly and total limits still apply; a time after 10:00 is allowed but marked "after the cut-off".'] },
+      'Evidence is then checked like any upload (approved automatically, or it lands in Review). Points, streaks, fines and the race track update within a minute. Everything is in the activity log.',
+      { example: ['Priya sent her screenshot on the WhatsApp group at **9:40 pm on 23 Nov** because the app wouldn\'t load → Correct → Record evidence → day 23 Nov, sent at 23 Nov 21:40, reason "Sent on WhatsApp group, app was down".',
+        'Ravi messaged "rest day today" at 8:15 am on 24 Nov → Correct → Record rest day → 24 Nov, declared 08:15, reason "Declared on WhatsApp".'], title: 'Examples' },
+      { tip: 'A screenshot sent on 24 Nov can\'t count for 23 Nov - evidence only counts for the day it was sent.' },
+    ] },
+  { id: 'team-tab', group: 'For admins', audience: ['admin'], title: 'Team tab: race track, who needs a hand, WhatsApp reminders', keywords: 'team race track whatsapp reminder at risk nudge group message',
+    body: [
+      '**🏁 The race:** each face moves one step per successful day; 🏁 is the last day; the dashed line is where someone hitting every day would be now. Hover or tap a face for days, streak, points, adherence and today\'s status.',
+      '**🤝 Who might need a hand:** people with 2+ misses in a row or below the prize line, with a **Check in** button (a friendly WhatsApp message).',
+      '**WhatsApp reminders:** who hasn\'t sent today\'s steps, with **📲 Remind** (opens WhatsApp to that person with an editable message) or **Message the group**. Messages go from your own WhatsApp; the row then shows "Reminded … by …" so admins don\'t repeat each other.',
+    ] },
+  { id: 'bonus', group: 'For admins', audience: ['admin', 'everyone'], title: 'Weekend bonus activities', keywords: 'bonus weekend activity extra points',
+    body: ['Admins set up an activity for a weekend in the **Bonus** tab (title, what to send). Participants submit a photo that weekend; an admin approves it for the bonus points (Calamari: +10, once per weekend).'] },
+  { id: 'settings', group: 'For admins', audience: ['admin', 'super'], title: 'Settings (rules) and how changes apply', keywords: 'settings rules version change evidence verification rest days scoring coach community money prizes',
+    body: [
+      '**Calamari → Settings** holds every rule: basics, activity and target, **evidence** (instructions; several screenshots a day), verification, rest days, exemptions, scoring, **coach**, community, money and prizes.',
+      'Once a challenge has started, saving creates a **new rules version** from a date you choose; days already played keep their rules. A reason is required.',
+      { list: ['**Weeks start on** is locked once the challenge starts (it would reshuffle weeks, money and rest days).', '**Money** and **Prizes** can only be changed by a Super Admin.', 'Heads-ups about unfinished settings appear in Alerts.'] },
+      { example: ['Turning on "Allow several screenshots a day → Add them up" before the start applies from day 1; turning it on mid-challenge applies from the date you pick.'], title: 'Example' },
+    ] },
+
+  // ---------- For the finance manager ----------
+  { id: 'payments-admin', group: 'For the finance manager', audience: ['finance', 'admin'], title: 'Confirming payments, two-person rule and refunds', keywords: 'confirm payment utr finance two person refund record on behalf cash',
+    body: [
+      '**Money** tab (finance view): payments reported with their UTR wait for you to **Confirm** or **Reject** (with a reason) after checking your bank / UPI app.',
+      'A payment an admin **records on someone\'s behalf** (e.g. cash) must be confirmed by **another** admin. Refunds are proposed by one person and approved by a **different** admin - never by the person who proposed them.',
+      'The **checks** at the bottom must all be green - they prove the books balance.',
+      { tip: 'Payment details (UPI ID, QR) are set by the finance manager in the Money tab.' },
+    ] },
+  { id: 'results', group: 'For the finance manager', audience: ['finance', 'admin', 'super'], title: 'Results, prizes and payouts', keywords: 'results settlement payout prize tie publish approve',
+    body: ['After the last day, **Results** shows what is still blocking (reviews, payments), then the recommended prize split. Ties are never decided silently - a choice is made and recorded (splitting equally is recommended). The finance manager prepares it; a **Super Admin approves and publishes** the results; payouts are then recorded, with anything a person still owes set off automatically.'] },
+
+  // ---------- For Super Admins ----------
+  { id: 'activity-log', group: 'For Super Admins', audience: ['super'], title: 'Activity log and errors', keywords: 'activity log audit who did what errors csv sign in',
+    body: ['**People → 📜 Activity log**: every action - who, what, when, which challenge, reason, before → after, device and IP - including sign-ins and failed sign-ins. Filter by person, challenge, action, dates or search; **Download CSV**. **Errors** shows anything that broke on the server. Entries can\'t be edited or deleted.'] },
+  { id: 'backups', group: 'For Super Admins', audience: ['super'], title: 'Backups', keywords: 'backup restore offsite google drive encrypted',
+    body: ['Every night at 03:15 the database and photos are backed up on the server and an **encrypted** copy goes to Google Drive (30 daily, 12 weekly, 12 monthly). Every Sunday a restore test proves a backup can be opened. Keep the two encryption passwords in your password manager - without them the Drive copies can\'t be opened.'] },
+];
+
+/** All the words of a topic, for search. */
+export const topicText = (t: Topic): string => [t.title, t.keywords ?? '', t.group, ...t.body.flatMap((b) =>
+  typeof b === 'string' ? [b] : 'list' in b ? b.list : 'steps' in b ? b.steps : 'example' in b ? [b.title ?? '', ...b.example] : [b.tip])].join(' ').replace(/\*\*/g, '');

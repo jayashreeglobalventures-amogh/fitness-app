@@ -14,6 +14,7 @@ import { CommunityPage } from './pages/Community';
 import { ActivityLogPage } from './pages/ActivityLog';
 import { HealthPage } from './pages/Health';
 import { PersonPage } from './pages/Person';
+import { HelpPage } from './pages/Help';
 import { navigate, usePath } from './router';
 import { Avatar } from './ui';
 
@@ -57,6 +58,7 @@ export function App() {
       <header className="topbar">
         <div className="brand"><span className="brand-dot" aria-hidden="true" />Fitness</div>
         <div className="row" style={{ gap: 8 }}>
+          <button className="btn ghost small help-btn" onClick={() => navigate('/help')} aria-label="Help" title="Help">?</button>
           <button className="btn ghost small" style={{ padding: 2, minHeight: 0, borderRadius: '50%' }} onClick={() => navigate('/profile')} aria-label="My profile"><Avatar fileId={me.photoFileId} name={me.displayName} size={32} /></button>
           <button className="btn ghost small" onClick={signOut}>Sign out</button>
         </div>
@@ -87,6 +89,7 @@ function route(path: string, me: Me, refresh: () => void): ReactNode {
   if (path === '/profile') return <ProfilePage onChanged={refresh} />;
   if (path === '/profile/password') return <ChangePasswordPage onDone={() => navigate('/profile')} />;
   if (path === '/profile/health') return <HealthPage />;
+  if (path === '/help') return <HelpPage me={me} />;
   const pp = /^\/people\/(\d+)$/.exec(path);
   if (pp) return <PersonPage userId={Number(pp[1])} />;
   if (path === '/admin/users' && me.canManageAccounts) return <AccountsPage me={me} />;

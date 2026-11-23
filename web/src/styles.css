@@ -249,3 +249,18 @@ button.linklike:hover { text-decoration: underline; }
 .race-tip { position: absolute; bottom: calc(100% + 6px); width: 180px; z-index: 10; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.5;
   background: var(--surface); border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / .35); pointer-events: none; }
 .race-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+
+/* Help */
+.help-btn { width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 50%; font-weight: 800; font-size: 16px; }
+.help-search { position: sticky; top: var(--topbar-h); z-index: 3; background: var(--bg); padding: 6px 0; }
+.help-search input { width: 100%; font-size: 16px; padding: 12px 14px; }
+.help-group h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 20px 0 8px; }
+.help-topic { scroll-margin-top: calc(var(--topbar-h) + 70px); }
+.help-body { margin-top: 10px; font-size: 15px; }
+.help-body p { margin: 0 0 8px; }
+.help-body ul, .help-body ol { margin: 0 0 8px; padding-left: 20px; }
+.help-body li { margin: 3px 0; }
+.help-example { border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.help-example ul { margin: 4px 0 0; }
+.help-tip { background: color-mix(in srgb, var(--info) 10%, var(--surface-2)); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
+mark { background: color-mix(in srgb, var(--warn) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }

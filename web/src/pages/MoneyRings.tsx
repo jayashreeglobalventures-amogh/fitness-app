@@ -7,7 +7,7 @@ interface MyMoney {
   weeks: { periodNo: number; startsOn: string; endsOn: string; finePool: number; fines: number; finePoolLeft: number; paid: number; creditUsed: number; status: string }[];
   payments: { amount: number; status: string }[];
   pools: { collected: number };
-  prizePool?: { total: number; fromContributions: number; fromFines: number };
+  prizePool?: { total: number; fromContributions: number; fromFines: number; allWeeks?: { total: number } };
   today: string;
 }
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
@@ -62,10 +62,10 @@ export function MoneyRings({ challengeId }: { challengeId: number }) {
         <div className="ring-row">
           <Ring part={d.prizePool.fromFines} whole={d.prizePool.total} label={`Prize pool ${inr(d.prizePool.total)}: ${inr(d.prizePool.fromFines)} from fines, ${inr(d.prizePool.fromContributions)} from weekly contributions`} />
           <div className="small">
-            <b>Prize pool</b>
+            <b>Prize pool so far</b>
             <div><span className="dot" style={{ background: 'var(--ring-rest)' }} /> Weekly ₹ shares: {inr(d.prizePool.fromContributions)}</div>
             <div><span className="dot" style={{ background: 'var(--accent)' }} /> From misses (fines): {inr(d.prizePool.fromFines)}</div>
-            <div className="muted">Total: {inr(d.prizePool.total)} (all weeks)</div>
+            <div className="muted">Collected: {inr(d.prizePool.total)}{d.prizePool.allWeeks ? ` of ${inr(d.prizePool.allWeeks.total)} for all weeks` : ''}</div>
           </div>
         </div>
       )}

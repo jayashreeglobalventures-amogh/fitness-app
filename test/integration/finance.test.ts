@@ -78,6 +78,10 @@ describe('contributions, payments and fines (Calamari)', () => {
     expect(m.weeks[0]).toMatchObject({ status: 'PAID', paid: 1000 });
     expect(m.owed).toBe(4714);
     expect(m.pools.collected).toBe(1000);
+    // What has actually come in: Asha's ₹400 prize share (Ben's week 1 is not confirmed yet).
+    expect(m.soFar).toMatchObject({ prizePool: 400, fromFines: 0, inFinePools: 600 });
+    expect(m.dueNow).toBe(0);
+    expect((await fin()).participants.find((p: { displayName: string }) => p.displayName === 'ben').dueNow).toBe(1000);
   });
 
   it('rejecting needs a reason; the UTR can then be used again', async () => {
@@ -95,6 +99,8 @@ describe('contributions, payments and fines (Calamari)', () => {
     const b = await mine(ben);
     expect(b.weeks[0]).toMatchObject({ fines: 100, finePoolLeft: 500 });
     expect(b.pools.prizePool).toBe(2 * 2286 + 100); // both owe all weeks' prize share + Ben's fine
+    expect(b.soFar.prizePool).toBe(400); // Ben hasn't paid, so his fine is not real money yet
+    expect(b.prizePool).toMatchObject({ total: 400, allWeeks: { total: 2 * 2286 + 100 } });
     await walk(asha, '2026-11-24');
   });
 

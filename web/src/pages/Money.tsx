@@ -12,7 +12,9 @@ interface Week {
 }
 interface Payment { paymentId: number; periodNo: number; amount: number; method: string; utr: string | null; paidOn: string; status: string; decisionReason: string | null; proofFileId: number | null }
 interface Pools { prizePool: number; yearEndPool: number; collected: number; stillOwed: number; refundsDue: number; inFinePools: number; prizesDue: number }
-interface MyMoney { weeks: Week[]; owed: number; refundDue: number; payments: Payment[]; pools: Pools; today: string }
+/** Money actually received so far (confirmed payments) - the ledger pools count every week of the challenge up front. */
+interface SoFar { prizePool: number; fromFines: number; fromContributions: number; inFinePools: number; dueNow: number }
+interface MyMoney { weeks: Week[]; owed: number; dueNow: number; refundDue: number; payments: Payment[]; pools: Pools; soFar: SoFar; today: string }
 interface Settings { upiId: string | null; payeeName: string | null; qrFileId: number | null; canEdit: boolean; needsUpdate: boolean }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -54,9 +56,9 @@ function MyMoneyView({ v }: { v: ChallengeView }) {
   return (
     <>
       <div className="stats" style={{ marginBottom: 12 }}>
-        <div className="stat"><span>Still to pay (all weeks)</span><b>{inr(d.owed)}</b></div>
+        <div className="stat"><span>To pay now</span><b>{inr(d.dueNow)}</b><span className="muted">{inr(d.owed)} for all weeks</span></div>
         <div className="stat"><span>Owed back to you</span><b>{inr(d.refundDue)}</b></div>
-        <div className="stat"><span>Prize pool</span><b>{inr(d.pools.prizePool)}</b></div>
+        <div className="stat"><span>Prize pool so far</span><b>{inr(d.soFar.prizePool)}</b><span className="muted">{inr(d.pools.prizePool)} once every week is paid</span></div>
       </div>
       {next && <PayNow v={v} week={next} onReported={m.reload} />}
       <h2>Week by week</h2>
@@ -180,8 +182,8 @@ function PaymentDetails({ v, onSaved }: { v: ChallengeView; onSaved?: () => void
 // ---------------- finance ----------------
 
 interface Overview {
-  pools: Pools; checks: { name: string; ok: boolean }[]; today: string; periods: { periodNo: number; startsOn: string; endsOn: string }[];
-  participants: { participantId: number; displayName: string; status: string; isMe?: boolean; owed: number; refundDue: number; paid: number; fines: number; overdueWeeks: number[]; checking: number[] }[];
+  pools: Pools; soFar: SoFar; checks: { name: string; ok: boolean }[]; today: string; periods: { periodNo: number; startsOn: string; endsOn: string }[];
+  participants: { participantId: number; displayName: string; status: string; isMe?: boolean; owed: number; dueNow: number; refundDue: number; paid: number; fines: number; overdueWeeks: number[]; checking: number[] }[];
   payments: (Payment & { participantId: number; displayName: string; mine: boolean; note: string | null; recordedByAdmin: boolean; recordedByMe: boolean; byAdminForSelf: boolean })[];
   refunds: { refundId: number; participantId: number; displayName: string; amount: number; reason: string; status: string; proposedBy: number; decisionReason: string | null }[];
   canConfirm: boolean; canCountersign: boolean; canProposeRefund: boolean; canApproveRefund: boolean;
@@ -201,17 +203,17 @@ function FinanceView({ v }: { v: ChallengeView }) {
   return (
     <>
       <div className="stats" style={{ marginBottom: 12 }}>
-        <div className="stat"><span>Prize pool</span><b>{inr(d.pools.prizePool)}</b></div>
+        <div className="stat"><span>Prize pool so far</span><b>{inr(d.soFar.prizePool)}</b><span className="muted">{inr(d.pools.prizePool)} once every week is paid</span></div>
         {d.pools.yearEndPool > 0 && <div className="stat"><span>Year-end pool</span><b>{inr(d.pools.yearEndPool)}</b></div>}
         <div className="stat"><span>Held (received − paid out)</span><b>{inr(d.pools.collected)}</b></div>
-        <div className="stat"><span>Still owed to us</span><b>{inr(d.pools.stillOwed)}</b></div>
+        <div className="stat"><span>Due now, not paid</span><b>{inr(d.soFar.dueNow)}</b><span className="muted">{inr(d.pools.stillOwed)} for all weeks</span></div>
         <div className="stat"><span>Refunds owed</span><b>{inr(d.pools.refundsDue)}</b></div>
         {d.pools.prizesDue > 0 && <div className="stat"><span>Prizes owed</span><b>{inr(d.pools.prizesDue)}</b></div>}
-        <div className="stat"><span>In fine pools</span><b>{inr(d.pools.inFinePools)}</b></div>
+        <div className="stat"><span>In fine pools so far</span><b>{inr(d.soFar.inFinePools)}</b><span className="muted">{inr(d.pools.inFinePools)} once every week is paid</span></div>
       </div>
       <details className="card"><summary>Reconciliation: {allOk ? '✅ all checks pass' : '⚠️ needs attention'}</summary>
         <ul>{d.checks.map((c) => <li key={c.name} className="small">{c.ok ? '✅' : '❌'} {c.name}</li>)}</ul>
-        <p className="muted small">"Still owed" counts every week of the challenge, including weeks not due yet.</p>
+        <p className="muted small">The big figures are money actually received (confirmed payments). The small "all weeks" figures, and these checks, count every week of the challenge, including weeks not due yet.</p>
       </details>
       <ErrorBox error={error} />
 
@@ -235,13 +237,13 @@ function FinanceView({ v }: { v: ChallengeView }) {
 
       <h2>Everyone</h2>
       <div className="card table-wrap"><table>
-        <thead><tr><th>Name</th><th>Paid</th><th>Fines</th><th>Owed back</th><th /></tr></thead>
+        <thead><tr><th>Name</th><th>Due now</th><th>Paid</th><th>Fines</th><th>Owed back</th><th /></tr></thead>
         <tbody>{d.participants.map((p) => (
           <tr key={p.participantId}>
             <td><b>{p.displayName}</b>{p.overdueWeeks.length > 0 && <div><span className="badge danger">overdue: week {p.overdueWeeks.join(', ')}</span></div>}
               {p.checking.length > 0 && <div><span className="badge info">checking: week {p.checking.join(', ')}</span></div>}
               {p.status !== 'ACTIVE' && <div><span className="badge warn">{p.status.toLowerCase()}</span></div>}</td>
-            <td>{inr(p.paid)}</td><td>{inr(p.fines)}</td><td>{inr(p.refundDue)}</td>
+            <td>{p.dueNow > 0 ? <b>{inr(p.dueNow)}</b> : inr(0)}</td><td>{inr(p.paid)}</td><td>{inr(p.fines)}</td><td>{inr(p.refundDue)}</td>
             <td><div className="row" style={{ gap: 4 }}>
               {d.canConfirm && <button className="btn small ghost" onClick={() => setAct({ kind: 'record', participantId: p.participantId })}>Record payment</button>}
               {d.canProposeRefund && <button className="btn small ghost" onClick={() => setAct({ kind: 'refund', participantId: p.participantId })}>Refund</button>}

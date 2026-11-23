@@ -3,7 +3,11 @@
 // Ties that touch a prize place are never resolved silently: they come back as decisions an admin must make.
 import type { ChallengeConfig } from '../challenges/config.js';
 
-export interface StandingIn { participantId: number; displayName: string; rank: number; tied: boolean; points: number; adherencePct: number | null; eligible: boolean }
+export interface StandingIn {
+  participantId: number; displayName: string; rank: number; tied: boolean; points: number; adherencePct: number | null; eligible: boolean;
+  /** Days of the challenge this person took part in, and the challenge's days (for pro-rata prizes); absent = all. */
+  daysIn?: number; daysTotal?: number;
+}
 export type TieResolution = { resolution: 'SPLIT_EQUALLY' } | { resolution: 'MANUAL_ORDER'; order: number[] };
 export interface TieDecision { groupKey: string; reason: string; decision: TieResolution }
 
@@ -52,7 +56,14 @@ export function allocatePrizes(standings: StandingIn[], pool: number, prizes: Ch
     const money = prizePlaces.reduce((a, p) => a + placeMoney[p - 1]!, 0);
     const give = (s: StandingIn, amount: number, at: number) => {
       if (!s.eligible) { qualificationPool += amount; notes.push(`${s.displayName} (place ${at}) is not eligible: that place's ${rs(amount)} joins the qualification pool.`); return; }
-      const a = alloc.get(s.participantId)!; a.topThree += amount; a.place = at;
+      let paid = amount;
+      if (prizes.proRataByDays && s.daysIn !== undefined && s.daysTotal && s.daysIn < s.daysTotal) {
+        // Late joiner: the place's money in proportion to the days they took part; the rest joins the qualifiers' pool.
+        paid = Math.floor((amount * s.daysIn) / s.daysTotal);
+        qualificationPool += amount - paid;
+        notes.push(`${s.displayName} took part ${s.daysIn} of ${s.daysTotal} days: place ${at} pays ${rs(paid)} of ${rs(amount)}; ${rs(amount - paid)} joins the qualification pool.`);
+      }
+      const a = alloc.get(s.participantId)!; a.topThree += paid; a.place = at;
     };
     if (g.length === 1) give(g[0]!, money, place);
     else {
@@ -94,7 +105,12 @@ export function allocatePrizes(standings: StandingIn[], pool: number, prizes: Ch
   } else {
     const byPoints = prizes.distribution === 'PROPORTIONAL' && qualifiers.some((s) => s.points > 0);
     if (prizes.distribution === 'PROPORTIONAL' && !byPoints) notes.push('No qualifier has positive points, so the qualification pool is shared equally.');
-    split(qualificationPool, qualifiers.map((s) => (byPoints ? Math.max(0, s.points) : 1))).forEach((amt, i) => { alloc.get(qualifiers[i]!.participantId)!.qualification += amt; });
+    // Pro-rata: each share is also weighted by the days the person took part (a full-challenge person = a full share).
+    const days = (s: StandingIn) => (prizes.proRataByDays && s.daysIn !== undefined && s.daysTotal ? s.daysIn : 1);
+    if (prizes.proRataByDays && qualifiers.some((s) => s.daysIn !== undefined && s.daysTotal && s.daysIn < s.daysTotal)) {
+      notes.push(`Late joiners share the qualification pool in proportion to the days they took part: ${qualifiers.filter((s) => s.daysIn !== undefined && s.daysTotal && s.daysIn < s.daysTotal).map((s) => `${s.displayName} ${s.daysIn}/${s.daysTotal} days`).join(', ')}.`);
+    }
+    split(qualificationPool, qualifiers.map((s) => (byPoints ? Math.max(0, s.points) : 1) * days(s))).forEach((amt, i) => { alloc.get(qualifiers[i]!.participantId)!.qualification += amt; });
   }
   // Unresolved ties: their places' money is held back until decided.
   for (const i of issues) if (i.kind === 'TIE_NEEDS_DECISION' && i.places) unallocated += i.places.reduce((a, p) => a + placeMoney[p - 1]!, 0);

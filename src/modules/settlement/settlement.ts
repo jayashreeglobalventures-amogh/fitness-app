@@ -59,7 +59,17 @@ async function compute(db: Queryable, actorUserId: number, challengeId: number, 
   // The prize pool as it was before any approved settlement booked prizes or moved the year-end pool:
   // (main + booked - yearEndMoved) + (yearEnd + yearEndMoved) = main + booked + yearEnd.
   const pool = mainPool + booked + yearEnd;
-  const prizes = allocatePrizes(r.standings.map((s) => ({ participantId: s.participantId, displayName: s.displayName, rank: s.rank, tied: s.tied, points: s.points, adherencePct: s.adherencePct, eligible: s.eligible })),
+  // Days each person took part in (joined -> left or the end), for pro-rata prizes.
+  const { rows: [ch] } = await db.query(`SELECT starts_on, ends_on FROM challenges WHERE challenge_id = $1`, [challengeId]);
+  const daysTotal = daysBetween(ch.starts_on, ch.ends_on) + 1;
+  const { rows: spans } = await db.query(`SELECT participant_id, joined_on, left_on FROM participants WHERE challenge_id = $1`, [challengeId]);
+  const daysIn = new Map(spans.map((x) => {
+    const from = daysBetween(ch.starts_on, x.joined_on) > 0 ? x.joined_on : ch.starts_on;
+    const to = x.left_on && daysBetween(x.left_on, ch.ends_on) > 0 ? x.left_on : ch.ends_on;
+    return [Number(x.participant_id), Math.max(0, Math.min(daysTotal, daysBetween(from, to) + 1))];
+  }));
+  const prizes = allocatePrizes(r.standings.map((s) => ({ participantId: s.participantId, displayName: s.displayName, rank: s.rank, tied: s.tied, points: s.points, adherencePct: s.adherencePct,
+    eligible: s.eligible, daysIn: daysIn.get(s.participantId) ?? daysTotal, daysTotal })),
     Math.max(0, pool), r.config.prizes, decisions);
   const statements = r.standings.map((s) => {
     const prize = prizes.allocations.find((a) => a.participantId === s.participantId)?.total ?? 0;

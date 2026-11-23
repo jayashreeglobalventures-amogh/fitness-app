@@ -164,6 +164,16 @@ Defaults applied where nothing was said:
 | The image | Removed = hidden, kept on record. If it's a private photo (the person ticks this), an admin can erase the image permanently; the record stays ("image erased"). Erased images stay in encrypted backups until those expire (up to 12 months) |
 | Records | Every removal, request, decision and erase is in the activity log |
 
+## Late joiners: pro-rata prizes (owner, 23 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Measure | Days taken part (joined → end, or the day they left) ÷ the challenge's days (Calamari: 40) |
+| Qualifier pool (70%) | Shared in proportion to days taken part (someone in for all days = a full share) |
+| Top three (30%) | A late joiner's place money × their share of days; the rest joins the qualifier pool |
+| Setting | Settings → Prizes → "Late joiners: prizes in proportion to the days they took part" (on for Calamari; Super Admin) |
+| Contributions | Already only for the weeks a person takes part in (unchanged) |
+
 ## Still open
 
 **22** Calamari's exemption voting numbers (set in *Settings → Exemptions*; until then every request goes to an admin).

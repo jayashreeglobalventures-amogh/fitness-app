@@ -220,6 +220,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <SplitIn ctx={money} />
         <Select ctx={money} p={['prizes', 'distribution']} label="Qualification pool shared" options={{ '': 'Not decided yet', EQUAL: 'Equally', PROPORTIONAL: 'In proportion to points' }} nullable />
         <Select ctx={money} p={['prizes', 'topThreeIneligible']} label="If a top-three person isn't eligible" options={{ NEXT_ELIGIBLE: 'The next eligible person moves up', TO_QUALIFICATION_POOL: 'That place\'s money joins the qualification pool' }} />
+        <Check ctx={money} p={['prizes', 'proRataByDays']} label="Late joiners: prizes in proportion to the days they took part (their qualifier share is weighted by days; a top-three prize is scaled by days and the rest joins the qualifier pool)" />
       </Section>
 
       <Section title="Community">

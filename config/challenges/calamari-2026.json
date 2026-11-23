@@ -132,6 +132,7 @@
     ],
     "distribution": "EQUAL",
     "topThreeIneligible": "NEXT_ELIGIBLE",
+    "proRataByDays": true,
     "payoutDate": "2027-01-01"
   },
   "community": {

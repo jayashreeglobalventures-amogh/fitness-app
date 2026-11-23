@@ -43,7 +43,10 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
   const v: ChallengeView = realAdmin && !adminView ? { ...v0, myPermissions: [] } : v0;
   const can = (p: string) => v.myPermissions.includes(p);
   const isAdmin = can('challenge.view_admin');
-  const isParticipant = !!v.participantStatus;
+  // With admin view on, only the admin tabs show (an admin who also takes part flips the switch off for their own tabs);
+  // shared tabs (Money, Bonus, Exemptions) then show only their admin side.
+  const isParticipant = !!v.participantStatus && !adminView;
+  const va: ChallengeView = adminView ? { ...v, participantStatus: null } : v;
   const live = v.status === 'PUBLISHED';
   const sections = [
     { key: 'today', label: 'Today', show: isParticipant && live },
@@ -58,7 +61,7 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
     { key: 'admins', label: 'Admins', show: isAdmin },
     { key: 'settings', label: 'Settings', show: isAdmin },
     { key: 'overview', label: 'Rules', show: true },
-    { key: 'demo', label: 'Demo', show: true },
+    { key: 'demo', label: 'Demo', show: !adminView },
   ].filter((s) => s.show);
   const fallback = sections[0]!.key;
   const active = section === 'default' ? fallback : sections.some((s) => s.key === section) ? section : fallback;
@@ -92,10 +95,10 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       {active === 'review' && <ReviewSection v={v} />}
       {active === 'leaderboard' && <LeaderboardSection v={v} />}
       {active === 'demo' && <DemoSection v={v} />}
-      {active === 'money' && <MoneySection v={v} />}
+      {active === 'money' && <MoneySection key={`m${adminView}`} v={va} />}
       {active === 'results' && <ResultsSection v={v} />}
-      {active === 'bonus' && <BonusSection v={v} />}
-      {active === 'exemptions' && <ExemptionsSection v={v} />}
+      {active === 'bonus' && <BonusSection v={va} />}
+      {active === 'exemptions' && <ExemptionsSection v={va} />}
       {active === 'overview' && <Overview v={v} invitationId={invitation?.invitationId ?? null} onChanged={() => { view.reload(); invites.reload(); }} />}
       {active === 'settings' && <SettingsSection v={v} me={me} onSaved={view.reload} />}
       {active === 'roster' && <RosterSection v={v} me={me} />}

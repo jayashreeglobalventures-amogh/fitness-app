@@ -128,7 +128,7 @@ export const TOPICS: Topic[] = [
 
   // ---------- For admins ----------
   { id: 'admin-view', group: 'For admins', audience: ['admin'], title: 'Admin view switch', keywords: 'admin view toggle participant tabs switch',
-    body: ['Next to the challenge name, **Admin view** shows or hides the admin tabs (Team, Review, Roster, Admins, Settings and the admin parts of Money, Exemptions, Bonus and Results). Off = you see the challenge exactly as a participant does. It is remembered per challenge on this device.'] },
+    body: ['Next to the challenge name, **Admin view** switches between your two sets of tabs. **On** = only the admin tabs (Team, Leaderboard, Results, Review, Roster, Admins, Settings, Rules, and the admin side of Money, Exemptions and Bonus); your own Today, Demo, "My money" and requests are hidden. **Off** = you see the challenge exactly as a participant does. It is remembered per challenge on this device.'] },
   { id: 'admins-tab', group: 'For admins', audience: ['admin'], title: 'Admins and the finance manager', keywords: 'admin role two admins finance manager handover appoint',
     body: [
       '**Calamari → Admins.** A challenge needs **at least 2 admins** (so nothing depends on one person); any admin can add more. One admin\'s money requests are approved by another.',

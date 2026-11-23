@@ -105,9 +105,11 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   // CSRF: a state-changing request must come from our own origin (browsers send Origin / Sec-Fetch-Site).
   app.addHook('onRequest', async (req, reply) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return;
-    // The Apple Shortcut's step sync: no cookies are used there (a personal sync key in the Authorization header),
-    // so a forged cross-site request has nothing to ride on.
-    if (req.method === 'POST' && req.url.split('?')[0] === '/api/health-sync' && !req.headers.cookie) return;
+    // The Apple Shortcut's step sync: it is authorised only by the personal sync key in the Authorization header (the
+    // handler never looks at cookies, which iPhones may still send). With no cookies there is no session to misuse; a
+    // browser on another site can't add that header
+    // without our CORS approval, which is never given - so there is nothing for a cross-site request to ride on.
+    if (req.method === 'POST' && req.url.split('?')[0] === '/api/health-sync' && (!req.headers.cookie || /^bearer fit_/i.test(String(req.headers.authorization ?? '')))) return;
     const origin = req.headers.origin;
     const site = req.headers['sec-fetch-site'];
     if (origin !== config.publicOrigin && site !== 'same-origin') {

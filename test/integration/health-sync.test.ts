@@ -48,9 +48,14 @@ describe('sync key', () => {
     expect((await sync('fit_' + 'x'.repeat(32), { steps: 8000 })).statusCode).toBe(401);
   });
 
-  it('a request carrying a browser session still needs to come from the app (no cross-site sends)', async () => {
-    const r = await sync(ashaKey, { steps: 8000 }, { cookie: 'fit_session=whatever' });
-    expect(r.statusCode).toBe(403);
+  it('the iPhone may send cookies too: the sync key is what counts; without a key it is a cross-site request', async () => {
+    h.setNow(ist('2026-11-21', '12:00')); // before the start: nothing to save, but accepted
+    const r = await sync(ashaKey, { steps: 8000 }, { cookie: 'fit_session=whatever; __cf_bm=x' });
+    expect(r.statusCode).toBe(200);
+    const noKey = await h.app.inject({ method: 'POST', url: '/api/health-sync', headers: { cookie: 'fit_session=whatever', 'content-type': 'application/json' }, payload: '{"steps":1}' });
+    expect(noKey.statusCode).toBe(403);
+    expect(await h.app.inject({ method: 'OPTIONS', url: '/api/health-sync', headers: { origin: 'https://evil.example', 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization' } })
+      .then((x) => x.headers['access-control-allow-origin'])).toBeUndefined(); // no CORS approval for other sites
   });
 });
 

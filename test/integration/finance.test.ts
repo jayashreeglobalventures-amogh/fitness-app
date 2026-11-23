@@ -119,14 +119,14 @@ describe('contributions, payments and fines (Calamari)', () => {
     expect((await mine(ben)).refundDue).toBe(500); // ₹600 - one ₹100 fine
   });
 
-  it('a Finance Admin can record a payment on someone\'s behalf; another admin must confirm it (two-person rule)', async () => {
-    const r = await fa.post(`/api/participants/${pid.ben}/payments`, { periodNo: 1, amount: 1000, method: 'CASH', paidOn: '2026-11-28', reason: 'Paid cash to the organiser' });
+  it('the finance manager records a payment for someone else: it counts straight away; UTR and "where" are optional', async () => {
+    const r = await fa.post(`/api/participants/${pid.ben}/payments`, { periodNo: 1, amount: 1000, method: 'UPI', paidOn: '2026-11-28' });
     expect(r.status).toBe(200);
-    const self = await fa.post(`/api/payments/${r.body.data.paymentId}/decide`, { confirm: true });
-    expect(self.status).toBe(403);
-    expect(self.body.message).toContain('another admin');
-    expect((await ca.post(`/api/payments/${r.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
+    expect(r.body.data.confirmed).toBe(true);
     expect((await mine(ben)).weeks[0].status).toBe('PAID');
+    const { rows } = await h.admin.query(`SELECT action FROM audit_log WHERE action = 'PAYMENT_RECORDED_AND_CONFIRMED'`);
+    expect(rows).toHaveLength(1);
+    expect((await ca.post(`/api/participants/${pid.ben}/payments`, { periodNo: 1, amount: 1000, method: 'CASH', paidOn: '2026-11-28' })).status).toBe(403); // only those who confirm payments
   });
 
   it('withdrawal refund: Finance Admin proposes, a different Super Admin approves, then it is owed', async () => {
@@ -168,5 +168,18 @@ describe('contributions, payments and fines (Calamari)', () => {
     const m = await mine(asha);
     expect(Object.keys(m)).toEqual(expect.arrayContaining(['weeks', 'owed', 'refundDue', 'payments', 'pools']));
     expect(JSON.stringify(m)).not.toContain('ben');
+  });
+});
+
+describe('Settings -> Money: UTR mandatory for participants', () => {
+  it('on (default): a participant must give a UTR; off: it is optional', async () => {
+    h.setNow('2026-11-29T06:00:00Z');
+    const r = await asha.post(`/api/challenges/${id}/payments`, { periodNo: 2, amount: 1000, paidOn: '2026-11-29' });
+    expect(r.status).toBe(400);
+    expect(r.body.message).toContain('UTR');
+    const cfg = calamariConfig(); cfg.finance.unusedFinePool = 'REFUND'; cfg.finance.utrRequired = false;
+    expect((await sa.put(`/api/challenges/${id}/config`, { config: cfg, reason: 'UTR optional for participants', effectiveFrom: '2026-11-30' })).status).toBe(200);
+    h.setNow('2026-11-30T06:00:00Z');
+    expect((await asha.post(`/api/challenges/${id}/payments`, { periodNo: 2, amount: 1000, paidOn: '2026-11-30' })).status).toBe(200);
   });
 });

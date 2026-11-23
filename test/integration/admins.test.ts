@@ -96,10 +96,17 @@ describe('the finance manager: exactly one, changed only through a handover', ()
     expect((await a1.post(`/api/finance-handovers/${r.body.data.handoverId}/accept`, { receivedAmount: 1000, accountsSettled: true })).status).toBe(200);
     expect(await roles()).toEqual(['admin1:CHALLENGE_ADMIN', 'admin1:FINANCE_ADMIN', 'admin2:CHALLENGE_ADMIN']);
     const pid = (await a1.get(`/api/challenges/${id}/participants`)).body.data.find((x: { username: string }) => x.username === 'asha').participantId;
-    // As finance manager they record a payment for Asha: they can't confirm it themselves; admin2 can.
-    const p = await a1.post(`/api/participants/${pid}/payments`, { periodNo: 2, amount: 1000, method: 'CASH', paidOn: '2026-11-20', reason: 'Cash handed over at the park' });
-    expect((await a1.post(`/api/payments/${p.body.data.paymentId}/decide`, { confirm: true })).status).toBe(403);
-    expect((await a2.post(`/api/payments/${p.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
+    // As finance manager they record a payment for Asha: it counts straight away (owner, 23 Nov 2026).
+    const p = await a1.post(`/api/participants/${pid}/payments`, { periodNo: 2, amount: 1000, method: 'CASH', paidOn: '2026-11-20' });
+    expect(p.body.data.confirmed).toBe(true);
+    // Their OWN payment (they also take part): waits for another admin, who may confirm it; they can't.
+    const inv = await a2.post(`/api/challenges/${id}/invitations`, { userIds: [a1.userId] });
+    const mePid = (await a1.post(`/api/invitations/${inv.body.data.invited[0]}/accept`, { rulesVersionNo: 1, acceptFitnessRules: true, acceptFinancialRules: true })).body.data.participantId;
+    const own = await a1.post(`/api/participants/${mePid}/payments`, { periodNo: 2, amount: 1000, method: 'CASH', paidOn: '2026-11-20' });
+    expect(own.body.data.confirmed).toBe(false);
+    expect((await a1.post(`/api/payments/${own.body.data.paymentId}/decide`, { confirm: true })).status).toBe(403);
+    expect((await a1.get(`/api/challenges/${id}/finance`)).body.data.payments.find((x: { paymentId: number }) => x.paymentId === own.body.data.paymentId).byAdminForSelf).toBe(true);
+    expect((await a2.post(`/api/payments/${own.body.data.paymentId}/decide`, { confirm: true })).status).toBe(200);
     // A refund they propose is approved by another admin, not by them.
     const rf = await a1.post(`/api/participants/${pid}/refunds`, { amount: 100, reason: 'Overpaid by mistake' });
     expect((await a1.post(`/api/refunds/${rf.body.data.refundId}/decide`, { approve: true })).status).toBe(403);

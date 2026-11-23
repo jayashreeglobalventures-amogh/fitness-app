@@ -99,7 +99,7 @@ export const TOPICS: Topic[] = [
   { id: 'paying', group: 'Money', audience: ['everyone'], title: 'Paying your weekly contribution', keywords: 'pay upi utr qr contribution weekly due overdue',
     body: [
       'Calamari is **₹1,000 a week**: ₹400 to the prize pool and ₹600 into your own fine pool. Due on **Sunday**; after a 2-day grace it shows as overdue (it never affects points).',
-      { steps: ['**Money** tab → scan the QR or use the UPI ID shown.', 'Pay in your UPI app, then tap **I\'ve paid this week** and enter the **UTR / reference** and date.', 'The finance manager confirms it; the week turns **Paid**.'] },
+      { steps: ['**Money** tab → scan the QR or use the UPI ID shown.', 'Pay in your UPI app, then tap **I\'ve paid this week** and enter the **UTR / reference** (if your challenge makes it optional, you can leave it out) and the date.', 'The finance manager confirms it; the week turns **Paid**.'] },
       { tip: 'Paid more than needed? The extra counts towards your next weeks automatically.' },
     ] },
   { id: 'fine-pool', group: 'Money', audience: ['everyone', 'finance'], title: 'Fines and the fine pool (carry-over)', keywords: 'fine pool carry forward refund top up 700 600 miss',
@@ -172,7 +172,7 @@ export const TOPICS: Topic[] = [
   { id: 'payments-admin', group: 'For the finance manager', audience: ['finance', 'admin'], title: 'Confirming payments, two-person rule and refunds', keywords: 'confirm payment utr finance two person refund record on behalf cash',
     body: [
       '**Money** tab (finance view): payments reported with their UTR wait for you to **Confirm** or **Reject** (with a reason) after checking your bank / UPI app.',
-      'A payment an admin **records on someone\'s behalf** (e.g. cash) must be confirmed by **another** admin. Refunds are proposed by one person and approved by a **different** admin - never by the person who proposed them.',
+      '**Settings → Money → UTR mandatory** (Super Admin) decides whether participants must give a UTR when they report a payment. **Record payment** (a participant\'s row): for someone else it counts **straight away** - e.g. cash handed over, or a UTR sent on WhatsApp; UTR and "where it was reported" are optional. Your **own** payment (if you also take part) waits for **another** admin to confirm it. Refunds are proposed by one person and approved by a **different** admin.',
       'The **checks** at the bottom must all be green - they prove the books balance.',
       { tip: 'Payment details (UPI ID, QR) are set by the finance manager in the Money tab.' },
     ] },

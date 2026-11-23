@@ -73,3 +73,10 @@ export function RaceTrack({ challengeId, startsOn, endsOn, today, people }: { ch
     </Collapsible>
   );
 }
+
+/** The race for participants (Leaderboard tab): loads just what the track needs, without the admin-only details. */
+export function RaceForEveryone({ challengeId, startsOn, endsOn }: { challengeId: number; startsOn: string; endsOn: string }) {
+  const r = useLoad(() => api.get<{ today: string; people: RacePerson[] }>(`/api/challenges/${challengeId}/race`), [challengeId]);
+  if (!r.data) return null;
+  return <RaceTrack challengeId={challengeId} startsOn={startsOn} endsOn={endsOn} today={r.data.today} people={r.data.people} />;
+}

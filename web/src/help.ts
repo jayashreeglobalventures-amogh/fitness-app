@@ -83,9 +83,10 @@ export const TOPICS: Topic[] = [
       'Rest days and approved exemptions pause streaks rather than breaking them. The **Rules** tab always shows the exact numbers for your challenge.',
       { example: ['Mon ✓ Tue ✓ Wed ✗ Thu ✓ → +10 +10 −15 +10 = **+15**, streak 1.'], title: 'Example' },
     ] },
-  { id: 'leaderboard', group: 'Points & progress', audience: ['everyone'], title: 'Leaderboard and prizes', keywords: 'leaderboard rank prize adherence 80% top three qualify tie',
+  { id: 'leaderboard', group: 'Points & progress', audience: ['everyone'], title: 'Leaderboard and prizes', keywords: 'leaderboard race track rank prize adherence 80% top three qualify tie',
     body: [
-      'Ranking: points, then adherence, successful days, longest streak, then who got there first. **Hover over a name** to see whether they are on track for prizes; **tap a name** to open their profile (only what that person has chosen to share).',
+      '**🏁 The race** at the top shows everyone as a face that moves one step per successful day (🏁 = the last day; the dashed line is where someone hitting every day would be now). Hover or tap a face for details.',
+      'Ranking: points, then adherence, successful days, longest streak, then who got there first.**Hover over a name** to see whether they are on track for prizes; **tap a name** to open their profile (only what that person has chosen to share).',
       '**Adherence** = successful days ÷ days that counted (rest days and exemptions don\'t count). Calamari\'s prize line is **80%**.',
       { list: ['**70%** of the prize pool is shared **equally** by everyone at 80% or above.', '**30%** goes to the top three: **50% / 30% / 20%**. Someone below 80% can\'t take a top-three place - the next eligible person moves up.'] },
       { example: ['Prize pool ₹20,000: ₹14,000 shared by 10 qualifiers = ₹1,400 each; top three get ₹3,000 / ₹1,800 / ₹1,200 on top.'], title: 'Example' },

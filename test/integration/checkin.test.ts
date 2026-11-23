@@ -306,3 +306,13 @@ describe('dashboards', () => {
     expect((await fa.get(`/api/challenges/${id}/overview`)).status).toBe(200); // finance admin sees participation, not health
   });
 });
+
+describe('the race track', () => {
+  it('participants can see it, with only what the track needs (no mobiles or usernames)', async () => {
+    const r = await priya.get(`/api/challenges/${id}/race`);
+    expect(r.status).toBe(200);
+    const people = r.body.data.people as Record<string, unknown>[];
+    expect(people.length).toBeGreaterThan(1);
+    for (const p of people) expect(Object.keys(p).sort()).toEqual(['day', 'displayName', 'participantId', 'status', 'summary']);
+  });
+});

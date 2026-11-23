@@ -8,6 +8,7 @@ import { pendingAi, verifySubmission } from '../modules/checkin/submissions.js';
 import { reconcileAll } from '../modules/scoring/ledger.js';
 import { reconcileAllMoney } from '../modules/finance/finance.js';
 import { sendDue, vapidKeys, webPushSender, type PushSender } from '../modules/notifications/push.js';
+import { noteRanks } from '../modules/notifications/rankup.js';
 
 export interface SchedulerOptions { everyMs?: number; pushEveryMs?: number; publicOrigin: string; sender?: PushSender }
 
@@ -26,6 +27,7 @@ export function startScheduler(pool: pg.Pool, mediaDir: string, log: (msg: strin
       await closeDueVotes(pool, new Date());
       await reconcileAll(pool, new Date()); // points for days that just closed (midnight), decisions, corrections
       await reconcileAllMoney(pool, new Date()); // contributions due, fines, weeks closing, confirmed payments
+      await noteRanks(pool, new Date()).catch((e) => fail('leaderboard moves', e)); // once a day: who moved up
     } catch (e) { fail('scheduler tick', e); } finally { running = false; }
   };
 

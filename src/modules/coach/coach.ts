@@ -82,13 +82,16 @@ export async function coachNotices(db: Queryable, userId: number, challengeId: n
     const p = await participantOf(db, challengeId, userId);
     if (p) {
       const days = await participantDays(db, ctx, p, now);
-      // Evening nudge.
-      if (live && opts.notSubmittedToday && cfg.coach.eveningNudge) {
-        const [h, m] = cfg.coach.nudgeTime.split(':').map(Number) as [number, number];
+      // Step reminders (Settings → Notifications): at each reminder time that has passed, while today's steps aren't in.
+      // Each time is a new alert (so it reaches the phone again); the app lists only the latest.
+      const sr = cfg.notifications.stepReminders;
+      if (live && opts.notSubmittedToday && sr.enabled) {
         const local = new Date(now.toLocaleString('en-US', { timeZone: ctx.ch.timeZone }));
-        if (local.getHours() * 60 + local.getMinutes() >= h * 60 + m) {
+        const nowMin = local.getHours() * 60 + local.getMinutes();
+        const slot = [...sr.times].sort().filter((x) => Number(x.slice(0, 2)) * 60 + Number(x.slice(3, 5)) <= nowMin).pop();
+        if (slot) {
           const t = await write((w) => w.nudge(nudgeFacts(ctx, days, now, endOfDay(ctx.today, ctx.ch.timeZone))));
-          out.push({ id: `nudge:${challengeId}:${ctx.today}`, kind: 'action', title: t.title, body: t.body, link, challengeId });
+          out.push({ id: `nudge:${challengeId}:${ctx.today}:${slot.replace(':', '')}`, kind: 'action', title: t.title, body: t.body, link, challengeId });
           nudged = true;
         }
       }

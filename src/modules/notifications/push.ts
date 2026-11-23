@@ -6,7 +6,7 @@ import webpush from 'web-push';
 import { writeAudit } from '../../core/audit.js';
 import type { Queryable } from '../../core/db.js';
 import { validation } from '../../core/errors.js';
-import { myNotifications } from './notifications.js';
+import { myNotifications, type Notice } from './notifications.js';
 
 export interface VapidKeys { publicKey: string; privateKey: string; subject: string }
 
@@ -110,9 +110,27 @@ export function inQuietHours(now: Date): boolean {
   return h >= QUIET_FROM || h < QUIET_UNTIL;
 }
 
+const hhmm = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+function localMinutes(now: Date, timeZone: string): { min: number; day: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  const g = (k: string) => parts.find((p) => p.type === k)!.value;
+  return { min: Number(g('hour')) * 60 + Number(g('minute')), day: `${g('year')}-${g('month')}-${g('day')}` };
+}
+/** The phone key for an alert now, or null if it must wait (quiet hours, or an admin task between round-ups). */
+export function pushKeyNow(n: Notice, now: Date): string | null {
+  const r = n.pushRules;
+  if (!r) return inQuietHours(now) ? null : n.seenKey!;
+  const { min, day } = localMinutes(now, r.timeZone);
+  const [a, b] = [hhmm(r.quietFrom), hhmm(r.quietUntil)];
+  if (a !== b && (a < b ? min >= a && min < b : min >= a || min < b)) return null;
+  if (!r.digestTimes) return n.seenKey!;
+  // Round-up: only within the hour after a round-up time, once per round-up for as long as it is waiting.
+  const slot = r.digestTimes.find((t) => min >= hhmm(t) && min < hhmm(t) + 60);
+  return slot ? `${n.seenKey}@${day}T${slot}`.slice(0, 250) : null;
+}
+
 export async function sendDue(db: Queryable, send: PushSender, now: Date): Promise<{ sent: number; removed: number }> {
   let sent = 0, removed = 0;
-  if (inQuietHours(now)) return { sent, removed };
   const { rows: people } = await db.query(
     `SELECT p.user_id FROM notification_prefs p JOIN users u USING (user_id)
       WHERE p.push_enabled AND u.status = 'ACTIVE' AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.user_id = p.user_id)`);
@@ -121,7 +139,8 @@ export async function sendDue(db: Queryable, send: PushSender, now: Date): Promi
     const notices = (await myNotifications(db, userId, now)).filter((n) => !n.seen && n.push !== false);
     const { rows: done } = await db.query(`SELECT push_key FROM push_sent WHERE user_id = $1`, [userId]);
     const already = new Set(done.map((r) => r.push_key as string));
-    const fresh = notices.filter((n) => !already.has(n.seenKey!));
+    const fresh = notices.map((n) => ({ ...n, pushKey: pushKeyNow(n, now) }))
+      .filter((n): n is Notice & { pushKey: string } => n.pushKey !== null && !already.has(n.pushKey));
     if (!fresh.length) continue;
     const msgs: PushMessage[] = fresh.length <= 3
       ? fresh.map((n) => ({ title: n.title, body: 'Tap to open your alerts.', url: '/notifications', tag: n.id }))
@@ -144,7 +163,7 @@ export async function sendDue(db: Queryable, send: PushSender, now: Date): Promi
       }
     }
     // Recorded as sent even if a phone was unreachable: the alert is still in the app, and nobody wants it twice later.
-    for (const n of fresh) await db.query(`INSERT INTO push_sent (user_id, push_key, sent_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [userId, n.seenKey, now]);
+    for (const n of fresh) await db.query(`INSERT INTO push_sent (user_id, push_key, sent_at) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [userId, n.pushKey, now]);
     await db.query(`DELETE FROM push_sent WHERE user_id = $1 AND sent_at < $2::timestamptz - interval '120 days'`, [userId, now]);
   }
   return { sent, removed };

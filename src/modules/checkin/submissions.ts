@@ -18,6 +18,7 @@ import { currentReader } from '../verification/select.js';
 import { canSeeBonusFile } from '../scoring/bonus.js';
 import { canSeeFinanceFile } from '../finance/finance.js';
 import { canSeeProfilePhoto } from '../profile/profile.js';
+import { addNotice } from '../notifications/prefs.js';
 import { canSeeCommunityPhoto } from '../community/community.js';
 import { challengeContext, participantById, participantOf, participatesOn, type ParticipantRow } from './days.js';
 
@@ -273,6 +274,22 @@ export async function review(db: Queryable, actorUserId: number, submissionId: n
     [submissionId, value, outcome, reason || null, actorUserId, now]);
   await writeAudit(db, now, { actorUserId, challengeId, action: override ? 'EVIDENCE_DECISION_OVERRIDDEN' : 'EVIDENCE_REVIEWED', entity: 'SUBMISSION', entityId: submissionId, reason: reason || null,
     before: { status: s.status, finalValue: s.final_value }, after: { status: outcome, finalValue: value } });
+  // Tell the participant (Settings → Notifications → "screenshot approved / declined").
+  const cfgNow = ctx.cfgOn(s.day);
+  if (cfgNow.notifications.extras.reviewOutcome) {
+    const when = new Date(`${s.day}T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+    const n = (x: number) => x.toLocaleString('en-IN');
+    const unit = cfgNow.activity.unit;
+    const [title, body] = outcome === 'REJECTED'
+      ? [`${ctx.ch.name}: your ${when} screenshot was declined`, reason || 'An admin declined it. You can ask them to look again.']
+      : outcome === 'APPROVED'
+        ? [`${ctx.ch.name}: your ${when} screenshot was approved ✅`, `${n(value!)} ${unit} counted.`]
+        : outcome === 'ACHIEVED'
+          ? [`${ctx.ch.name}: ${when} - target met ✅`, `${n(value!)} ${unit} counted.${reason ? ` ${reason}` : ''}`]
+          : [`${ctx.ch.name}: ${when} - below the target`, `${n(value!)} of ${n(target)} ${unit} counted.${reason ? ` ${reason}` : ''}`];
+    await addNotice(db, { userId: p.userId, challengeId, key: `decided:${submissionId}:${outcome}:${value ?? ''}`, category: 'reviewOutcome',
+      kind: outcome === 'REJECTED' || outcome === 'BELOW_TARGET' ? 'warning' : 'info', title, body, link: `/challenges/${challengeId}/today` }, now);
+  }
 }
 
 /** The participant asks for a second look at a below-target or rejected decision (once per submission). */

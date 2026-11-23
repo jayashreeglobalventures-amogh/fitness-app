@@ -32,6 +32,13 @@ export function blankConfig(name: string, startDate: string, endDate: string): C
     prizes: { qualificationAdherencePct: 80, qualificationPoolPct: null, topThreePct: null, topThreeSplitPct: null, distribution: null, topThreeIneligible: 'NEXT_ELIGIBLE', proRataByDays: true, payoutDate: null },
     community: { enabled: true, participantsCanPost: true, photos: true },
     coach: { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true },
+    notifications: {
+      stepReminders: { enabled: true, times: ['20:00'] },
+      adminAlerts: { reviews: true, payments: true, exemptions: true, bonuses: true, reports: true, delivery: 'IMMEDIATE', digestTimes: ['09:00', '18:00'] },
+      community: { newPosts: true, comments: true },
+      quietHours: { from: '23:00', until: '07:00' },
+      extras: { reviewOutcome: true, streakMilestones: true, rankUp: true, paymentConfirmed: true, paymentDueReminder: true, restDayReminder: false, teamStreakAtRisk: true, teamStreakTime: '19:00' },
+    },
     leaderboard: { ranking: ['POINTS', 'ADHERENCE', 'SUCCESSFUL_DAYS', 'LONGEST_PERSONAL_STREAK', 'EARLIEST_FINAL_SCORE'] },
   };
 }

@@ -28,7 +28,7 @@ export function blankConfig(name: string, startDate: string, endDate: string): C
         teamStreakBreak: { enabled: false, when: 'RUNNING_STREAK_ONLY', points: 0 },
       },
     },
-    finance: { enabled: false, currency: 'INR', contribution: { total: 0, mainPool: 0, finePool: 0 }, periodOverrides: [], finePerMissedDay: 0, unusedFinePool: 'REFUND', dueWeekday: 'SUNDAY', graceDays: 2, paymentInstructions: '' },
+    finance: { enabled: false, currency: 'INR', contribution: { total: 0, mainPool: 0, finePool: 0 }, periodOverrides: [], finePerMissedDay: 0, unusedFinePool: 'REFUND', dueWeekday: 'SUNDAY', graceDays: 2, utrRequired: true, paymentInstructions: '' },
     prizes: { qualificationAdherencePct: 80, qualificationPoolPct: null, topThreePct: null, topThreeSplitPct: null, distribution: null, topThreeIneligible: 'NEXT_ELIGIBLE', payoutDate: null },
     community: { enabled: true, participantsCanPost: true, photos: true },
     coach: { weeklySummary: true, eveningNudge: true, nudgeTime: '20:00', atRiskAlerts: true },

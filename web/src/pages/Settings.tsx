@@ -184,6 +184,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
             <Rupees ctx={money} p={['finance', 'finePerMissedDay']} label="Fine per missed day (₹)" />
             <Select ctx={money} p={['finance', 'dueWeekday']} label="Due every" options={Object.fromEntries(WEEKDAYS.map((d) => [d, title(d)]))} />
             <Num ctx={money} p={['finance', 'graceDays']} label="Grace days before 'overdue'" />
+            <Check ctx={money} p={['finance', 'utrRequired']} label="UTR mandatory when participants report a payment (admins recording a payment never need one)" />
             <Select ctx={money} p={['finance', 'unusedFinePool']} label="Fine-pool money left at the end of a week" options={{ CARRY_FORWARD: 'Carried to next week (they pay only the top-up)', REFUND: 'Refunded to the participant at the end', PRIZE_POOL: 'Goes to the prize pool', YEAR_END_POOL: 'Goes to a separate year-end pool' }}
               hint={get(c, ['finance', 'unusedFinePool']) === 'CARRY_FORWARD' ? 'E.g. ₹600 fine pool, 3 misses at ₹100: ₹300 carries over, so next week they pay ₹400 + ₹300 = ₹700. What is left after the last week is refunded.' : undefined} />
           </div>

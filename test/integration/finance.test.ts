@@ -170,3 +170,16 @@ describe('contributions, payments and fines (Calamari)', () => {
     expect(JSON.stringify(m)).not.toContain('ben');
   });
 });
+
+describe('Settings -> Money: UTR mandatory for participants', () => {
+  it('on (default): a participant must give a UTR; off: it is optional', async () => {
+    h.setNow('2026-11-29T06:00:00Z');
+    const r = await asha.post(`/api/challenges/${id}/payments`, { periodNo: 2, amount: 1000, paidOn: '2026-11-29' });
+    expect(r.status).toBe(400);
+    expect(r.body.message).toContain('UTR');
+    const cfg = calamariConfig(); cfg.finance.unusedFinePool = 'REFUND'; cfg.finance.utrRequired = false;
+    expect((await sa.put(`/api/challenges/${id}/config`, { config: cfg, reason: 'UTR optional for participants', effectiveFrom: '2026-11-30' })).status).toBe(200);
+    h.setNow('2026-11-30T06:00:00Z');
+    expect((await asha.post(`/api/challenges/${id}/payments`, { periodNo: 2, amount: 1000, paidOn: '2026-11-30' })).status).toBe(200);
+  });
+});

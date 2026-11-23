@@ -122,6 +122,7 @@ function PayNow({ v, week, onReported }: { v: ChallengeView; week: Week; onRepor
 
 function ReportPayment({ v, week, onDone }: { v: ChallengeView; week: Week; onDone: () => void }) {
   const [f, setF] = useState({ amount: String(Math.max(0, week.due - week.paid - week.pending) || week.due), utr: '', paidOn: v.today, note: '' });
+  const utrRequired = (v.upcoming ?? v.current).config.finance.utrRequired !== false;
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -134,11 +135,11 @@ function ReportPayment({ v, week, onDone }: { v: ChallengeView; week: Week; onDo
       <ErrorBox error={error} />
       <div className="grid2">
         <Field label="Amount (₹)"><input type="number" inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></Field>
-        <Field label="UTR / UPI reference" hint="Usually 12 digits, in your payment app's receipt"><input type="text" inputMode="numeric" autoCapitalize="characters" value={f.utr} onChange={(e) => setF({ ...f, utr: e.target.value })} /></Field>
+        <Field label={utrRequired ? 'UTR / UPI reference' : 'UTR / UPI reference (optional)'} hint="Usually 12 digits, in your payment app's receipt"><input type="text" inputMode="numeric" autoCapitalize="characters" value={f.utr} onChange={(e) => setF({ ...f, utr: e.target.value })} /></Field>
         <Field label="Paid on" hint="Paid before the app was live? Use the real date."><input type="date" value={f.paidOn} max={v.today} onChange={(e) => setF({ ...f, paidOn: e.target.value })} /></Field>
         <Field label="Screenshot (optional)"><input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
       </div>
-      <button className="btn primary" disabled={busy || f.utr.trim().length < 6} onClick={send}>{busy ? 'Sending…' : 'Send for checking'}</button>
+      <button className="btn primary" disabled={busy || (utrRequired ? f.utr.trim().length < 6 : f.utr.trim().length > 0 && f.utr.trim().length < 6)} onClick={send}>{busy ? 'Sending…' : 'Send for checking'}</button>
     </div>
   );
 }

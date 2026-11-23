@@ -142,6 +142,9 @@ export const ChallengeConfigSchema = Type.Object({
     dueWeekday: Weekday,
     // Days after the due day before an unpaid contribution is shown as overdue. Never affects points.
     graceDays: Type.Integer({ minimum: 0, maximum: 14 }),
+    // Participants must give the UPI reference (UTR) when they report a payment; off: optional. Admins recording a
+    // payment never need one.
+    utrRequired: Type.Boolean(),
     paymentInstructions: Type.String({ maxLength: 1000 }),
   }, { additionalProperties: false }),
   prizes: Type.Object({
@@ -195,6 +198,7 @@ export function normalizeConfig<T>(input: T): T {
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)
     if (f.graceDays === undefined) f.graceDays = 2;
+    if (f.utrRequired === undefined) f.utrRequired = true;
   }
   const s = c.scoring;
   if (s && typeof s === 'object') {

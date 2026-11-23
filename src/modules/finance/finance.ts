@@ -154,8 +154,9 @@ async function insertPayment(db: Queryable, mediaDir: string, actorUserId: numbe
   const method = onBehalf ? String(input.method ?? 'UPI') : 'UPI';
   if (!['UPI', 'CASH', 'BANK_TRANSFER', 'OTHER'].includes(method)) throw validation('Unknown payment method.');
   const utr = String(input.utr ?? '').replace(/\s/g, '').toUpperCase() || null;
-  // Participants give the UTR (the finance manager checks it against the bank); for admins recording a payment it is optional.
-  if (method === 'UPI' && !utr && !onBehalf) throw validation('Enter the UPI reference (UTR) from your payment app.');
+  // Participants give the UTR if the challenge requires it (Settings -> Money); for admins recording a payment it is optional.
+  const utrRequired = ctx.cfgOn(daysBetween(ctx.ch.startsOn, ctx.today) < 0 ? ctx.ch.startsOn : ctx.today).finance.utrRequired;
+  if (method === 'UPI' && !utr && !onBehalf && utrRequired) throw validation('Enter the UPI reference (UTR) from your payment app.');
   if (utr && !/^[A-Z0-9]{6,30}$/.test(utr)) throw validation('The UTR is 6–30 letters and digits (usually 12 digits).');
   const paidOn = String(input.paidOn ?? '');
   if (!isValidDate(paidOn) || daysBetween(paidOn, ctx.today) < 0) throw validation('Enter the date you paid (not in the future).');

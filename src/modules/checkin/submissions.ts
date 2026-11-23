@@ -48,7 +48,7 @@ const parseClaim = (v: unknown): number | null => {
 export const MAX_PARTS_PER_DAY = 10;
 
 async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantRow, day: string, receivedAt: Date, input: SubmitInput,
-  actorUserId: number, source: 'PARTICIPANT' | 'ADMIN_CORRECTION', correctionReason: string | null, now: Date, aiEnabled: boolean, multi = false): Promise<Submitted> {
+  actorUserId: number, source: 'PARTICIPANT' | 'ADMIN_CORRECTION', correctionReason: string | null, now: Date, aiEnabled: boolean, multi = false, direct = false): Promise<Submitted> {
   const clientRef = String(input.clientRef ?? '');
   if (!/^[A-Za-z0-9_-]{8,64}$/.test(clientRef)) throw validation('Missing upload reference.');
   // Idempotency: the same upload sent twice (retry, double tap) returns the first result.
@@ -92,7 +92,7 @@ async function createSubmission(db: Queryable, mediaDir: string, p: ParticipantR
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$14,$13,$13) RETURNING submission_id`,
     [p.challengeId, p.participantId, day, file.fileId, receivedAt, clientRef, claimedValue, status, source, actorUserId, correctionReason, prev ? prev.submission_id : null, now, multi]);
   const submissionId = Number(rows[0].submission_id);
-  if (duplicate || !aiEnabled) {
+  if (duplicate || (!aiEnabled && !direct)) { // (direct: an admin decides it right after, with the number they entered)
     await db.query(`INSERT INTO verification_results (submission_id, method, outcome, flags, reason, created_at) VALUES ($1,'SYSTEM','NEEDS_REVIEW',$2,$3,$4)`,
       [submissionId, JSON.stringify(duplicate ? ['DUPLICATE_IMAGE'] : []), duplicate ? `The same image was already used for submission ${dup.rows[0].submission_id}.` : 'Manual review (automatic reading is off).', now]);
   }
@@ -117,7 +117,7 @@ export async function submit(db: Queryable, mediaDir: string, userId: number, ch
   return r;
 }
 
-export interface CorrectionInput extends SubmitInput { day: unknown; receivedAt: unknown; reason: unknown }
+export interface CorrectionInput extends SubmitInput { day: unknown; receivedAt: unknown; reason: unknown; value?: unknown }
 
 /**
  * An admin records evidence on a participant's behalf with its ORIGINAL time (e.g. sent on WhatsApp before the app
@@ -142,10 +142,20 @@ export async function recordCorrection(db: Queryable, mediaDir: string, actorUse
   if (localDay(receivedAt, ctx.ch.timeZone) !== day) throw validation(`The original time must be on ${day} (${ctx.ch.timeZone}): evidence counts only for the day it was sent, before midnight.`);
   const reason = String(input.reason ?? '').trim().slice(0, 500) || null; // optional
   const cfg = ctx.cfgOn(day);
-  const r = await createSubmission(db, mediaDir, p0, day, receivedAt, input, actorUserId, 'ADMIN_CORRECTION', reason, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null, cfg.submission.multiplePerDay.enabled);
+  // Steps entered by the admin (optional): the screenshot is approved straight away with that number - no Review task.
+  // Left empty: it is checked like any upload (automatic reading, or Review).
+  const rawSteps = String(input.value ?? '').replace(/[\s,]/g, '');
+  const steps = rawSteps === '' ? null : Number(rawSteps);
+  if (steps !== null && (!Number.isSafeInteger(steps) || steps < 0 || steps > 10_000_000)) throw validation('Enter the step count as a whole number, e.g. 8214.');
+  const direct = steps !== null;
+  const r = await createSubmission(db, mediaDir, p0, day, receivedAt, input, actorUserId, 'ADMIN_CORRECTION', reason, now,
+    !direct && cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null, cfg.submission.multiplePerDay.enabled, direct);
   await writeAudit(db, now, { actorUserId, challengeId: p0.challengeId, action: 'EVIDENCE_RECORDED_BY_ADMIN', entity: 'SUBMISSION', entityId: r.submissionId, reason,
-    after: { participantId, day, receivedAt: receivedAt.toISOString() } });
-  return r;
+    after: { participantId, day, receivedAt: receivedAt.toISOString(), steps } });
+  if (!direct) return r;
+  await review(db, actorUserId, r.submissionId, { outcome: 'APPROVED', value: steps, reason: reason ?? undefined }, now);
+  const { rows: [s] } = await db.query(`SELECT status FROM submissions WHERE submission_id = $1`, [r.submissionId]);
+  return { ...r, status: s.status, verify: false };
 }
 
 /** What the AI reading means. Only a clean, confident, on-target reading of the right day is approved. */

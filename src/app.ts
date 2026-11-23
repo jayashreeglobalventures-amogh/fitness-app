@@ -319,7 +319,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     const { fields, file } = await form(c.req);
     if (!file) throw new AppError('VALIDATION', 'Choose the screenshot to record.');
     const r = await submissions.recordCorrection(c.tx, config.mediaDir, c.user.userId, pid(c),
-      { image: file, clientRef: fields.clientRef, claimedValue: fields.claimedValue, day: fields.day, receivedAt: fields.receivedAt, reason: fields.reason }, c.now);
+      { image: file, clientRef: fields.clientRef, claimedValue: fields.claimedValue, day: fields.day, receivedAt: fields.receivedAt, reason: fields.reason, value: fields.value }, c.now);
     verifyLater(c, r);
     return r;
   }));

@@ -172,6 +172,17 @@ describe('daily evidence', () => {
     expect(rows[0]).toMatchObject({ source: 'ADMIN_CORRECTION', recorded_by: ca.userId });
   });
 
+  it('with a step count entered, the admin\'s correction is approved straight away (no Review task)', async () => {
+    const url = `/api/participants/${pids.rahul}/submissions`;
+    expect((await ca.upload(url, { clientRef: 'corr-rahul-23-x', day: '2026-11-23', value: 'lots' }, png('rahul-23-b'))).status).toBe(400);
+    const r = await ca.upload(url, { clientRef: 'corr-rahul-23-a', day: '2026-11-23', value: '6,500' }, png('rahul-23-b'));
+    expect(r.status).toBe(200);
+    expect(r.body.data).toMatchObject({ status: 'BELOW_TARGET', verify: false });
+    expect(await day(rahul, '2026-11-23')).toMatchObject({ status: 'TARGET_MISSED', submission: { finalValue: 6500 } });
+    const queue = (await ca.get(`/api/challenges/${id}/review-queue`)).body.data as { submissionId: number }[];
+    expect(queue.some((q) => q.submissionId === r.body.data.submissionId)).toBe(false);
+  });
+
   it('evidence images: the owner and reviewers can see them; other participants and the Finance Admin cannot', async () => {
     const d = await day(priya, '2026-11-22');
     const detail = (await priya.get(`/api/submissions/${d.submission.submissionId}`)).body.data;

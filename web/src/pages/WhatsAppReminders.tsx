@@ -3,7 +3,7 @@
 // everyone still pending, to send to the challenge group. Each one is recorded in the activity log.
 import { useState } from 'react';
 import { api } from '../api';
-import { ErrorBox } from '../ui';
+import { closeModal, ErrorBox, Modal } from '../ui';
 
 export interface Remindable {
   participantId: number; displayName: string; mobile?: string | null;
@@ -50,7 +50,7 @@ export function WhatsAppReminders({ challengeId, name, day, people, timeZone, on
   const record = (who: number | 'group') => {
     const payload = who === 'group' ? { day, group: true, names: pending.map((p) => p.displayName) } : { day, participantId: who };
     api.post(`/api/challenges/${challengeId}/reminders`, payload).then(onSent, setError);
-    setEditing(null);
+    closeModal();
   };
 
   if (!pending.length) return <div className="alert ok small">Everyone has sent today's steps (or has a rest day / exemption). Nobody to remind. 🎉</div>;
@@ -79,15 +79,15 @@ export function WhatsAppReminders({ challengeId, name, day, people, timeZone, on
         );
       })}
       {editing !== null && (
-        <div className="section">
-          <b className="small">{editing === 'group' ? 'Message for the group' : `Message to ${person?.displayName} (+${number})`}</b>
-          <textarea rows={4} value={text} onChange={(e) => setText(e.target.value)} style={{ width: '100%', marginTop: 6 }} maxLength={1000} />
+        <Modal title={editing === 'group' ? 'Message for the group' : `Remind ${person?.displayName}`} onClose={() => setEditing(null)}>
+          {editing !== 'group' && <p className="muted small" style={{ marginTop: 0 }}>To +{number}, from your own WhatsApp. Edit the text if you like.</p>}
+          <textarea rows={5} value={text} onChange={(e) => setText(e.target.value)} style={{ width: '100%' }} maxLength={1000} />
           {editing === 'group' && <p className="muted small" style={{ margin: '4px 0' }}>WhatsApp will ask which chat to send it to - pick your {name} group.</p>}
           <div className="row" style={{ marginTop: 6 }}>
             <a className="btn primary" href={waLink(editing === 'group' ? null : number, text)} target="_blank" rel="noopener noreferrer" onClick={() => record(editing)}>Open WhatsApp</a>
-            <button className="btn ghost" onClick={() => setEditing(null)}>Cancel</button>
+            <button className="btn ghost" onClick={closeModal}>Cancel</button>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

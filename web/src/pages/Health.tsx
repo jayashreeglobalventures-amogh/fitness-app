@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../router';
-import { day, ErrorBox, Field, Loading } from '../ui';
+import { day, ErrorBox, Field, Loading, VisibilityChip } from '../ui';
 
 type Vis = 'PRIVATE' | 'ADMINS' | 'MEMBERS' | 'PUBLIC';
 interface Rec { id: number; on: string; heightCm: number | null; weightKg: number | null; bodyFatPct: number | null; waistCm: number | null; restingHr: number | null; note: string | null; bmi: number | null }
@@ -19,7 +19,10 @@ interface Health {
 export const GOAL_LABEL: Record<string, string> = { FAT_LOSS: 'Fat loss', MUSCLE_GAIN: 'Muscle gain', ENDURANCE: 'Endurance', STRENGTH: 'Strength', STEPS: 'Steps', CONSISTENCY: 'Consistency' };
 export const FITNESS_LABEL: Record<string, string> = { BEGINNER: 'Beginner', INTERMEDIATE: 'Intermediate', ADVANCED: 'Advanced' };
 export const ACTIVITY_LABEL: Record<string, string> = { SEDENTARY: 'Sedentary (mostly sitting)', LIGHT: 'Lightly active', MODERATE: 'Moderately active', ACTIVE: 'Active', VERY_ACTIVE: 'Very active' };
-const VIS_LABEL: Record<Vis, string> = { PRIVATE: 'Only me', ADMINS: 'My challenge admins', MEMBERS: 'My challenge members', PUBLIC: 'Everyone in the app' };
+const HEALTH_VIS: { value: Vis; icon: string; text: string }[] = [
+  { value: 'PRIVATE', icon: '🔒', text: 'Only me' }, { value: 'ADMINS', icon: '🛡️', text: 'Admins' },
+  { value: 'MEMBERS', icon: '👥', text: 'Members' }, { value: 'PUBLIC', icon: '🌍', text: 'Everyone' },
+];
 const FIELD_LABEL: Record<string, string> = {
   height: 'Height', weight: 'Weight', bmi: 'BMI', bodyFat: 'Body fat', waist: 'Waist', restingHr: 'Resting heart rate',
   fitnessLevel: 'Fitness level', activityLevel: 'Activity level', goals: 'Goals', considerations: 'Health considerations',
@@ -369,13 +372,12 @@ function Sharing({ h, run }: { h: Health; run: Run }) {
   return (
     <div className="card">
       <h3>Who can see what</h3>
-      <p className="muted small">Everything starts as "Only me". Making your basic profile public never makes health data public. "Challenge admins" means the admins of challenges you take part in (not the finance manager).</p>
+      <p className="muted small">Tap a chip to change who sees that item: 🔒 only me → 🛡️ my challenge admins → 👥 my challenge members → 🌍 everyone. Everything starts as "Only me". Making your basic profile public never makes health data public. "Challenge admins" means the admins of challenges you take part in (not the finance manager).</p>
       {Object.keys(FIELD_LABEL).map((f) => (
         <div key={f} className="spread" style={{ padding: '4px 0' }}>
           <span className="small">{FIELD_LABEL[f]}</span>
-          <select value={vis[f] ?? 'PRIVATE'} onChange={(e) => { setVis({ ...vis, [f]: e.target.value as Vis }); setSaved(false); }} style={{ maxWidth: 220 }}>
-            {(f === 'considerations' ? (['PRIVATE', 'ADMINS'] as Vis[]) : (Object.keys(VIS_LABEL) as Vis[])).map((v) => <option key={v} value={v}>{VIS_LABEL[v]}</option>)}
-          </select>
+          <VisibilityChip label={FIELD_LABEL[f]!} value={vis[f] ?? 'PRIVATE'} onChange={(v) => { setVis({ ...vis, [f]: v }); setSaved(false); }}
+            options={HEALTH_VIS.filter((o) => f !== 'considerations' || o.value === 'PRIVATE' || o.value === 'ADMINS')} />
         </div>
       ))}
       {saved && <div className="alert ok small">Sharing updated.</div>}

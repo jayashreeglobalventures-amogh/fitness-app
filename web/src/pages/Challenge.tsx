@@ -30,9 +30,17 @@ export interface ChallengeView {
 export function ChallengePage({ me, id, section }: { me: Me; id: number; section: string }) {
   const view = useLoad(() => api.get<ChallengeView>(`/api/challenges/${id}`), [id]);
   const invites = useLoad(() => api.get<{ invitationId: number; challengeId: number }[]>('/api/me/invitations'), [id]);
-  const v = view.data;
-  if (view.loading && !v) return <Loading />;
-  if (!v) return <ErrorBox error={view.error} />;
+  // Admin view (remembered per challenge on this device): off = see the challenge exactly as a participant does.
+  const prefKey = `fit:adminview:${id}`;
+  const [adminPref, setAdminPref] = useState<boolean | null>(() => { try { const x = localStorage.getItem(prefKey); return x === null ? null : x === '1'; } catch { return null; } });
+  const v0 = view.data;
+  if (view.loading && !v0) return <Loading />;
+  if (!v0) return <ErrorBox error={view.error} />;
+  const realAdmin = v0.myPermissions.includes('challenge.view_admin');
+  const adminView = realAdmin && (adminPref ?? !v0.participantStatus);
+  const setAdminView = (on: boolean) => { setAdminPref(on); try { localStorage.setItem(prefKey, on ? '1' : '0'); } catch { /* fine */ } };
+  // With admin view off, every tab behaves as for a participant (the server still checks permissions on every action).
+  const v: ChallengeView = realAdmin && !adminView ? { ...v0, myPermissions: [] } : v0;
   const can = (p: string) => v.myPermissions.includes(p);
   const isAdmin = can('challenge.view_admin');
   const isParticipant = !!v.participantStatus;
@@ -61,7 +69,16 @@ export function ChallengePage({ me, id, section }: { me: Me; id: number; section
       <button className="btn ghost small" onClick={() => navigate('/challenges')}>← Challenges</button>
       <div className="spread" style={{ marginTop: 8 }}>
         <h1>{v.name}</h1>
-        <span className={`badge ${v.phase}`}>{PHASE_LABEL[v.phase]}</span>
+        <span className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
+          {realAdmin && (
+            <label className="switch" title="Show the admin tabs">
+              <input type="checkbox" role="switch" checked={adminView} onChange={(e) => setAdminView(e.target.checked)} aria-label="Admin view" />
+              <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>
+              <span className="small">Admin view</span>
+            </label>
+          )}
+          <span className={`badge ${v.phase}`}>{PHASE_LABEL[v.phase]}</span>
+        </span>
       </div>
       <p className="muted small">{day(v.startsOn)} – {day(v.endsOn)} · {v.timeZone}</p>
       {sections.length > 1 && (

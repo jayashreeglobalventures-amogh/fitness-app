@@ -264,3 +264,36 @@ button.linklike:hover { text-decoration: underline; }
 .help-example ul { margin: 4px 0 0; }
 .help-tip { background: color-mix(in srgb, var(--info) 10%, var(--surface-2)); border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 14px; }
 mark { background: color-mix(in srgb, var(--warn) 45%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
+/* Pop-up panels */
+.modal-backdrop { position: fixed; inset: 0; z-index: 90; background: rgb(0 0 0 / .55); display: flex; align-items: flex-end; justify-content: center; }
+.modal { width: 100%; max-height: 88dvh; overflow: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 18px 18px 0 0;
+  padding: 14px 16px max(16px, env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .4); animation: sheet-up .18s ease-out; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; position: sticky; top: -14px; background: var(--surface); padding: 2px 0 8px; z-index: 1; }
+@media (min-width: 640px) {
+  .modal-backdrop { align-items: center; }
+  .modal { width: min(560px, calc(100% - 32px)); border-radius: 18px; padding-bottom: 16px; animation: pop-in .15s ease-out; }
+  .modal.wide { width: min(760px, calc(100% - 32px)); }
+}
+@keyframes sheet-up { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@keyframes pop-in { from { transform: scale(.97); opacity: .6; } to { transform: none; opacity: 1; } }
+
+/* Switch (Admin view) */
+.switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; white-space: nowrap; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch-track { width: 38px; height: 22px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); position: relative; transition: background .15s; }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: left .15s, background .15s; }
+.switch input:checked + .switch-track { background: color-mix(in srgb, var(--accent) 35%, var(--surface-2)); border-color: var(--accent); }
+.switch input:checked + .switch-track .switch-thumb { left: 18px; background: var(--accent); }
+.switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Visibility chip */
+.vis-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); white-space: nowrap; min-height: 28px; }
+.vis-chip.vis-1 { color: var(--info); border-color: color-mix(in srgb, var(--info) 45%, var(--border)); }
+.vis-chip.vis-2 { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.vis-chip.vis-3 { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.field-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.field-head label { font-size: 13px; font-weight: 600; color: var(--muted); }
+div.field { margin-bottom: 12px; }
+div.field > input, div.field > textarea { width: 100%; }

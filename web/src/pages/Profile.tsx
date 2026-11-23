@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { navigate } from '../router';
-import { Avatar, ErrorBox, Field, Loading, upload, useLoad } from '../ui';
+import { Avatar, ErrorBox, Field, Loading, PROFILE_VIS, upload, useLoad, VisibilityChip } from '../ui';
 import { PhotoCropper } from '../PhotoCropper';
 import { PhoneNotifications } from '../PhoneNotifications';
 
@@ -12,7 +12,6 @@ const FIELDS: { key: F; label: string; type: string }[] = [
   { key: 'birthDate', label: 'Date of birth', type: 'date' }, { key: 'gender', label: 'Gender', type: 'text' }, { key: 'location', label: 'Location', type: 'text' },
   { key: 'about', label: 'About you', type: 'area' },
 ];
-const VIS = { PRIVATE: 'Only me', CHALLENGE_MEMBERS: 'My challenge members', PUBLIC: 'Everyone in the app' };
 
 export function ProfilePage({ onChanged }: { onChanged: () => void }) {
   const { data, error, loading } = useLoad(() => api.get<Profile>('/api/me/profile'), []);
@@ -35,13 +34,16 @@ export function ProfilePage({ onChanged }: { onChanged: () => void }) {
       <PhoneNotifications />
       <div className="card">
         <Field label="Display name (shown in challenges)"><input type="text" value={p.displayName} onChange={(e) => { setP({ ...p, displayName: e.target.value }); setSaved(false); }} maxLength={80} /></Field>
+        <p className="muted small" style={{ margin: '4px 0 10px' }}>Tap the chip next to each item to choose who can see it: 🔒 only me → 👥 my challenge members → 🌍 everyone in the app.</p>
         {FIELDS.map((f) => (
-          <div key={f.key} className="grid2" style={{ alignItems: 'end' }}>
-            <Field label={f.label}>{f.type === 'area'
-              ? <textarea value={p.fields[f.key] ?? ''} onChange={(e) => setField(f.key, e.target.value)} maxLength={1000} />
-              : <input type={f.type} value={p.fields[f.key] ?? ''} onChange={(e) => setField(f.key, e.target.value)} />}</Field>
-            <Field label="Who can see it"><select value={p.visibility[f.key]} onChange={(e) => setVis(f.key, e.target.value)}>
-              {Object.entries(VIS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          <div key={f.key} className="field">
+            <div className="field-head">
+              <label htmlFor={`pf-${f.key}`}>{f.label}</label>
+              <VisibilityChip label={f.label} value={p.visibility[f.key]} options={[...PROFILE_VIS]} onChange={(v) => setVis(f.key, v)} />
+            </div>
+            {f.type === 'area'
+              ? <textarea id={`pf-${f.key}`} value={p.fields[f.key] ?? ''} onChange={(e) => setField(f.key, e.target.value)} maxLength={1000} />
+              : <input id={`pf-${f.key}`} type={f.type} value={p.fields[f.key] ?? ''} onChange={(e) => setField(f.key, e.target.value)} />}
           </div>
         ))}
         <ErrorBox error={saveError} />
@@ -80,8 +82,10 @@ function PhotoCard({ p, onChanged }: { p: Profile; onChanged: (p: Profile) => vo
             <button className="btn primary small" disabled={busy} onClick={() => input.current?.click()}>{busy ? 'Uploading…' : p.photoFileId ? 'Change photo' : 'Add a photo'}</button>
             {p.photoFileId && <button className="btn ghost small" disabled={busy} onClick={remove}>Remove</button>}
           </div>
-          <Field label="Who can see your photo"><select value={p.photoVisibility} onChange={(e) => void setVis(e.target.value)}>
-            {Object.entries(VIS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></Field>
+          <div className="field-head" style={{ justifyContent: 'flex-start' }}>
+            <span className="small muted">Who can see your photo:</span>
+            <VisibilityChip label="Photo" value={p.photoVisibility} options={[...PROFILE_VIS]} onChange={(v) => void setVis(v)} />
+          </div>
         </div>
       </div>
       <p className="muted small" style={{ margin: 0 }}>Take one with the camera or choose from your gallery, then position and zoom it.</p>

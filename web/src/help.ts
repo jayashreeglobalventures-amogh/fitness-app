@@ -116,7 +116,7 @@ export const TOPICS: Topic[] = [
       'Something wrong? **⋯ → Report**. Admins can pin, remove (with a reason - the author is told why and can delete it) or mute someone for a few days.',
     ] },
   { id: 'profile', group: 'Community & profile', audience: ['everyone'], title: 'Your profile and privacy', keywords: 'profile photo privacy visibility mobile email',
-    body: ['**Profile**: photo (crop and zoom), name, mobile, email and more - each with its own "who can see it": only me, my challenge members, or everyone in the app. Tap someone\'s name to see what they share.', 'Read the full **Privacy policy** from the sign-in screen or Profile.'] },
+    body: ['**Profile**: photo (crop and zoom), name, mobile, email and more. Tap the chip next to each item to change who can see it: 🔒 only me → 👥 my challenge members → 🌍 everyone in the app (then Save). Tap someone\'s name to see what they share.', 'Read the full **Privacy policy** from the sign-in screen or Profile.'] },
   { id: 'health', group: 'Community & profile', audience: ['everyone', 'super'], title: 'Health profile', keywords: 'health weight height bmi consent share private support access',
     body: [
       'Optional: **Profile → Health profile**. Nothing is stored until you give consent. Record height, weight (BMI is worked out), waist, body fat and resting heart rate as dated entries with progress charts; set goals and fitness level.',
@@ -125,6 +125,8 @@ export const TOPICS: Topic[] = [
     ] },
 
   // ---------- For admins ----------
+  { id: 'admin-view', group: 'For admins', audience: ['admin'], title: 'Admin view switch', keywords: 'admin view toggle participant tabs switch',
+    body: ['Next to the challenge name, **Admin view** shows or hides the admin tabs (Team, Review, Roster, Admins, Settings and the admin parts of Money, Exemptions, Bonus and Results). Off = you see the challenge exactly as a participant does. It is remembered per challenge on this device.'] },
   { id: 'admins-tab', group: 'For admins', audience: ['admin'], title: 'Admins and the finance manager', keywords: 'admin role two admins finance manager handover appoint',
     body: [
       '**Calamari → Admins.** A challenge needs **at least 2 admins** (so nothing depends on one person); any admin can add more. One admin\'s money requests are approved by another.',

@@ -2,7 +2,7 @@
 // their original time - e.g. for days before the app was live).
 import { useState } from 'react';
 import { api, type Me } from '../api';
-import { day, ErrorBox, Field, Loading, newRef, StatusBadge, upload, useLoad } from '../ui';
+import { closeModal, day, ErrorBox, Field, Loading, Modal, newRef, StatusBadge, upload, useLoad } from '../ui';
 import { navigate } from '../router';
 import type { ChallengeView } from './Challenge';
 import { WhatsAppReminders } from './WhatsAppReminders';
@@ -57,12 +57,12 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
             <td>{canCorrect && p.userId !== me.userId && <button className="btn small ghost" onClick={() => setOpen(open === p.participantId ? null : p.participantId)}>Correct</button>}</td>
           </tr>))}
         </tbody></table></div>
-      {open && <Correction v={v} person={d.people.find((p) => p.participantId === open)!} defaultDay={d.day} onDone={() => { setOpen(null); o.reload(); }} />}
+      {open && <Correction v={v} person={d.people.find((p) => p.participantId === open)!} defaultDay={d.day} onClose={() => setOpen(null)} onSaved={() => o.reload()} />}
     </>
   );
 }
 
-function Correction({ v, person, defaultDay, onDone }: { v: ChallengeView; person: Person; defaultDay: string; onDone: () => void }) {
+function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeView; person: Person; defaultDay: string; onClose: () => void; onSaved: () => void }) {
   const [kind, setKind] = useState<'evidence' | 'rest'>('evidence');
   const [dayPick, setDayPick] = useState(defaultDay);
   const [at, setAt] = useState('');
@@ -75,13 +75,12 @@ function Correction({ v, person, defaultDay, onDone }: { v: ChallengeView; perso
     try {
       if (kind === 'evidence') await upload(`/api/participants/${person.participantId}/submissions`, { clientRef: newRef(), day: dayPick, receivedAt: at, reason }, file);
       else await api.post(`/api/participants/${person.participantId}/rest-days`, { day: dayPick, declaredAt: at || undefined, reason });
-      onDone();
+      onSaved(); closeModal();
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
   return (
-    <div className="card">
-      <h3>Correction for {person.displayName}</h3>
-      <p className="muted small">For evidence or rest days sent outside the app (e.g. on WhatsApp before the app was live). Use the ORIGINAL time it was sent. Evidence still goes through the normal check; everything is recorded in the audit log.</p>
+    <Modal title={`Correct: ${person.displayName}`} onClose={onClose}>
+      <p className="muted small" style={{ marginTop: 0 }}>For evidence or rest days sent outside the app (e.g. on WhatsApp before the app was live). Use the ORIGINAL time it was sent. Evidence still goes through the normal check; everything is recorded in the audit log.</p>
       <div className="subnav inline" style={{ margin: '0 0 12px' }}>
         <button aria-current={kind === 'evidence'} onClick={() => setKind('evidence')}>Record evidence</button>
         <button aria-current={kind === 'rest'} onClick={() => setKind('rest')}>Record rest day</button>
@@ -94,6 +93,6 @@ function Correction({ v, person, defaultDay, onDone }: { v: ChallengeView; perso
       {kind === 'evidence' && <Field label="Screenshot"><input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>}
       <Field label="Reason / where it came from"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent on the Calamari WhatsApp group at 9:40 pm" /></Field>
       <button className="btn primary" disabled={busy || reason.trim().length < 5 || (kind === 'evidence' && (!file || !at))} onClick={send}>Save correction</button>
-    </div>
+    </Modal>
   );
 }

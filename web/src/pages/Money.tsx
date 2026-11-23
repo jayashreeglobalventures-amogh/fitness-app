@@ -3,7 +3,7 @@
 // payment details. Money never affects points.
 import { useState } from 'react';
 import { api } from '../api';
-import { day, ErrorBox, Field, Loading, upload, useLoad, ViewPhoto } from '../ui';
+import { closeModal, day, ErrorBox, Field, Loading, Modal, upload, useLoad, ViewPhoto } from '../ui';
 import type { ChallengeView } from './Challenge';
 
 interface Week {
@@ -248,7 +248,7 @@ function FinanceView({ v }: { v: ChallengeView }) {
             </div></td>
           </tr>))}
         </tbody></table></div>
-      {act && <AdminAction d={d} act={act} onDone={() => { setAct(null); o.reload(); }} onCancel={() => setAct(null)} />}
+      {act && <AdminAction d={d} act={act} onSaved={() => o.reload()} onClose={() => setAct(null)} />}
 
       {d.refunds.length > 0 && (<>
         <h2>Refunds</h2>
@@ -281,7 +281,7 @@ function FinanceView({ v }: { v: ChallengeView }) {
   );
 }
 
-function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: 'record' | 'refund'; participantId: number }; onDone: () => void; onCancel: () => void }) {
+function AdminAction({ d, act, onSaved, onClose }: { d: Overview; act: { kind: 'record' | 'refund'; participantId: number }; onSaved: () => void; onClose: () => void }) {
   const who = d.participants.find((p) => p.participantId === act.participantId)!;
   const [f, setF] = useState({ periodNo: String(d.periods[0]?.periodNo ?? 1), amount: '', method: 'UPI', utr: '', paidOn: d.today, reason: '' });
   const [error, setError] = useState<unknown>(null);
@@ -290,12 +290,11 @@ function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: '
     try {
       if (act.kind === 'record') await api.post(`/api/participants/${act.participantId}/payments`, f);
       else await api.post(`/api/participants/${act.participantId}/refunds`, { amount: f.amount, reason: f.reason });
-      onDone();
+      onSaved(); closeModal();
     } catch (e) { setError(e); }
   };
   return (
-    <div className="card" style={{ borderColor: 'var(--accent)' }}>
-      <div className="spread"><h3>{act.kind === 'record' ? `Record a payment from ${who.displayName}` : `Propose a refund to ${who.displayName}`}</h3><button className="btn small ghost" onClick={onCancel}>✕</button></div>
+    <Modal title={act.kind === 'record' ? `Record a payment from ${who.displayName}` : `Propose a refund to ${who.displayName}`} onClose={onClose}>
       <ErrorBox error={error} />
       {act.kind === 'record' ? (
         <div className="grid2">
@@ -314,6 +313,6 @@ function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: '
       )}
       <p className="muted small">{act.kind === 'record' ? (who.isMe ? 'This is your own payment: another admin must confirm it before it counts.' : 'It counts straight away (recorded in the activity log under your name).') : 'Another admin (not you) must approve it before it is owed.'}</p>
       <button className="btn primary" disabled={!f.amount} onClick={send}>{act.kind === 'record' ? (who.isMe ? 'Record - send for confirmation' : 'Record payment') : 'Propose refund'}</button>
-    </div>
+    </Modal>
   );
 }

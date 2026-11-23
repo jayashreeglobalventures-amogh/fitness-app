@@ -70,11 +70,13 @@ export async function adminDeclare(db: Queryable, actorUserId: number, participa
   const ctx = await challengeContext(db, p.challengeId, now);
   const day = String(input.day ?? '');
   const periodNo = await checkAllowed(db, ctx, p, day);
-  const reason = String(input.reason ?? '').trim();
-  if (reason.length < 5) throw validation('Give a reason (at least 5 characters).');
-  const declaredAt = input.declaredAt ? parseInstant(input.declaredAt, ctx.ch.timeZone) : now;
+  const reason = String(input.reason ?? '').trim().slice(0, 500) || null; // optional
+  // The original time is optional: without one, the admin is vouching it was declared in time (just before the cutoff,
+  // or now if that is earlier).
+  const cutoff = restCutoff(ctx.cfgOn(day), day);
+  const declaredAt = input.declaredAt ? parseInstant(input.declaredAt, ctx.ch.timeZone) : new Date(Math.min(now.getTime(), cutoff.getTime() - 60_000));
   if (!declaredAt || declaredAt > now) throw validation('The original declaration time must be a valid time, not in the future.');
-  const afterCutoff = declaredAt >= restCutoff(ctx.cfgOn(day), day);
+  const afterCutoff = declaredAt >= cutoff;
   const { rows } = await db.query(
     `INSERT INTO rest_days (challenge_id, participant_id, day, period_no, declared_at, source, declared_by, reason, created_at) VALUES ($1,$2,$3,$4,$5,'ADMIN_CORRECTION',$6,$7,$8) RETURNING rest_day_id`,
     [p.challengeId, participantId, day, periodNo, declaredAt, actorUserId, reason, now]);

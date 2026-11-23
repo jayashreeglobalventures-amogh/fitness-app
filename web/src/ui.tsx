@@ -160,3 +160,54 @@ export function Collapsible({ id, title, defaultOpen = true, className, children
     </div>
   );
 }
+
+/**
+ * A pop-up panel over the screen (a bottom sheet on phones, centred on wider screens) for short tasks like Correct,
+ * Record payment or Remind. Closes with ✕, a tap outside, Escape or the phone's Back gesture.
+ */
+export function Modal({ title, onClose, children, wide }: { title: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    history.pushState({ modal: true }, '');
+    const onPop = () => onClose();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') history.back(); };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const close = () => history.back(); // pops our history entry -> onClose
+  return (
+    <div className="modal-backdrop" onClick={close}>
+      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3 style={{ margin: 0 }}>{title}</h3>
+          <button className="btn small ghost" aria-label="Close" onClick={close}>✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/** Closes the nearest Modal the same way ✕ does (keeps the Back-button history in step). */
+export const closeModal = () => history.back();
+
+/** Who can see something, as a chip that moves to the next choice on each tap (compact on phones). */
+export function VisibilityChip<V extends string>({ value, options, onChange, label }: {
+  value: V; options: { value: V; icon: string; text: string }[]; onChange: (v: V) => void; label: string;
+}) {
+  const i = Math.max(0, options.findIndex((o) => o.value === value));
+  const cur = options[i]!;
+  const next = options[(i + 1) % options.length]!;
+  return (
+    <button type="button" className={`vis-chip vis-${i}`} onClick={() => onChange(next.value)}
+      aria-label={`${label}: ${cur.text}. Tap to change to ${next.text}.`} title={`Who can see it: ${cur.text} (tap to change)`}>
+      <span aria-hidden="true">{cur.icon}</span> {cur.text}
+    </button>
+  );
+}
+export const PROFILE_VIS = [
+  { value: 'PRIVATE', icon: '🔒', text: 'Only me' },
+  { value: 'CHALLENGE_MEMBERS', icon: '👥', text: 'Members' },
+  { value: 'PUBLIC', icon: '🌍', text: 'Everyone' },
+] as const;

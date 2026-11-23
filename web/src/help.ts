@@ -134,6 +134,12 @@ export const TOPICS: Topic[] = [
     ] },
   { id: 'profile', group: 'Community & profile', audience: ['everyone'], title: 'Your profile and privacy', keywords: 'profile photo privacy visibility mobile email',
     body: ['**Profile**: photo (crop and zoom), name, mobile, email and more. Tap the chip next to each item to change who can see it: 🔒 only me → 👥 my challenge members → 🌍 everyone in the app (then Save). Tap someone\'s name to see what they share.', 'Read the full **Privacy policy** from the sign-in screen or Profile.'] },
+  { id: 'appearance', group: 'Community & profile', audience: ['everyone'], title: 'Colours and background picture', keywords: 'theme colour color appearance dark light background picture photo wallpaper sunset ocean neon berry',
+    body: [
+      '**Profile → Appearance.** Pick a colour theme - **Sunset** (the default), Classic Mint, Ocean Pop, Neon Sport or Berry Bloom - and **Automatic** (follows your phone), **Light** or **Dark**.',
+      '**Background picture:** a built-in scene (Sunrise hills, Running track, Mountain peaks, Calm waves) or **your own photo**, shown faded behind everything. Use **How visible** to make it stronger or softer.',
+      { tip: 'These choices are saved on this device only. Your own photo is never uploaded - nobody else sees it.' },
+    ] },
   { id: 'health', group: 'Community & profile', audience: ['everyone', 'super'], title: 'Health profile', keywords: 'health weight height bmi consent share private support access',
     body: [
       'Optional: **Profile → Health profile**. Nothing is stored until you give consent. Record height, weight (BMI is worked out), waist, body fat and resting heart rate as dated entries with progress charts; set goals and fitness level.',

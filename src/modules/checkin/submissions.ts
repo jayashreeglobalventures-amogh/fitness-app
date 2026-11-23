@@ -9,7 +9,7 @@
 import type pg from 'pg';
 import { writeAudit } from '../../core/audit.js';
 import { lockChallenge, withTx, type Queryable } from '../../core/db.js';
-import { daysBetween, endOfDay, isValidDate, localDay, parseInstant } from '../../core/dates.js';
+import { daysBetween, endOfDay, isValidDate, localDay, parseInstant, zonedInstant } from '../../core/dates.js';
 import { conflict, forbidden, notFound, validation } from '../../core/errors.js';
 import { readImage, storeImage } from '../../core/media.js';
 import { accessFor, requirePermission } from '../identity/permissions.js';
@@ -132,12 +132,15 @@ export async function recordCorrection(db: Queryable, mediaDir: string, actorUse
   const day = String(input.day ?? '');
   if (!isValidDate(day) || daysBetween(ctx.ch.startsOn, day) < 0 || daysBetween(day, ctx.today) < 0) throw validation('Choose a challenge day up to today.');
   if (!participatesOn(p0, day)) throw validation('The participant was not taking part on that day.');
-  const receivedAt = parseInstant(input.receivedAt, ctx.ch.timeZone);
-  if (!receivedAt) throw validation('Enter the original date and time the evidence was sent.');
+  // The original time is optional: without one, the admin is vouching it arrived that day (counted as 23:59 that day,
+  // or now for today). If given, it must still be on that day, before midnight.
+  const given = input.receivedAt != null && String(input.receivedAt).trim() !== '';
+  const receivedAt = given ? parseInstant(input.receivedAt, ctx.ch.timeZone)
+    : day === ctx.today ? now : zonedInstant(day, '23:59', ctx.ch.timeZone);
+  if (!receivedAt) throw validation('The original time is not a valid date and time.');
   if (receivedAt > now) throw validation('The original time can\'t be in the future.');
   if (localDay(receivedAt, ctx.ch.timeZone) !== day) throw validation(`The original time must be on ${day} (${ctx.ch.timeZone}): evidence counts only for the day it was sent, before midnight.`);
-  const reason = String(input.reason ?? '').trim();
-  if (reason.length < 5) throw validation('Give a reason (at least 5 characters), e.g. where the evidence came from.');
+  const reason = String(input.reason ?? '').trim().slice(0, 500) || null; // optional
   const cfg = ctx.cfgOn(day);
   const r = await createSubmission(db, mediaDir, p0, day, receivedAt, input, actorUserId, 'ADMIN_CORRECTION', reason, now, cfg.verification.mode === 'AI_ASSISTED' && currentReader() !== null, cfg.submission.multiplePerDay.enabled);
   await writeAudit(db, now, { actorUserId, challengeId: p0.challengeId, action: 'EVIDENCE_RECORDED_BY_ADMIN', entity: 'SUBMISSION', entityId: r.submissionId, reason,

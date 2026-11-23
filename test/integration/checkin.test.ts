@@ -163,10 +163,11 @@ describe('daily evidence', () => {
     expect(late.status).toBe(400);
     expect((await priya.upload(url, { clientRef: 'corr-self-1', day: '2026-11-23', receivedAt: '2026-11-23T21:00:00+05:30', reason: 'Sent on WhatsApp' }, png('x'))).status).toBe(403);
     nextReading = reads({ date: '2026-11-23', value: 9100 });
-    const ok = await ca.upload(url, { clientRef: 'corr-priya-23-b', day: '2026-11-23', receivedAt: '2026-11-23T21:00', reason: 'Sent on WhatsApp before the app was live' }, png('priya-23'));
+    // Time and reason are optional: without a time it counts as sent at 23:59 that day.
+    const ok = await ca.upload(url, { clientRef: 'corr-priya-23-b', day: '2026-11-23' }, png('priya-23'));
     expect(ok.status).toBe(200);
     await h.settle();
-    expect(await day(priya, '2026-11-23')).toMatchObject({ status: 'ACHIEVED', submission: { receivedAt: '2026-11-23T15:30:00.000Z' } });
+    expect(await day(priya, '2026-11-23')).toMatchObject({ status: 'ACHIEVED', submission: { receivedAt: '2026-11-23T18:29:00.000Z' } });
     const { rows } = await h.admin.query(`SELECT source, recorded_by, correction_reason FROM submissions WHERE submission_id = $1`, [ok.body.data.submissionId]);
     expect(rows[0]).toMatchObject({ source: 'ADMIN_CORRECTION', recorded_by: ca.userId });
   });
@@ -215,10 +216,10 @@ describe('rest days', () => {
 
   it('admin correction records a past rest day with its original time (flagged if after the cut-off); not for themselves', async () => {
     const url = `/api/participants/${pids.meera}/rest-days`;
-    expect((await ca.post(url, { day: '2026-11-23', reason: '' })).status).toBe(400);
     expect((await fa.post(url, { day: '2026-11-23', reason: 'Declared on WhatsApp' })).status).toBe(403);
     expect((await ca.post(`/api/participants/${pids.chadmin}/rest-days`, { day: '2026-11-23', reason: 'Declared on WhatsApp' })).status).toBe(403);
-    const ok = await ca.post(url, { day: '2026-11-23', declaredAt: '2026-11-23T08:15:00+05:30', reason: 'Declared on WhatsApp before the app was live' });
+    // Time and reason are optional: without a time the admin is vouching it was declared in time.
+    const ok = await ca.post(url, { day: '2026-11-23' });
     expect(ok.body.data).toMatchObject({ afterCutoff: false });
     expect(await day(meera, '2026-11-23')).toMatchObject({ status: 'REST', restDay: { source: 'ADMIN_CORRECTION' } });
   });

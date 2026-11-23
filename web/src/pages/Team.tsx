@@ -65,7 +65,6 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
 function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeView; person: Person; defaultDay: string; onClose: () => void; onSaved: () => void }) {
   const [kind, setKind] = useState<'evidence' | 'rest'>('evidence');
   const [dayPick, setDayPick] = useState(defaultDay);
-  const [at, setAt] = useState('');
   const [reason, setReason] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -73,26 +72,23 @@ function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeV
   const send = async () => {
     setBusy(true); setError(null);
     try {
-      if (kind === 'evidence') await upload(`/api/participants/${person.participantId}/submissions`, { clientRef: newRef(), day: dayPick, receivedAt: at, reason }, file);
-      else await api.post(`/api/participants/${person.participantId}/rest-days`, { day: dayPick, declaredAt: at || undefined, reason });
+      if (kind === 'evidence') await upload(`/api/participants/${person.participantId}/submissions`, { clientRef: newRef(), day: dayPick, reason }, file);
+      else await api.post(`/api/participants/${person.participantId}/rest-days`, { day: dayPick, reason });
       onSaved(); closeModal();
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
   return (
     <Modal title={`Correct: ${person.displayName}`} onClose={onClose}>
-      <p className="muted small" style={{ marginTop: 0 }}>For evidence or rest days sent outside the app (e.g. on WhatsApp before the app was live). Use the ORIGINAL time it was sent. Evidence still goes through the normal check; everything is recorded in the audit log.</p>
+      <p className="muted small" style={{ marginTop: 0 }}>For a screenshot or rest day sent outside the app (e.g. on WhatsApp). It counts for the day you pick. Screenshots still go through the normal check; everything is recorded in the activity log.</p>
       <div className="subnav inline" style={{ margin: '0 0 12px' }}>
         <button aria-current={kind === 'evidence'} onClick={() => setKind('evidence')}>Record evidence</button>
         <button aria-current={kind === 'rest'} onClick={() => setKind('rest')}>Record rest day</button>
       </div>
       <ErrorBox error={error} />
-      <div className="grid2">
-        <Field label="Challenge day"><input type="date" value={dayPick} min={v.startsOn} max={v.today} onChange={(e) => setDayPick(e.target.value)} /></Field>
-        <Field label={`Originally sent at (${v.timeZone} time)`}><input type="datetime-local" value={at} onChange={(e) => setAt(e.target.value)} /></Field>
-      </div>
+      <Field label="Challenge day"><input type="date" value={dayPick} min={v.startsOn} max={v.today} onChange={(e) => setDayPick(e.target.value)} /></Field>
       {kind === 'evidence' && <Field label="Screenshot"><input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>}
-      <Field label="Reason / where it came from"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent on the Calamari WhatsApp group at 9:40 pm" /></Field>
-      <button className="btn primary" disabled={busy || reason.trim().length < 5 || (kind === 'evidence' && (!file || !at))} onClick={send}>Save correction</button>
+      <Field label="Note (optional)"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent on the WhatsApp group" /></Field>
+      <button className="btn primary" disabled={busy || !dayPick || (kind === 'evidence' && !file)} onClick={send}>Save</button>
     </Modal>
   );
 }

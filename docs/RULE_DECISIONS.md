@@ -13,10 +13,10 @@ change any of them. **Open** items are not implemented until the owner decides (
 | Duplicate images | An image already used by anyone else, or by the same person for another day, always goes to an admin. |
 | Admin decisions | "Target reached" needs a value ≥ target; "below target" a value < target; "rejected" and any change of decision (including deciding an appeal) need a reason. Nobody reviews their own evidence. |
 | Appeals | One appeal per decision (below target or rejected); it goes back to the review queue. |
-| Rest days | Declared before 10:00 on the day or any earlier time; cancelable until 10:00 that day; not on a day with evidence or inside an exemption request. Admin corrections keep the weekly/total limits and record the original time (flagged if after 10:00). |
+| Rest days | Declared before 10:00 on the day or any earlier time; cancelable until 10:00 that day; not on a day with evidence or inside an exemption request. Admin corrections keep the weekly/total limits; the time is optional (owner, 2026-11-23) - without one the admin is vouching it was declared in time. |
 | Exemption requests | Up to 14 days per request; past days allowed (the vote/admin is the safeguard); no overlap with other requests, rest days, or days already achieved. The reason is shown to voters; evidence only to admins. |
 | Exemption voting | Voters = participants active on the day of the request (the requester only if the settings allow). Votes can be changed until the window closes. It closes early when everyone has voted. Approved if approve-share ≥ threshold; a tie or fewer votes than the minimum → admin. The voting settings are copied onto the request, so a later rules change can't alter a live vote. |
-| Corrections for days before the app is live | Admin records the evidence/rest day with its original time (must be before that day's midnight / is flagged if after 10:00) and a reason; evidence goes through the normal check. |
+| Corrections (admin records for someone) | Owner, 2026-11-23: as simple as possible - pick the day (+ screenshot for evidence); original time and note are optional. Without a time, evidence counts as sent at 23:59 that day (now, if today) and a rest day as declared in time; the admin's name is in the activity log. Evidence goes through the normal check. |
 | Adherence (shown now, provisional) | achieved ÷ (achieved + missed), over days that have happened; rest and excused days are left out; pending days don't count yet. |
 
 ## Phase 3 scoring - owner rulings (20 Nov 2026), in Calamari's settings

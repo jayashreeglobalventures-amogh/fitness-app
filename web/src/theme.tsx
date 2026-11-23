@@ -2,6 +2,7 @@
 // A link with ?palette=sunset (or ?mode=light) previews one and remembers it, handy for comparing on a phone.
 import { useState } from 'react';
 import { applyBackground, backgroundFromLink, BackgroundPicker } from './background';
+import { Collapsible } from './ui';
 
 export const PALETTES = {
   classic: { name: 'Classic Mint', note: 'Today\'s look: calm green on charcoal', colors: ['#0b0f14', '#3ddc97', '#3ddc97'] },
@@ -47,8 +48,7 @@ export function AppearanceCard() {
   const [t, setT] = useState(current);
   const pick = (palette: Palette, mode: Mode) => { write(KEY.palette, palette); write(KEY.mode, mode); applyTheme(palette, mode); setT({ palette, mode }); };
   return (
-    <div className="card">
-      <h3>Appearance</h3>
+    <Collapsible id="appearance" title="🎨 Appearance" defaultOpen={false}>
       <p className="muted small">Pick a colour theme. It changes this device only.</p>
       <div className="swatches">
         {(Object.keys(PALETTES) as Palette[]).map((k) => (
@@ -65,6 +65,6 @@ export function AppearanceCard() {
         ))}
       </div>
       <BackgroundPicker />
-    </div>
+    </Collapsible>
   );
 }

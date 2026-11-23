@@ -2,7 +2,8 @@
 // the database's sharing check).
 import { api } from '../api';
 import { navigate } from '../router';
-import { Avatar, day, ErrorBox, Loading, useLoad } from '../ui';
+import type { ReactNode } from 'react';
+import { Avatar, day, ErrorBox, Loading, Modal, useLoad } from '../ui';
 import { ACTIVITY_LABEL, bmiNote, FITNESS_LABEL, fmtHeight, fmtWaist, fmtWeight, GOAL_LABEL } from './Health';
 
 interface Dated { value: number; on: string }
@@ -21,16 +22,35 @@ export function PersonPage({ userId }: { userId: number }) {
   const p = useLoad(() => api.get<PersonCard>(`/api/people/${userId}`), [userId]);
   if (p.loading) return <Loading />;
   if (!p.data) return <ErrorBox error={p.error} />;
-  const d = p.data;
-  if (d.self) { navigate('/profile'); return null; }
+  if (p.data.self) { navigate('/profile'); return null; }
+  return (
+    <>
+      <button className="btn ghost small" onClick={() => history.back()}>← Back</button>
+      <PersonDetails d={p.data} />
+    </>
+  );
+}
+
+/** Someone's profile in a pop-up (e.g. from the leaderboard): the same visibility rules as the page. */
+export function PersonModal({ userId, onClose, extra }: { userId: number; onClose: () => void; extra?: ReactNode }) {
+  const p = useLoad(() => api.get<PersonCard>(`/api/people/${userId}`), [userId]);
+  return (
+    <Modal title="Profile" onClose={onClose}>
+      {extra}
+      {p.loading && !p.data ? <Loading /> : p.data ? <PersonDetails d={p.data} bare /> : <ErrorBox error={p.error} />}
+    </Modal>
+  );
+}
+
+function PersonDetails({ d, bare }: { d: PersonCard; bare?: boolean }) {
   const v = d.health?.values ?? {};
   const units = 'METRIC';
   const row = (label: string, value: string | null | undefined, on?: string) => value ? (
     <div className="spread" style={{ padding: '4px 0', borderBottom: '1px solid var(--border)' }}><span className="muted small">{label}</span><span>{value}{on && <span className="muted small"> · {day(on)}</span>}</span></div>) : null;
+  const empty = Object.keys(d.fields).length === 0 && !d.health;
   return (
     <>
-      <button className="btn ghost small" onClick={() => history.back()}>← Back</button>
-      <div className="card" style={{ marginTop: 8 }}>
+      <div className={bare ? '' : 'card'} style={{ marginTop: bare ? 0 : 8 }}>
         <div className="row" style={{ alignItems: 'center', gap: 14 }}>
           <Avatar fileId={d.photoFileId} name={d.displayName} size={72} />
           <div>
@@ -39,9 +59,10 @@ export function PersonPage({ userId }: { userId: number }) {
           </div>
         </div>
         {Object.keys(d.fields).length > 0 && <div style={{ marginTop: 12 }}>{Object.entries(d.fields).map(([k, val]) => <div key={k}>{row(FIELD[k] ?? k, val)}</div>)}</div>}
+        {empty && <p className="muted small" style={{ marginBottom: 0 }}>{d.displayName} hasn't shared any other profile details with you.</p>}
       </div>
       {d.health && (
-        <div className="card">
+        <div className={bare ? '' : 'card'} style={bare ? { marginTop: 14 } : undefined}>
           <h3>Health</h3>
           {d.health.support && <div className="alert warn small">You can see this because {d.displayName} gave you temporary support access. This view is recorded.</div>}
           {row('Height', v.heightCm ? fmtHeight(v.heightCm.value, units) : null, v.heightCm?.on)}

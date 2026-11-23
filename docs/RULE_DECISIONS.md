@@ -84,7 +84,7 @@ Defaults applied where nothing was said:
 | Topic | Rule |
 |---|---|
 | Challenge admins | Any admin (or Super Admin) can make other users admins - **no limit**. A challenge needs **at least 2** to be published and can't drop below 2, so nothing depends on one person |
-| Two-person rule | A payment recorded by an admin on someone's behalf is confirmed by a **different** admin; a refund is approved by an admin other than the one who proposed it |
+| Two-person rule | (Updated 23 Nov 2026) A payment the finance manager records **for someone else** counts straight away (logged under their name); a payment an admin records or reports **for themselves** is confirmed by a **different** admin. UTR and "where it was reported" are optional when an admin records a payment. A refund is approved by an admin other than the one who proposed it |
 | Finance manager | **Exactly one** per challenge. The first is appointed directly; changing it is a **handover** started by an admin (checks: money held, payment reports and refunds still waiting; the admin confirms the money is being handed over). The **new manager confirms the exact amount received and that the accounts are settled**; only then does the role move. The old UPI ID / QR are hidden from participants until the new manager enters theirs |
 | Admin as finance manager | Allowed (owner, 21 Nov 2026). The handover checks still apply, and the two-person rule still covers their own money requests |
 

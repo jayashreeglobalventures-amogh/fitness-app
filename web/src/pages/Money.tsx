@@ -180,8 +180,8 @@ function PaymentDetails({ v, onSaved }: { v: ChallengeView; onSaved?: () => void
 
 interface Overview {
   pools: Pools; checks: { name: string; ok: boolean }[]; today: string; periods: { periodNo: number; startsOn: string; endsOn: string }[];
-  participants: { participantId: number; displayName: string; status: string; owed: number; refundDue: number; paid: number; fines: number; overdueWeeks: number[]; checking: number[] }[];
-  payments: (Payment & { participantId: number; displayName: string; mine: boolean; note: string | null; recordedByAdmin: boolean; recordedByMe: boolean })[];
+  participants: { participantId: number; displayName: string; status: string; isMe?: boolean; owed: number; refundDue: number; paid: number; fines: number; overdueWeeks: number[]; checking: number[] }[];
+  payments: (Payment & { participantId: number; displayName: string; mine: boolean; note: string | null; recordedByAdmin: boolean; recordedByMe: boolean; byAdminForSelf: boolean })[];
   refunds: { refundId: number; participantId: number; displayName: string; amount: number; reason: string; status: string; proposedBy: number; decisionReason: string | null }[];
   canConfirm: boolean; canCountersign: boolean; canProposeRefund: boolean; canApproveRefund: boolean;
 }
@@ -222,8 +222,8 @@ function FinanceView({ v }: { v: ChallengeView }) {
           <div className="spread"><b>{p.displayName} · week {p.periodNo} · {inr(p.amount)}</b><Badge s={p.status} /></div>
           <p className="small" style={{ margin: '6px 0' }}>{p.method === 'UPI' ? <>UTR <b style={{ userSelect: 'all' }}>{p.utr}</b></> : p.method.toLowerCase()} · paid {day(p.paidOn)}{p.note ? ` · ${p.note}` : ''}
             {p.proofFileId && <> · <ViewPhoto fileId={p.proofFileId} alt="Payment screenshot">screenshot</ViewPhoto></>}</p>
-          {p.recordedByAdmin && <p className="small"><span className="badge info">recorded by an admin</span> needs a second admin to confirm</p>}
-          {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : p.recordedByMe ? <p className="muted small">You recorded this: another admin must confirm it.</p> : (p.recordedByAdmin ? d.canCountersign : d.canConfirm) && (
+          {p.byAdminForSelf && <p className="small"><span className="badge info">an admin's own payment</span> needs another admin to confirm</p>}
+          {p.mine ? <p className="muted small">Your own payment: another admin must confirm it.</p> : p.recordedByMe ? <p className="muted small">You recorded this: another admin must confirm it.</p> : (p.byAdminForSelf || p.recordedByAdmin ? d.canCountersign : d.canConfirm) && (
             <div className="row">
               <button className="btn small primary" onClick={() => run(() => api.post(`/api/payments/${p.paymentId}/decide`, { confirm: true }))}>Confirm received</button>
               <button className="btn small danger" disabled={reason.trim().length < 5} onClick={() => run(() => api.post(`/api/payments/${p.paymentId}/decide`, { confirm: false, reason }))}>Not received</button>
@@ -301,9 +301,9 @@ function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: '
           <Field label="Week"><select value={f.periodNo} onChange={(e) => setF({ ...f, periodNo: e.target.value })}>{d.periods.map((p) => <option key={p.periodNo} value={p.periodNo}>Week {p.periodNo} ({day(p.startsOn)})</option>)}</select></Field>
           <Field label="Amount (₹)"><input type="number" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></Field>
           <Field label="Method"><select value={f.method} onChange={(e) => setF({ ...f, method: e.target.value })}><option value="UPI">UPI</option><option value="CASH">Cash</option><option value="BANK_TRANSFER">Bank transfer</option><option value="OTHER">Other</option></select></Field>
-          {f.method === 'UPI' && <Field label="UTR"><input type="text" value={f.utr} onChange={(e) => setF({ ...f, utr: e.target.value })} /></Field>}
+          {f.method === 'UPI' && <Field label="UTR (optional)"><input type="text" value={f.utr} onChange={(e) => setF({ ...f, utr: e.target.value })} /></Field>}
           <Field label="Paid on"><input type="date" value={f.paidOn} max={d.today} onChange={(e) => setF({ ...f, paidOn: e.target.value })} /></Field>
-          <Field label="Where it was reported"><input type="text" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="e.g. UTR sent on WhatsApp" /></Field>
+          <Field label="Where it was reported (optional)"><input type="text" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="e.g. UTR sent on WhatsApp" /></Field>
         </div>
       ) : (
         <div className="grid2">
@@ -311,8 +311,8 @@ function AdminAction({ d, act, onDone, onCancel }: { d: Overview; act: { kind: '
           <Field label="Reason (the admin decision)"><input type="text" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} placeholder="e.g. withdrew on medical grounds" /></Field>
         </div>
       )}
-      <p className="muted small">{act.kind === 'record' ? 'Another admin must confirm it before it counts (two-person rule).' : 'Another admin (not you) must approve it before it is owed.'}</p>
-      <button className="btn primary" onClick={send}>{act.kind === 'record' ? 'Record' : 'Propose refund'}</button>
+      <p className="muted small">{act.kind === 'record' ? (who.isMe ? 'This is your own payment: another admin must confirm it before it counts.' : 'It counts straight away (recorded in the activity log under your name).') : 'Another admin (not you) must approve it before it is owed.'}</p>
+      <button className="btn primary" disabled={!f.amount} onClick={send}>{act.kind === 'record' ? (who.isMe ? 'Record - send for confirmation' : 'Record payment') : 'Propose refund'}</button>
     </div>
   );
 }

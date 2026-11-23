@@ -172,7 +172,7 @@ export const TOPICS: Topic[] = [
   { id: 'payments-admin', group: 'For the finance manager', audience: ['finance', 'admin'], title: 'Confirming payments, two-person rule and refunds', keywords: 'confirm payment utr finance two person refund record on behalf cash',
     body: [
       '**Money** tab (finance view): payments reported with their UTR wait for you to **Confirm** or **Reject** (with a reason) after checking your bank / UPI app.',
-      'A payment an admin **records on someone\'s behalf** (e.g. cash) must be confirmed by **another** admin. Refunds are proposed by one person and approved by a **different** admin - never by the person who proposed them.',
+      '**Record payment** (a participant\'s row): for someone else it counts **straight away** - e.g. cash handed over, or a UTR sent on WhatsApp; UTR and "where it was reported" are optional. Your **own** payment (if you also take part) waits for **another** admin to confirm it. Refunds are proposed by one person and approved by a **different** admin.',
       'The **checks** at the bottom must all be green - they prove the books balance.',
       { tip: 'Payment details (UPI ID, QR) are set by the finance manager in the Money tab.' },
     ] },

@@ -146,7 +146,7 @@ const paise = (rupees: unknown): number => {
   return Math.round(n * 100);
 };
 
-async function insertPayment(db: Queryable, mediaDir: string, actorUserId: number, p: { participantId: number; challengeId: number; userId: number }, ctx: ChallengeContext, input: PaymentInput, now: Date, onBehalf: boolean): Promise<{ paymentId: number }> {
+async function insertPayment(db: Queryable, mediaDir: string, actorUserId: number, p: { participantId: number; challengeId: number; userId: number }, ctx: ChallengeContext, input: PaymentInput, now: Date, onBehalf: boolean, confirmNow = false): Promise<{ paymentId: number }> {
   const periodNo = Number(input.periodNo);
   const period = ctx.periods.find((x) => x.periodNo === periodNo);
   if (!period) throw validation('Choose which week this payment is for.');
@@ -154,7 +154,8 @@ async function insertPayment(db: Queryable, mediaDir: string, actorUserId: numbe
   const method = onBehalf ? String(input.method ?? 'UPI') : 'UPI';
   if (!['UPI', 'CASH', 'BANK_TRANSFER', 'OTHER'].includes(method)) throw validation('Unknown payment method.');
   const utr = String(input.utr ?? '').replace(/\s/g, '').toUpperCase() || null;
-  if (method === 'UPI' && !utr) throw validation('Enter the UPI reference (UTR) from your payment app.');
+  // Participants give the UTR (the finance manager checks it against the bank); for admins recording a payment it is optional.
+  if (method === 'UPI' && !utr && !onBehalf) throw validation('Enter the UPI reference (UTR) from your payment app.');
   if (utr && !/^[A-Z0-9]{6,30}$/.test(utr)) throw validation('The UTR is 6–30 letters and digits (usually 12 digits).');
   const paidOn = String(input.paidOn ?? '');
   if (!isValidDate(paidOn) || daysBetween(paidOn, ctx.today) < 0) throw validation('Enter the date you paid (not in the future).');
@@ -172,9 +173,11 @@ async function insertPayment(db: Queryable, mediaDir: string, actorUserId: numbe
   }
   const note = String(input.note ?? '').trim().slice(0, 500) || null;
   const { rows } = await db.query(
-    `INSERT INTO payments (challenge_id, participant_id, period_no, amount_paise, method, utr, paid_on, proof_file_id, note, status, submitted_by, submitted_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'SUBMITTED',$10,$11,$11) RETURNING payment_id`,
-    [p.challengeId, p.participantId, periodNo, amount, method, utr, paidOn, proof, note, actorUserId, now]);
+    `INSERT INTO payments (challenge_id, participant_id, period_no, amount_paise, method, utr, paid_on, proof_file_id, note, status, submitted_by, submitted_at, updated_at,
+                           decided_by, decided_at, decision_reason)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$12,$10,$11,$11,$13,$14,$15) RETURNING payment_id`,
+    [p.challengeId, p.participantId, periodNo, amount, method, utr, paidOn, proof, note, actorUserId, now, confirmNow ? 'CONFIRMED' : 'SUBMITTED',
+      confirmNow ? actorUserId : null, confirmNow ? now : null, confirmNow ? 'Recorded by the finance manager' : null]);
   return { paymentId: Number(rows[0].payment_id) };
 }
 
@@ -190,18 +193,22 @@ export async function submitPayment(db: Queryable, mediaDir: string, userId: num
   return r;
 }
 
-/** A Finance Admin records a payment on someone's behalf (cash, bank transfer, or a UTR they received). */
-export async function recordPayment(db: Queryable, mediaDir: string, actorUserId: number, participantId: number, input: PaymentInput, now: Date): Promise<{ paymentId: number }> {
+/**
+ * The finance manager records a payment (cash, bank transfer, or a UTR they received). For someone else it is confirmed
+ * at once (owner, 23 Nov 2026); for themselves it waits for another admin - nobody confirms their own money.
+ * UTR and "where it was reported" are optional here.
+ */
+export async function recordPayment(db: Queryable, mediaDir: string, actorUserId: number, participantId: number, input: PaymentInput, now: Date): Promise<{ paymentId: number; confirmed: boolean }> {
   const p = await participantById(db, participantId);
   await lockChallenge(db, p.challengeId);
   requirePermission(await accessFor(db, actorUserId, p.challengeId), 'payments.verify');
-  if (p.userId === actorUserId) throw forbidden('You can\'t record your own payment; another admin must do it.');
-  const reason = String(input.reason ?? '').trim();
-  if (reason.length < 5) throw validation('Say where this payment was reported (at least 5 characters).');
+  const own = p.userId === actorUserId;
+  const reason = String(input.reason ?? '').trim().slice(0, 300);
   const ctx = await challengeContext(db, p.challengeId, now);
-  const r = await insertPayment(db, mediaDir, actorUserId, p, ctx, { ...input, note: [reason, String(input.note ?? '')].filter(Boolean).join(' · ') }, now, true);
-  await writeAudit(db, now, { actorUserId, challengeId: p.challengeId, action: 'PAYMENT_RECORDED_BY_ADMIN', entity: 'PAYMENT', entityId: r.paymentId, reason, after: { participantId } });
-  return r;
+  const r = await insertPayment(db, mediaDir, actorUserId, p, ctx, { ...input, note: [reason, String(input.note ?? '')].filter(Boolean).join(' · ') }, now, true, !own);
+  await writeAudit(db, now, { actorUserId, challengeId: p.challengeId, action: own ? 'PAYMENT_RECORDED_BY_ADMIN' : 'PAYMENT_RECORDED_AND_CONFIRMED', entity: 'PAYMENT', entityId: r.paymentId,
+    reason: reason || null, after: { participantId, confirmed: !own, amountPaise: Math.round(Number(String(input.amount).replace(/[,\s₹]/g, '')) * 100), periodNo: Number(input.periodNo) } });
+  return { ...r, confirmed: !own };
 }
 
 export async function decidePayment(db: Queryable, actorUserId: number, paymentId: number, input: { confirm: unknown; reason?: unknown }, now: Date): Promise<void> {
@@ -212,9 +219,10 @@ export async function decidePayment(db: Queryable, actorUserId: number, paymentI
   const access = await accessFor(db, actorUserId, Number(pay.challenge_id));
   const p = await participantById(db, Number(pay.participant_id));
   if (p.userId === actorUserId) throw forbidden('You can\'t confirm your own payment; another admin must do it.');
-  // Two-person rule: money an admin recorded on someone's behalf is confirmed by a different admin.
+  // Two-person rule: an admin's own payment is confirmed by a different admin (one who confirms or countersigns payments).
   const recordedByAdmin = Number(pay.submitted_by) !== p.userId;
-  if (recordedByAdmin) {
+  const ownByAdmin = !recordedByAdmin && (await accessFor(db, p.userId, Number(pay.challenge_id))).permissions.has('payments.verify');
+  if (recordedByAdmin || ownByAdmin) {
     if (Number(pay.submitted_by) === actorUserId) throw forbidden('You recorded this payment, so another admin must confirm it.');
     if (!access.permissions.has('payments.verify') && !access.permissions.has('payments.countersign')) throw forbidden();
   } else requirePermission(access, 'payments.verify');
@@ -389,11 +397,15 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
   if (!access.permissions.has('finance.view') && !access.permissions.has('refunds.approve')) throw forbidden();
   const { ctx } = await reconcileMoney(db, challengeId, now);
   const bal = await accountBalances(db, challengeId);
-  const { rows: people } = await db.query(`SELECT p.participant_id, p.status, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ORDER BY u.display_name`, [challengeId]);
+  const { rows: people } = await db.query(`SELECT p.participant_id, p.user_id, p.status, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ORDER BY u.display_name`, [challengeId]);
+  // People who confirm payments here (finance manager, Super Admins): their own payments need another admin.
+  const { rows: verifiers } = await db.query(
+    `SELECT user_id FROM challenge_roles WHERE challenge_id = $1 AND role = 'FINANCE_ADMIN' UNION SELECT user_id FROM platform_roles WHERE role = 'SUPER_ADMIN'`, [challengeId]);
+  const verifierIds = new Set(verifiers.map((v) => Number(v.user_id)));
   const rows = [];
   for (const r of people) {
     const s = await statementOf(db, ctx, Number(r.participant_id));
-    rows.push({ participantId: Number(r.participant_id), displayName: r.display_name, status: r.status, owed: s.owed, refundDue: s.refundDue,
+    rows.push({ participantId: Number(r.participant_id), displayName: r.display_name, status: r.status, owed: s.owed, refundDue: s.refundDue, isMe: Number(r.user_id) === userId,
       paid: Math.round(s.weeks.reduce((a, w) => a + w.paid - w.creditUsed, 0) * 100) / 100, fines: s.weeks.reduce((a, w) => a + w.fines, 0),
       overdueWeeks: s.weeks.filter((w) => w.status === 'OVERDUE').map((w) => w.periodNo), checking: s.weeks.filter((w) => w.status === 'CHECKING').map((w) => w.periodNo) });
   }
@@ -426,6 +438,7 @@ export async function financeOverview(db: Queryable, userId: number, challengeId
     canProposeRefund: access.permissions.has('payouts.prepare'), canApproveRefund: access.permissions.has('refunds.approve'),
     payments: pays.map((x) => ({ paymentId: Number(x.payment_id), participantId: Number(x.participant_id), displayName: x.display_name, mine: Number(x.user_id) === userId,
       recordedByAdmin: Number(x.submitted_by) !== Number(x.user_id), recordedByMe: Number(x.submitted_by) === userId,
+      byAdminForSelf: Number(x.submitted_by) === Number(x.user_id) && verifierIds.has(Number(x.user_id)),
       periodNo: x.period_no, amount: rupees(Number(x.amount_paise)), method: x.method, utr: x.utr, paidOn: x.paid_on, note: x.note, status: x.status,
       proofFileId: x.proof_file_id ? Number(x.proof_file_id) : null, decisionReason: x.decision_reason, submittedAt: x.submitted_at.toISOString() })),
     refunds: refunds.map((r) => ({ refundId: Number(r.refund_id), participantId: Number(r.participant_id), displayName: r.display_name, amount: rupees(Number(r.amount_paise)), reason: r.reason,

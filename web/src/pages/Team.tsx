@@ -67,19 +67,20 @@ function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeV
   const [dayPick, setDayPick] = useState(defaultDay);
   const [reason, setReason] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [steps, setSteps] = useState('');
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const send = async () => {
     setBusy(true); setError(null);
     try {
-      if (kind === 'evidence') await upload(`/api/participants/${person.participantId}/submissions`, { clientRef: newRef(), day: dayPick, reason }, file);
+      if (kind === 'evidence') await upload(`/api/participants/${person.participantId}/submissions`, { clientRef: newRef(), day: dayPick, reason, value: steps.trim() }, file);
       else await api.post(`/api/participants/${person.participantId}/rest-days`, { day: dayPick, reason });
       onSaved(); closeModal();
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
   return (
     <Modal title={`Correct: ${person.displayName}`} onClose={onClose}>
-      <p className="muted small" style={{ marginTop: 0 }}>For a screenshot or rest day sent outside the app (e.g. on WhatsApp). It counts for the day you pick. Screenshots still go through the normal check; everything is recorded in the activity log.</p>
+      <p className="muted small" style={{ marginTop: 0 }}>For a screenshot or rest day sent outside the app (e.g. on WhatsApp). It counts for the day you pick. Enter the steps to approve it straight away; leave them empty and the screenshot goes through the normal check. Everything is recorded in the activity log.</p>
       <div className="subnav inline" style={{ margin: '0 0 12px' }}>
         <button aria-current={kind === 'evidence'} onClick={() => setKind('evidence')}>Record evidence</button>
         <button aria-current={kind === 'rest'} onClick={() => setKind('rest')}>Record rest day</button>
@@ -87,8 +88,13 @@ function Correction({ v, person, defaultDay, onClose, onSaved }: { v: ChallengeV
       <ErrorBox error={error} />
       <Field label="Challenge day"><input type="date" value={dayPick} min={v.startsOn} max={v.today} onChange={(e) => setDayPick(e.target.value)} /></Field>
       {kind === 'evidence' && <Field label="Screenshot"><input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>}
+      {kind === 'evidence' && (
+        <Field label="Steps (approves it straight away)">
+          <input type="text" inputMode="numeric" value={steps} onChange={(e) => setSteps(e.target.value)} placeholder="e.g. 8214 - or leave empty for the normal check" />
+        </Field>
+      )}
       <Field label="Note (optional)"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Sent on the WhatsApp group" /></Field>
-      <button className="btn primary" disabled={busy || !dayPick || (kind === 'evidence' && !file)} onClick={send}>Save</button>
+      <button className="btn primary" disabled={busy || !dayPick || (kind === 'evidence' && !file)} onClick={send}>{kind === 'evidence' && steps.trim() ? 'Save and approve' : 'Save'}</button>
     </Modal>
   );
 }

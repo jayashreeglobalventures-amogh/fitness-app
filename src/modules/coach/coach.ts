@@ -1,4 +1,4 @@
-// The coach (rule-based today; see writer.ts for the AI plug-in slot): weekly summaries for participants, an evening
+// The coach (templates, or AI-written with COACH_WRITER=omniroute - see writer.ts): weekly summaries for participants, an evening
 // nudge if today's steps aren't in, and "who might need a hand" for admins. Everything is worked out live from the
 // same day records and points the rest of the app uses; nothing here touches health data or money.
 import { daysBetween, endOfDay } from '../../core/dates.js';

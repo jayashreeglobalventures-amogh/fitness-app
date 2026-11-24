@@ -24,7 +24,7 @@ export class ReaderError extends Error {
 
 export const SCREENSHOT_MODEL = 'claude-opus-5-5';
 
-const READING_SCHEMA = {
+export const READING_SCHEMA = {
   type: 'object',
   additionalProperties: false,
   required: ['readable', 'date', 'value', 'sourceApp', 'confidence', 'flags', 'notes'],
@@ -39,11 +39,16 @@ const READING_SCHEMA = {
   },
 } as const;
 
-const SYSTEM = `You read screenshots from phone fitness apps and wearables (Google Fit, Samsung Health, Apple Health, Fitbit, Mi Fitness, Garmin, etc.) for a walking challenge.
+export const READING_SYSTEM = `You read screenshots from phone fitness apps and wearables (Google Fit, Samsung Health, Apple Health, Fitbit, Mi Fitness, Garmin, etc.) for a walking challenge.
 Report exactly what the screenshot shows. Do not guess: if the date or the day's total is not clearly visible, return null for it and lower your confidence.
 - "date": the specific calendar day the total belongs to. Resolve words like "Today" or "Yesterday" only if the screen also shows enough to know the actual date; otherwise null and DATE_NOT_VISIBLE. Dates without a year belong to the year given by the user.
 - "value": the total for that one day (not a weekly total, average or goal). Ignore the goal number.
 - Flag anything an admin should look at. Flagging is not an accusation; it only asks a human to check.`;
+
+/** The per-screenshot instruction, shared by every AI reader. */
+export function readingPrompt(ctx: ReadContext): string {
+  return `The participant says this shows their ${ctx.metricLabel.toLowerCase()} (${ctx.unit}) for ${ctx.expectedDay} (time zone ${ctx.timeZone}, year ${ctx.expectedDay.slice(0, 4)}). Read the screenshot.`;
+}
 
 export function anthropicReader(apiKey: string): ScreenshotReader {
   const client = new Anthropic({ apiKey, maxRetries: 2, timeout: 90_000 });
@@ -57,13 +62,13 @@ export function anthropicReader(apiKey: string): ScreenshotReader {
           // A declined request is re-run on a fallback model chosen by the API (server-side fallback).
           betas: ['server-side-fallback-2026-07-01'],
           fallbacks: 'default',
-          system: SYSTEM,
+          system: READING_SYSTEM,
           output_config: { effort: 'low', format: { type: 'json_schema', schema: READING_SCHEMA } },
           messages: [{
             role: 'user',
             content: [
               { type: 'image', source: { type: 'base64', media_type: mimeType as 'image/png', data: image.toString('base64') } },
-              { type: 'text', text: `The participant says this shows their ${ctx.metricLabel.toLowerCase()} (${ctx.unit}) for ${ctx.expectedDay} (time zone ${ctx.timeZone}, year ${ctx.expectedDay.slice(0, 4)}). Read the screenshot.` },
+              { type: 'text', text: readingPrompt(ctx) },
             ],
           }],
         });

@@ -1,7 +1,9 @@
-// Turns the coach's facts into words. This is the plug-in slot for AI: today the template writer below (free,
-// instant, private, predictable). An AI writer can be added later by implementing CoachWriter and selecting it with
-// COACH_WRITER - it would receive only the facts (no names beyond the first name, no health data, no money details).
-// If an AI writer ever fails, callers fall back to the template writer, so messages never stop.
+// Turns the coach's facts into words. The template writer below is the default (free, instant, private,
+// predictable). COACH_WRITER=omniroute selects the AI writer (ai-writer.ts), which receives only the facts and the
+// template's draft (no names, no health data, no money details).
+// If an AI writer ever fails or isn't ready, callers fall back to the template writer, so messages never stop.
+import { omniRouteConfig } from '../../core/omniroute.js';
+import { omnirouteWriter } from './ai-writer.js';
 import type { NudgeFacts, RiskFacts, WeekFacts } from './facts.js';
 
 export interface CoachMessage { headline: string; lines: string[] }
@@ -78,10 +80,23 @@ export const templateWriter: CoachWriter = {
   },
 };
 
-/** The writer chosen with COACH_WRITER (only "templates" exists today; anything else falls back to it). */
+// One AI writer per configuration, so its cache of written messages lives as long as the process.
+let aiWriter: { key: string; writer: CoachWriter } | null = null;
+
+/**
+ * The writer chosen with COACH_WRITER: "templates" (default) or "omniroute" (AI through the OmniRoute gateway, see
+ * ai-writer.ts; needs OMNIROUTE_API_KEY). Anything else, or omniroute without a key, uses the templates.
+ */
 export function selectWriter(env: NodeJS.ProcessEnv = process.env): CoachWriter {
   switch (env.COACH_WRITER ?? 'templates') {
-    // case 'claude': return claudeWriter(...);   // later: same interface, facts only, falls back on error
+    case 'omniroute': {
+      const cfg = omniRouteConfig(env);
+      if (!cfg) return templateWriter;
+      const model = env.OMNIROUTE_TEXT_MODEL?.trim() || undefined;
+      const key = `${cfg.baseUrl}|${cfg.apiKey}|${model ?? ''}`;
+      if (aiWriter?.key !== key) aiWriter = { key, writer: omnirouteWriter(cfg, { model }) };
+      return aiWriter.writer;
+    }
     default: return templateWriter;
   }
 }

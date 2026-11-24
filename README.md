@@ -28,8 +28,12 @@ npm run dev:local     # embedded PostgreSQL in .local/, migrations, then http://
 ```
 
 The first run prints a temporary password for the Super Admin `admin` and creates Calamari as a draft.
-Screenshots are read by a free on-server reader (Tesseract) or, when `ANTHROPIC_API_KEY` is set, by Claude;
-`SCREENSHOT_OCR=off` (with no key) sends every screenshot to an admin. `npx tsx scripts/ocr-probe.ts <image>` shows what
+Screenshots are read by a free on-server reader (Tesseract); when `ANTHROPIC_API_KEY` is set, by Claude; or, when
+`OMNIROUTE_API_KEY` is set, by a vision model through the OmniRoute AI gateway (`OMNIROUTE_VISION_MODEL`, default NVIDIA
+Nemotron VL) with Tesseract as its backup. `SCREENSHOT_OCR=off` (with no key) sends every screenshot to an admin.
+`COACH_WRITER=omniroute` has the AI rewrite coach summaries and nudges (`OMNIROUTE_TEXT_MODEL`, default the
+`Amogh-Ai-Combo` combo); the templates answer whenever the AI text isn't ready, and AI text with a number that isn't in
+the facts is never used. `OMNIROUTE_BASE_URL` defaults to the gateway on the VPS edge network. `npx tsx scripts/ocr-probe.ts <image>` shows what
 the free reader sees in a screenshot.
 `FITNESS_SCHEDULER_ENABLED=true` turns on AI retries and closing exemption votes on time.
 `rm -rf .local` starts over.
@@ -67,7 +71,8 @@ src/
     challenges/challenges.ts  create, versioned edits, publish, duplicate, archive, admin roles
     roster/    invitations, rules acceptance, roster lock, participant status
     checkin/   day statuses, submissions + review + appeals, rest days, exemptions + voting, admin overview
-    verification/  screenshot readers behind one interface: ocr.ts (free, Tesseract), reader.ts (Claude), select.ts
+    verification/  screenshot readers behind one interface: ocr.ts (free, Tesseract), reader.ts (Claude),
+                   omniroute-reader.ts (OmniRoute gateway, with a backup reader), select.ts
     scoring/   engine.ts (pure rules), ledger.ts (append-only points, reconcile, leaderboard), bonus.ts (weekend activities)
     finance/   engine.ts (pure money rules), finance.ts (double-entry ledger, payments, refunds, statements)
     settlement/  engine.ts (pure prize allocation), settlement.ts (readiness, approval, publish, payouts)

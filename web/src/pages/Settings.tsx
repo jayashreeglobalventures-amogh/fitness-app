@@ -102,7 +102,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         )}
         <Check ctx={ctx} p={['submission', 'healthSync', 'enabled']} label="Also accept steps sent from the iPhone Health app (Apple Shortcut) - a synced count that reaches the target meets the day; admins can doubt one and ask for a screenshot" />
         <p className="muted small">Deadline: midnight at the end of each day ({c.basics.timeZone}). Late evidence never counts for an earlier day.</p>
-        <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or Claude if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
+        <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or an AI reader if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
         <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the reading is at least this sure (0.5–1)" step={0.01} />
       </Section>
 

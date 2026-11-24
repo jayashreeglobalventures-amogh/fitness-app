@@ -14,11 +14,12 @@ const NAME = 'Send steps to Fitness';
 const SHORTCUT = `/shortcuts/${location.host}/${encodeURIComponent(NAME)}.shortcut`;
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /**
- * Open the Shortcut file in Safari (x-safari-https://, iOS 17+), which offers "Open in Shortcuts" - Fitness stays open
- * behind it. Opening the file inside the installed app showed a black preview page with no way back, and the
- * Shortcuts app's own import link only accepts iCloud links ("The Shortcut url provided was invalid").
+ * The file opens inside the app: iOS shows a preview with "Open in Shortcuts" (owner's choice, 24 Nov 2026 - a one-time
+ * setup). That preview has no Back button, so the card says to close and reopen Fitness afterwards. Tried and dropped:
+ * the Shortcuts app's import link (accepts only iCloud links) and opening in Safari (goes to the default browser,
+ * e.g. Chrome, which doesn't hand the file to Shortcuts).
  */
-const IMPORT = () => `x-safari-${location.origin}${SHORTCUT}`;
+const IMPORT = () => SHORTCUT;
 const RUN = `shortcuts://run-shortcut?name=${encodeURIComponent(NAME)}`;
 
 function Copy({ text, label }: { text: string; label: string }) {
@@ -116,7 +117,7 @@ export function HealthSyncCard() {
               <div className="row" style={{ marginTop: 6 }}>
                 <button className={`btn ${s.key ? 'ghost' : 'primary'}`} disabled={busy} onClick={setUp}>{s.key ? 'Set up again on this iPhone' : 'Set up on this iPhone'}</button>
               </div>
-              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcut opens in Safari: tap <b>Open in Shortcuts</b> → <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. Switch back to Fitness, then <b>Sync now</b> once and tap <b>Allow</b> for Steps.</p>
+              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcut opens: tap <b>Open in Shortcuts</b> → <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. The black page it leaves behind has no Back button: <b>close Fitness</b> (swipe it away) and open it again, then tap <b>Sync now</b> once and <b>Allow</b> for Steps.</p>
             </div>
             <div><b className="small">2. Make it run every night</b> <span className="muted small">(Apple asks you to do this part yourself - about a minute)</span>
               <p className="small" style={{ margin: '4px 0 0' }}><a href="/help#apple-health" onClick={(e) => { e.preventDefault(); navigate('/help#apple-health'); }}>📖 Step-by-step guide (iOS 17 and newer, and iOS 16)</a></p>
@@ -128,7 +129,7 @@ export function HealthSyncCard() {
           <div className="alert ok small" style={{ marginTop: 10 }}>
             {fresh.copied ? '✓ Your new sync key is copied.' : 'Your new sync key - copy it now; it won\'t be shown again.'}
             <div className="row" style={{ marginTop: 6 }}><code style={{ wordBreak: 'break-all', flex: 1 }}>{fresh.key}</code><Copy text={fresh.key} label="Copy key" /></div>
-            {ready && isIOS() && <div style={{ marginTop: 4 }}>Opening it in Safari… tap <b>Open in Shortcuts</b> (or the download ⬇ → the file), then switch back to Fitness. Nothing opened? <a href={IMPORT()}>Try again</a> or <a href={SHORTCUT} target="_blank" rel="noopener">open the file here</a> (iOS 16).</div>}
+            {ready && isIOS() && <div style={{ marginTop: 4 }}>Opening the Shortcut… tap <b>Open in Shortcuts</b>. Afterwards close Fitness and open it again. Nothing opened? <a href={SHORTCUT}>Tap here</a>.</div>}
           </div>
         )}
 

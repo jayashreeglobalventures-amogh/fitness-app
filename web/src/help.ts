@@ -51,9 +51,9 @@ export const TOPICS: Topic[] = [
     body: [
       'On iPhone, an **Apple Shortcut** can send today\'s steps from the Health app to Fitness - no screenshot needed. Screenshots still work too.',
       { title: 'Step 1 - add the Shortcut (once)', steps: [
-        'On your iPhone, open Fitness: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and the Shortcut opens in **Safari**.',
-        'Tap **Open in Shortcuts** (if Safari shows a download instead, tap the ⬇ icon → the file). Then **Set Up Shortcut**, tap the box → **Paste**, then **Add Shortcut**.',
-        'Switch back to Fitness (swipe up from the bottom and pick it, or tap **◀** at the top-left).',
+        'On your iPhone, open Fitness: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and a page with the Shortcut opens.',
+        'Tap **Open in Shortcuts**, then **Set Up Shortcut**, tap the box → **Paste**, then **Add Shortcut**.',
+        'Fitness is left on a black page with no Back button (this only happens during setup): **close Fitness** - swipe up from the bottom, then swipe Fitness away - and open it again.',
         'Tap **🔄 Sync now**. The first time, the iPhone asks to read **Steps** - tap **Allow**. You should see a note like "Calamari: 8,214 steps saved…"; tap **◀ Fitness** to come back.'] },
       { title: 'Step 2 - make it run every night (iOS 17 and newer)', steps: [
         'Check your version: **Settings → General → About → iOS Version**.',

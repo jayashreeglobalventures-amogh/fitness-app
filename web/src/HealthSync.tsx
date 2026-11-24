@@ -117,7 +117,7 @@ export function HealthSyncCard() {
               <div className="row" style={{ marginTop: 6 }}>
                 <button className={`btn ${s.key ? 'ghost' : 'primary'}`} disabled={busy} onClick={setUp}>{s.key ? 'Set up again on this iPhone' : 'Set up on this iPhone'}</button>
               </div>
-              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcut opens: tap <b>Open in Shortcuts</b> → <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. The black page it leaves behind has no Back button: <b>close Fitness</b> (swipe it away) and open it again, then tap <b>Sync now</b> once and <b>Allow</b> for Steps.</p>
+              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcut opens: tap <b>Open in Shortcuts</b> → <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. The black page it leaves behind has no Back button: <b>close Fitness</b> (swipe it away) and open it again. Once: run it from the <b>Shortcuts</b> app (tap its tile) and tap <b>Allow</b> for Steps - then <b>Sync now</b> works from here.</p>
             </div>
             <div><b className="small">2. Make it run every night</b> <span className="muted small">(Apple asks you to do this part yourself - about a minute)</span>
               <p className="small" style={{ margin: '4px 0 0' }}><a href="/help#apple-health" onClick={(e) => { e.preventDefault(); navigate('/help#apple-health'); }}>📖 Step-by-step guide (iOS 17 and newer, and iOS 16)</a></p>

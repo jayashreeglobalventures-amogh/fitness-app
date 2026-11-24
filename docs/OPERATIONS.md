@@ -11,7 +11,8 @@ All commands run on the VPS as `deploy-fitness` in the environment's directory
 | Create a challenge from a settings file | `./cli.sh create-challenge <slug> config/challenges/<file>.json <admin username>` |
 | Check a settings file | `./cli.sh validate-config config/challenges/<file>.json` |
 | Apply a settings file as new rules (audited, versioned) | `./cli.sh apply-config <slug> config/challenges/<file>.json <admin username> "<reason>" [first day, after the start]` |
-| Screenshot reading on/off | `./set-key.sh anthropic` (paste the key; empty = off) |
+| Screenshot reading on/off | `./set-key.sh anthropic` or `./set-key.sh omniroute` (paste the key; empty = off) |
+| AI coach messages on/off | `COACH_WRITER=omniroute` (or `templates`) in `.env`, then `./set-key.sh omniroute` (needs the OmniRoute key) |
 | Backup now | `./backup.sh` (nightly at 03:15 IST anyway) |
 | Restore test now | `./restore-test.sh` (Sundays 04:15 IST anyway) |
 | Logs | `docker compose --project-directory . -f compose.yaml logs --tail 200 fit-app` (with `IMAGE_TAG=$(cat IMAGE_TAG)`) |

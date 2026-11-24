@@ -67,8 +67,12 @@ FIT_APP_ALIAS=fit-app-$ENVNAME
 POSTGRES_SUPERUSER_PASSWORD=$(rnd 16)
 FIT_OWNER_PASSWORD=$(rnd 16)
 FIT_APP_PASSWORD=$(rnd 16)
-# Screenshot reading (Claude). Set with: $DIR/set-key.sh anthropic   (empty = manual review only)
+# Screenshot reading (Claude). Set with: $DIR/set-key.sh anthropic   (empty = not used)
 ANTHROPIC_API_KEY=
+# OmniRoute AI gateway: screenshot reading (Tesseract backup) and, with COACH_WRITER=omniroute, the AI coach.
+# Set with: $DIR/set-key.sh omniroute   (empty = not used)
+OMNIROUTE_API_KEY=
+COACH_WRITER=templates
 FITNESS_SCHEDULER_ENABLED=true
 ENV
   chown deploy-fitness:deploy-fitness "$DIR/.env"; chmod 600 "$DIR/.env"

@@ -5,12 +5,20 @@
 import { useEffect, useState } from 'react';
 import { api } from './api';
 import { Collapsible, day, ErrorBox } from './ui';
+import { navigate } from './router';
 
 interface Status { key: { hint: string; createdAt: string; lastUsedAt: string | null } | null; recent: { challenge: string; day: string; steps: number; syncedAt: string; doubted: boolean }[] }
 
 /** The Shortcut built for this app's own address (production and test each have theirs; see scripts/build-shortcut.ts). */
-const SHORTCUT = `/shortcuts/${location.host}.shortcut`;
+const NAME = 'Send steps to Fitness';
+const SHORTCUT = `/shortcuts/${location.host}/${encodeURIComponent(NAME)}.shortcut`;
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+/**
+ * Hand over to the Shortcuts app (Fitness stays open behind it; "◀ Fitness" at the top-left comes back). Opening the
+ * file inside the installed app instead showed a black preview page with no way back.
+ */
+const IMPORT = () => `shortcuts://import-shortcut?url=${encodeURIComponent(location.origin + SHORTCUT)}&name=${encodeURIComponent(NAME)}`;
+const RUN = `shortcuts://run-shortcut?name=${encodeURIComponent(NAME)}`;
 
 function Copy({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
@@ -38,11 +46,30 @@ export function HealthSyncCard() {
   const [ready, setReady] = useState<boolean | null>(null); // is our ready-made Shortcut on the server?
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const load = () => api.get<Status>('/api/me/sync-key').then(setS, setError);
   useEffect(() => {
     void load();
     fetch(SHORTCUT, { method: 'HEAD' }).then((r) => setReady(r.ok && !(r.headers.get('content-type') ?? '').includes('text/html')), () => setReady(false));
+    // Back from the Shortcuts app: show the latest (e.g. the sync that just ran).
+    const back = () => { if (document.visibilityState === 'visible') void load(); };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
   }, []);
+
+  /** "Sync now": runs the Shortcut in the Shortcuts app, then checks for the new sync for a little while. */
+  const syncNow = () => {
+    setError(null); setSyncing(true);
+    const before = s?.key?.lastUsedAt ?? null;
+    location.href = RUN;
+    let tries = 0;
+    const t = setInterval(async () => {
+      tries++;
+      const st = await api.get<Status>('/api/me/sync-key').catch(() => null);
+      if (st) setS(st);
+      if ((st && st.key?.lastUsedAt !== before) || tries >= 20) { clearInterval(t); setSyncing(false); }
+    }, 3000);
+  };
 
   /** One tap: a new key, copied, then the Shortcut opens to be added (it asks for the key - just paste). */
   const setUp = async () => {
@@ -54,7 +81,7 @@ export function HealthSyncCard() {
       const copied = await copiedP;
       setFresh({ key, copied });
       await load();
-      if (ready && isIOS()) setTimeout(() => { location.href = SHORTCUT; }, copied ? 600 : 2500);
+      if (ready && isIOS()) setTimeout(() => { location.href = IMPORT(); }, copied ? 600 : 2500);
     } catch (e) { setError(e); } finally { setBusy(false); }
   };
   const newKeyOnly = async () => {
@@ -75,20 +102,23 @@ export function HealthSyncCard() {
       {!s ? null : (<>
         {s.key && !fresh && <p className="small">✅ Set up · key ending <b>…{s.key.hint}</b> · {s.key.lastUsedAt ? `last sync ${when(s.key.lastUsedAt)}` : 'no sync yet'}</p>}
 
+        {s.key && isIOS() && (
+          <div className="row" style={{ marginBottom: 10 }}>
+            <button className="btn primary" disabled={syncing} onClick={syncNow}>{syncing ? 'Syncing…' : '🔄 Sync now'}</button>
+            {syncing && <span className="muted small">Shortcuts runs it, then tap <b>◀ Fitness</b> at the top-left to come back.</span>}
+          </div>
+        )}
+
         {ready && (
           <div className="stack">
             <div><b className="small">1. Add the Shortcut</b>{!isIOS() && <span className="muted small"> - do this on your iPhone</span>}
               <div className="row" style={{ marginTop: 6 }}>
-                <button className="btn primary" disabled={busy} onClick={setUp}>{s.key ? 'Set up again on this iPhone' : 'Set up on this iPhone'}</button>
+                <button className={`btn ${s.key ? 'ghost' : 'primary'}`} disabled={busy} onClick={setUp}>{s.key ? 'Set up again on this iPhone' : 'Set up on this iPhone'}</button>
               </div>
-              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcut opens: tap <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. Run it once and tap <b>Allow</b> for Steps.</p>
+              <p className="muted small" style={{ marginTop: 6 }}>Your key is copied and the Shortcuts app opens: tap <b>Set Up Shortcut</b>, paste the key (tap the box → <b>Paste</b>), then <b>Add Shortcut</b>. Tap <b>◀ Fitness</b> at the top-left to come back, then <b>Sync now</b> once and tap <b>Allow</b> for Steps.</p>
             </div>
-            <div><b className="small">2. Make it run every night</b> <span className="muted small">(Apple asks you to do this part yourself - 30 seconds)</span>
-              <ol className="small" style={{ paddingLeft: 18, margin: '4px 0 0' }}>
-                <li>Shortcuts app → <b>Automation</b> → <b>+</b> → <b>Time of Day</b></li>
-                <li>Pick <b>23:30</b>, <b>Daily</b>, and <b>Run Immediately</b> → <b>Next</b></li>
-                <li>Choose <b>Send steps to Fitness</b> → Done ✅</li>
-              </ol>
+            <div><b className="small">2. Make it run every night</b> <span className="muted small">(Apple asks you to do this part yourself - about a minute)</span>
+              <p className="small" style={{ margin: '4px 0 0' }}><a href="/help#apple-health" onClick={(e) => { e.preventDefault(); navigate('/help#apple-health'); }}>📖 Step-by-step guide (iOS 17 and newer, and iOS 16)</a></p>
             </div>
           </div>
         )}
@@ -97,7 +127,7 @@ export function HealthSyncCard() {
           <div className="alert ok small" style={{ marginTop: 10 }}>
             {fresh.copied ? '✓ Your new sync key is copied.' : 'Your new sync key - copy it now; it won\'t be shown again.'}
             <div className="row" style={{ marginTop: 6 }}><code style={{ wordBreak: 'break-all', flex: 1 }}>{fresh.key}</code><Copy text={fresh.key} label="Copy key" /></div>
-            {ready && isIOS() && <div style={{ marginTop: 4 }}>Opening the Shortcut… if nothing happens, <a href={SHORTCUT}>tap here</a>.</div>}
+            {ready && isIOS() && <div style={{ marginTop: 4 }}>Opening the Shortcuts app… if nothing happens, <a href={IMPORT()}>tap here</a>, or <a href={SHORTCUT} target="_blank" rel="noopener">download the Shortcut</a> (then tap <b>Done</b> to come back).</div>}
           </div>
         )}
 

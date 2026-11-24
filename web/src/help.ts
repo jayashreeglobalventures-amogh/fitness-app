@@ -3,7 +3,7 @@
 // Numbers quoted for Calamari are its settings as of 21 Nov 2026; each challenge's Rules tab is the source of truth.
 
 export type Audience = 'everyone' | 'admin' | 'finance' | 'super';
-export type Block = string | { list: string[] } | { steps: string[] } | { example: string[]; title?: string } | { tip: string };
+export type Block = string | { list: string[] } | { steps: string[]; title?: string } | { example: string[]; title?: string } | { tip: string };
 export interface Topic { id: string; group: string; audience: Audience[]; title: string; keywords?: string; body: Block[] }
 
 export const GROUPS = ['Getting started', 'Daily check-in', 'Points & progress', 'Money', 'Community & profile', 'For admins', 'For the finance manager', 'For Super Admins'];
@@ -50,9 +50,26 @@ export const TOPICS: Topic[] = [
   { id: 'apple-health', group: 'Daily check-in', audience: ['everyone', 'admin'], title: 'Steps straight from Apple Health (iPhone)', keywords: 'apple health iphone shortcut sync automatic steps key automation watch',
     body: [
       'On iPhone, an **Apple Shortcut** can send today\'s steps from the Health app to Fitness - no screenshot needed. Screenshots still work too.',
-      { steps: ['On your iPhone: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and the Shortcut opens.',
-        'Tap **Set Up Shortcut**, paste the key, then **Add Shortcut**. Run it once and tap **Allow** for Steps.',
-        'Shortcuts → **Automation → + → Time of Day → 23:30, Daily, Run Immediately → Send steps to Fitness**. Add an evening time too if you like - each sync replaces the last.'] },
+      { title: 'Step 1 - add the Shortcut (once)', steps: [
+        'On your iPhone, open Fitness: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and the **Shortcuts** app opens.',
+        'Tap **Set Up Shortcut**, tap the box → **Paste**, then **Add Shortcut**.',
+        'Tap **◀ Fitness** at the top-left of the screen to come back (or switch apps).',
+        'Tap **🔄 Sync now**. The first time, the iPhone asks to read **Steps** - tap **Allow**. You should see a note like "Calamari: 8,214 steps saved…"; tap **◀ Fitness** to come back.'] },
+      { title: 'Step 2 - make it run every night (iOS 17 and newer)', steps: [
+        'Check your version: **Settings → General → About → iOS Version**.',
+        'Open the **Shortcuts** app and tap **Automation** at the bottom.',
+        'Tap **+** at the top right (or **New Automation** in the middle if you have none yet).',
+        'Scroll and tap **Time of Day**.',
+        'Tap the time and set **11:30 PM**. Under **Repeat** choose **Daily**. At the bottom choose **Run Immediately** (not "Run After Confirmation"). Optional: switch off **Notify When Run**.',
+        'Tap **Next** (top right).',
+        'Under **My Shortcuts** tap **Send steps to Fitness** (or type its name in the search bar). It is saved - you\'ll see "At 11:30 PM, daily" in the list.'] },
+      { title: 'Step 2 - make it run every night (iOS 16)', steps: [
+        'Shortcuts → **Automation** → **Create Personal Automation** (or **+** → Create Personal Automation).',
+        '**Time of Day** → set **11:30 PM** → **Daily** → **Next**.',
+        '**Add Action** → search **Run Shortcut** → tap it → tap the blue word **Shortcut** → choose **Send steps to Fitness** → **Next**.',
+        'Switch **off** "Ask Before Running" → **Don\'t Ask** → **Done**.'] },
+      { tip: 'Want the race track to fill in during the day too? Add a second automation the same way (e.g. 8:00 PM) - each sync replaces the last. Or tap **Sync now** in Profile any time.' },
+      { tip: '**Sync now** can\'t find the Shortcut? It must be named exactly **Send steps to Fitness** - in the Shortcuts app, long-press it → **Rename**.' },
       { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',
         'On a **rest day** nothing is sent. Steps only count for the day they are sent, before midnight.',
         '**Admins** see 📱 and the number in **Team**. **Doubt** stops it counting and asks the person for a screenshot (an admin records it with Correct if the day is over); **Accept** makes it count again.'] },
@@ -225,4 +242,4 @@ export const TOPICS: Topic[] = [
 
 /** All the words of a topic, for search. */
 export const topicText = (t: Topic): string => [t.title, t.keywords ?? '', t.group, ...t.body.flatMap((b) =>
-  typeof b === 'string' ? [b] : 'list' in b ? b.list : 'steps' in b ? b.steps : 'example' in b ? [b.title ?? '', ...b.example] : [b.tip])].join(' ').replace(/\*\*/g, '');
+  typeof b === 'string' ? [b] : 'list' in b ? b.list : 'steps' in b ? [b.title ?? '', ...b.steps] : 'example' in b ? [b.title ?? '', ...b.example] : [b.tip])].join(' ').replace(/\*\*/g, '');

@@ -21,7 +21,7 @@ function Rich({ text, words }: { text: string; words: string[] }) {
 function BlockView({ b, words }: { b: Block; words: string[] }) {
   if (typeof b === 'string') return <p><Rich text={b} words={words} /></p>;
   if ('list' in b) return <ul>{b.list.map((x, i) => <li key={i}><Rich text={x} words={words} /></li>)}</ul>;
-  if ('steps' in b) return <ol>{b.steps.map((x, i) => <li key={i}><Rich text={x} words={words} /></li>)}</ol>;
+  if ('steps' in b) return <>{b.title && <p style={{ margin: '12px 0 4px' }}><b><Rich text={b.title} words={words} /></b></p>}<ol>{b.steps.map((x, i) => <li key={i}><Rich text={x} words={words} /></li>)}</ol></>;
   if ('example' in b) return (
     <div className="help-example"><b>{b.title ?? 'Example'}</b><ul>{b.example.map((x, i) => <li key={i}><Rich text={x} words={words} /></li>)}</ul></div>);
   return <div className="help-tip">💡 <Rich text={b.tip} words={words} /></div>;

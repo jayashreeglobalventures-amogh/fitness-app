@@ -56,15 +56,15 @@ const id = { key: randomUUID().toUpperCase(), samples: randomUUID().toUpperCase(
 const actions: P[] = [
   // 0: the sync key (filled in once, when the person adds the Shortcut)
   { WFWorkflowActionIdentifier: 'is.workflow.actions.gettext', WFWorkflowActionParameters: { UUID: id.key, WFTextActionText: '' } },
-  // 1: today's steps from Health: grouped by day (so phone + watch are not counted twice), the latest day only
+  // 1: today's steps from Health: Start Date is today, grouped by day (so phone + watch are not counted twice).
+  //    No "latest first, limit 1": that picked the single most recent reading (e.g. 36 steps) instead of the total.
   { WFWorkflowActionIdentifier: 'is.workflow.actions.filter.health.quantity', WFWorkflowActionParameters: {
     UUID: id.samples,
     WFContentItemFilter: { Value: { WFActionParameterFilterPrefix: 1, WFContentPredicateBoundedDate: false, WFActionParameterFilterTemplates: [
       { Operator: 4, Property: 'Type', Removable: false, Values: { Enumeration: 'Steps' } },
+      { Operator: 1002, Property: 'Start Date', Removable: true, Values: { Unit: 16 } }, // "is today"
     ] }, WFSerializationType: 'WFContentPredicateTableTemplate' },
     WFHKSampleFilteringGroupBy: 'Day', WFHKSampleFilteringFillMissing: false,
-    WFContentItemSortProperty: 'Start Date', WFContentItemSortOrder: 'Latest First',
-    WFContentItemLimitEnabled: true, WFContentItemLimitNumber: 1,
   } },
   // 2: the total as a plain number
   { WFWorkflowActionIdentifier: 'is.workflow.actions.statistics', WFWorkflowActionParameters: {

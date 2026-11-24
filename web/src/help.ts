@@ -68,7 +68,7 @@ export const TOPICS: Topic[] = [
         '**Time of Day** → set **11:30 PM** → **Daily** → **Next**.',
         '**Add Action** → search **Run Shortcut** → tap it → tap the blue word **Shortcut** → choose **Send steps to Fitness** → **Next**.',
         'Switch **off** "Ask Before Running" → **Don\'t Ask** → **Done**.'] },
-      { tip: 'Want the race track to fill in during the day too? Add a second automation the same way (e.g. 8:00 PM) - each sync replaces the last. Or tap **Sync now** in Profile any time.' },
+      { tip: 'Want the race track to fill in during the day too? Add a second automation the same way (e.g. 8:00 PM) - a later sync raises the count, never lowers it. Or tap **Sync now** in Profile any time.' },
       { tip: '**Sync now** can\'t find the Shortcut? It must be named exactly **Send steps to Fitness** - in the Shortcuts app, long-press it → **Rename**.' },
       { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',
         'On a **rest day** nothing is sent. Steps only count for the day they are sent, before midnight.',

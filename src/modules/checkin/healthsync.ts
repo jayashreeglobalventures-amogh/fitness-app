@@ -1,7 +1,7 @@
 // Steps straight from the iPhone Health app, sent by an Apple Shortcut (owner, 23 Nov 2026; screenshots still work).
 // Each person creates a personal sync key in Profile (shown once; only its SHA-256 is kept). The Shortcut sends
 // today's step count with the key; it is saved for every live challenge the person takes part in that day (one number
-// per day, replaced by each newer sync). A count that reaches the target meets the day; below it, the day is "in
+// per day, raised by a newer sync, never lowered). A count that reaches the target meets the day; below it, the day is "in
 // progress" until midnight. An admin can doubt a synced number: it then stops counting and the person is asked for a
 // screenshot (an admin records it with Correct).
 import { createHash, randomBytes } from 'node:crypto';
@@ -102,14 +102,17 @@ export async function receiveSteps(db: Queryable, keyRaw: string | undefined, bo
     if (rest) { out.push(`${ctx.ch.name}: today is your rest day 😴 - nothing needed.`); continue; }
     const { rows: [prev] } = await db.query(`SELECT doubted_at FROM health_syncs WHERE participant_id = $1 AND day = $2`, [p.participantId, day]);
     if (prev?.doubted_at) { out.push(`${ctx.ch.name}: an admin asked for a screenshot for today - please upload one.`); continue; }
-    await db.query(
+    // Steps only go up during a day: a lower count (e.g. a single late reading) never replaces a higher one.
+    const { rows: [kept] } = await db.query(
       `INSERT INTO health_syncs (challenge_id, participant_id, day, steps, source, device, first_synced_at, synced_at) VALUES ($1,$2,$3,$4,'APPLE_HEALTH',$5,$6,$6)
-       ON CONFLICT (participant_id, day) DO UPDATE SET steps = EXCLUDED.steps, device = EXCLUDED.device, synced_at = EXCLUDED.synced_at, times = health_syncs.times + 1`,
+       ON CONFLICT (participant_id, day) DO UPDATE SET steps = GREATEST(health_syncs.steps, EXCLUDED.steps), device = EXCLUDED.device, synced_at = EXCLUDED.synced_at, times = health_syncs.times + 1
+       RETURNING steps`,
       [cid, p.participantId, day, steps, device.slice(0, 300) || null, now]);
+    const total = Number(kept.steps);
     const target = cfg.activity.dailyTarget;
-    out.push(steps >= target
-      ? `${ctx.ch.name}: ${fmt(steps)} ${cfg.activity.unit} saved for ${dayLabel(day)} - target met ✅`
-      : `${ctx.ch.name}: ${fmt(steps)} of ${fmt(target)} ${cfg.activity.unit} so far today - ${fmt(target - steps)} to go 💪`);
+    out.push(total >= target
+      ? `${ctx.ch.name}: ${fmt(total)} ${cfg.activity.unit} saved for ${dayLabel(day)} - target met ✅`
+      : `${ctx.ch.name}: ${fmt(total)} of ${fmt(target)} ${cfg.activity.unit} so far today - ${fmt(target - total)} to go 💪`);
   }
   return out.length ? out.join('\n') : 'No challenge is running for you today, so nothing was saved.';
 }

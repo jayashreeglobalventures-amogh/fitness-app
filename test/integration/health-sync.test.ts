@@ -156,3 +156,14 @@ describe('what the Shortcut sends', () => {
     expect((await sync(k, { steps: 8300, date: '2026-11-27T00:00:00+05:30' })).body).toContain('8,300');
   });
 });
+
+describe('a lower count later the same day', () => {
+  it('never replaces a higher one (steps only go up during a day)', async () => {
+    const k = (await asha.post('/api/me/sync-key')).body.data.key;
+    h.setNow(ist('2026-11-28', '18:00'));
+    expect((await sync(k, { steps: 9120 })).body).toContain('9,120 steps saved');
+    h.setNow(ist('2026-11-28', '23:30'));
+    expect((await sync(k, { steps: 36 })).body).toContain('9,120 steps saved'); // e.g. one late reading only
+    expect(await day(asha, '2026-11-28')).toMatchObject({ status: 'ACHIEVED', sync: { steps: 9120 } });
+  });
+});

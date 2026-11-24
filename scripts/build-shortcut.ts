@@ -15,8 +15,10 @@ import { randomUUID } from 'node:crypto';
 const ORIGINS = ['https://fitness.amogh.systems', 'https://fitness-test.amogh.systems']; // production, test
 const targets = (process.argv[2] ? [process.argv[2]] : ORIGINS).map((o) => o.replace(/\/+$/, ''));
 for (const o of targets) if (!/^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(o)) { console.error(`Give the app's https address, e.g. https://fitness.amogh.systems (got ${o})`); process.exit(1); }
-/** Each app offers the Shortcut built for its own address: web/public/shortcuts/<host>.shortcut */
-const fileFor = (o: string) => `web/public/shortcuts/${new URL(o).host}.shortcut`;
+/** Each app offers the Shortcut built for its own address. The file name becomes the Shortcut's name on the iPhone
+ * ("Send steps to Fitness"), which the app's "Sync now" button runs by name. */
+export const SHORTCUT_NAME = 'Send steps to Fitness';
+const fileFor = (o: string) => `web/public/shortcuts/${new URL(o).host}/${SHORTCUT_NAME}.shortcut`;
 
 // ---------- a tiny XML plist writer ----------
 type P = string | number | boolean | P[] | { [k: string]: P };
@@ -104,5 +106,5 @@ try {
 console.log(`Signed shortcut for ${origin} → ${out}`);
 }
 
-mkdirSync('web/public/shortcuts', { recursive: true });
+for (const o of targets) mkdirSync(`web/public/shortcuts/${new URL(o).host}`, { recursive: true });
 for (const o of targets) build(o, fileFor(o));

@@ -73,7 +73,7 @@ export const TOPICS: Topic[] = [
       { tip: 'Want the race track to fill in during the day too? Add a second automation the same way (e.g. 8:00 PM) - a later sync raises the count, never lowers it. Or tap **Sync now** in Profile any time.' },
       { tip: '**"…trying to share … Health items, which is not allowed"?** iPhone **Settings → Apps → Shortcuts → Advanced** → turn on **Allow Sharing Large Amounts of Data**.' },
       { tip: '**"Authorization not determined"?** Run it once from the Shortcuts app (tap its tile) and tap **Allow**. Still there? iPhone **Settings → Privacy & Security → Health → Shortcuts** → turn on **Steps**.' },
-      { tip: '**Sync now** can\'t find the Shortcut? It must be named exactly **Send steps to Fitness** - in the Shortcuts app, long-press it → **Rename**.' },
+      { tip: '**Sync now** says the Shortcut **doesn\'t exist**? The name doesn\'t match - an iPhone calls a second copy "Send steps to Fitness 1". Delete older copies and long-press the right one → **Rename** to **Send steps to Fitness**, or tap **Change** under Sync now and type the name exactly as the tile shows it.' },
       { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',
         'On a **rest day** nothing is sent. Steps only count for the day they are sent, before midnight.',
         '**Admins** see 📱 and the number in **Team**. **Doubt** stops it counting and asks the person for a screenshot (an admin records it with Correct if the day is over); **Accept** makes it count again.'] },

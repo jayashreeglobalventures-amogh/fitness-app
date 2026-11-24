@@ -20,7 +20,11 @@ const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.p
  * e.g. Chrome, which doesn't hand the file to Shortcuts).
  */
 const IMPORT = () => SHORTCUT;
-const RUN = `shortcuts://run-shortcut?name=${encodeURIComponent(NAME)}`;
+/** Sync now runs the Shortcut by name. Usually "Send steps to Fitness", but an iPhone can name a second copy "… 1", so
+ * the name can be changed on this device (kept in this browser only). */
+const runUrl = (name: string) => `shortcuts://run-shortcut?name=${encodeURIComponent(name)}`;
+const NAME_KEY = 'fit:shortcut-name';
+const storedName = () => { try { return localStorage.getItem(NAME_KEY)?.trim() || NAME; } catch { return NAME; } };
 
 function Copy({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
@@ -49,6 +53,15 @@ export function HealthSyncCard() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [noSync, setNoSync] = useState(false);
+  const [name, setName] = useState(storedName);
+  const [editName, setEditName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const saveName = (n: string) => {
+    const v = n.trim() || NAME;
+    try { if (v === NAME) localStorage.removeItem(NAME_KEY); else localStorage.setItem(NAME_KEY, v); } catch { /* just for now */ }
+    setName(v); setNoSync(false);
+  };
   const load = () => api.get<Status>('/api/me/sync-key').then(setS, setError);
   useEffect(() => {
     void load();
@@ -59,17 +72,18 @@ export function HealthSyncCard() {
     return () => document.removeEventListener('visibilitychange', back);
   }, []);
 
-  /** "Sync now": runs the Shortcut in the Shortcuts app, then checks for the new sync for a little while. */
+  /** "Sync now": runs the Shortcut (by its name on this iPhone) in the Shortcuts app, then watches for the new sync. */
   const syncNow = () => {
-    setError(null); setSyncing(true);
+    setError(null); setSyncing(true); setNoSync(false);
     const before = s?.key?.lastUsedAt ?? null;
-    location.href = RUN;
+    location.href = runUrl(name);
     let tries = 0;
     const t = setInterval(async () => {
       tries++;
       const st = await api.get<Status>('/api/me/sync-key').catch(() => null);
       if (st) setS(st);
-      if ((st && st.key?.lastUsedAt !== before) || tries >= 20) { clearInterval(t); setSyncing(false); }
+      const arrived = !!st && st.key?.lastUsedAt !== before;
+      if (arrived || tries >= 20) { clearInterval(t); setSyncing(false); if (!arrived) setNoSync(true); }
     }, 3000);
   };
 
@@ -108,6 +122,20 @@ export function HealthSyncCard() {
           <div className="row" style={{ marginBottom: 10 }}>
             <button className="btn primary" disabled={syncing} onClick={syncNow}>{syncing ? 'Syncing…' : '🔄 Sync now'}</button>
             {syncing && <span className="muted small">Shortcuts runs it, then tap <b>◀ Fitness</b> at the top-left to come back.</span>}
+          </div>
+        )}
+        {s.key && isIOS() && (
+          <div className="small muted" style={{ marginBottom: 10 }}>
+            {editName ? (
+              <span className="row" style={{ gap: 6 }}>
+                <input type="text" value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} aria-label="Shortcut name" style={{ flex: 1, minWidth: 160 }} />
+                <button type="button" className="btn small primary" onClick={() => { saveName(nameDraft); setEditName(false); }}>Save</button>
+                <button type="button" className="btn small ghost" onClick={() => setEditName(false)}>Cancel</button>
+              </span>
+            ) : (
+              <>Runs your Shortcut named <b>"{name}"</b> · <button type="button" className="btn ghost small" onClick={() => { setNameDraft(name); setEditName(true); }}>Change</button></>
+            )}
+            {noSync && <div className="alert warn small" style={{ marginTop: 6 }}>No sync arrived. If Shortcuts said <b>"doesn't exist"</b>, the name doesn't match: check the tile's name in the Shortcuts app (e.g. "{NAME} 1") and either rename it to <b>{NAME}</b> or tap <b>Change</b> here and type it exactly.</div>}
           </div>
         )}
 

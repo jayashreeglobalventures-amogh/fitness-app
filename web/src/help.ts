@@ -54,7 +54,8 @@ export const TOPICS: Topic[] = [
         'On your iPhone, open Fitness: **Profile → 📱 Steps from Apple Health → Set up on this iPhone**. Your key is copied and a page with the Shortcut opens.',
         'Tap **Open in Shortcuts**, then **Set Up Shortcut**, tap the box → **Paste**, then **Add Shortcut**.',
         'Fitness is left on a black page with no Back button (this only happens during setup): **close Fitness** - swipe up from the bottom, then swipe Fitness away - and open it again.',
-        'Once, before anything else: open the **Shortcuts** app and tap the **Send steps to Fitness** tile. The iPhone asks to read **Steps** - tap **Allow**. (It can only ask there, not from Sync now or the automation.)',
+        'Once: iPhone **Settings → Apps → Shortcuts → Advanced** → turn on **Allow Sharing Large Amounts of Data** (on iOS 17 and older, Shortcuts is in the main Settings list). Without it the iPhone refuses to send a day\'s worth of step readings ("…is trying to share 588 Health items, which is not allowed").',
+        'Also once: open the **Shortcuts** app and tap the **Send steps to Fitness** tile. The iPhone asks to read **Steps** - tap **Allow**. (It can only ask there, not from Sync now or the automation.)',
         'Back in Fitness, tap **🔄 Sync now**. You should see a note like "Calamari: 9,136 steps saved…"; tap **◀ Fitness** to come back.'] },
       { title: 'Step 2 - make it run every night (iOS 17 and newer)', steps: [
         'Check your version: **Settings → General → About → iOS Version**.',
@@ -70,6 +71,7 @@ export const TOPICS: Topic[] = [
         '**Add Action** → search **Run Shortcut** → tap it → tap the blue word **Shortcut** → choose **Send steps to Fitness** → **Next**.',
         'Switch **off** "Ask Before Running" → **Don\'t Ask** → **Done**.'] },
       { tip: 'Want the race track to fill in during the day too? Add a second automation the same way (e.g. 8:00 PM) - a later sync raises the count, never lowers it. Or tap **Sync now** in Profile any time.' },
+      { tip: '**"…trying to share … Health items, which is not allowed"?** iPhone **Settings → Apps → Shortcuts → Advanced** → turn on **Allow Sharing Large Amounts of Data**.' },
       { tip: '**"Authorization not determined"?** Run it once from the Shortcuts app (tap its tile) and tap **Allow**. Still there? iPhone **Settings → Privacy & Security → Health → Shortcuts** → turn on **Steps**.' },
       { tip: '**Sync now** can\'t find the Shortcut? It must be named exactly **Send steps to Fitness** - in the Shortcuts app, long-press it → **Rename**.' },
       { list: ['**Reaching the target** with synced steps meets the day - even if a screenshot was declined.', 'Below the target, the day shows **in progress** until midnight, then it is missed (unless a screenshot meets it).',

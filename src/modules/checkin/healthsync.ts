@@ -68,6 +68,33 @@ export function sampleDay(v: unknown): string | null {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const lines = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : String(v ?? '').split(/\r?\n/)).map((s) => s.trim()).filter((s, i, a) => s !== '' || i < a.length - 1);
+
+/**
+ * Today's total from the latest step readings (one per line: value, start date, device). Readings from other days are
+ * left out. If more than one device recorded steps (e.g. phone and watch, which overlap), the device with the most
+ * counts - close to what the Health app shows, never double.
+ */
+export function sumReadings(b: Record<string, unknown>, day: string): { total: number; counted: number } | { error: string } {
+  const values = lines(b.readings);
+  const dates = lines(b.dates);
+  const sources = lines(b.sources);
+  if (!values.length || values.length !== dates.length) return { error: `couldn't read the steps from Health (${values.length} readings, ${dates.length} dates). Please tell an admin.` };
+  const bySource = new Map<string, number>();
+  let counted = 0, unreadable = 0;
+  values.forEach((v, i) => {
+    const n = parseSteps(v);
+    const d = sampleDay(dates[i]);
+    if (n === null || d === null) { unreadable++; return; }
+    if (d !== day) return;
+    const src = sources.length === values.length ? sources[i]! : 'Health';
+    bySource.set(src, (bySource.get(src) ?? 0) + n);
+    counted++;
+  });
+  if (unreadable === values.length) return { error: `couldn't read the dates from Health (e.g. "${dates[0]!.slice(0, 40)}"). Please tell an admin.` };
+  return { total: Math.min(200_000, Math.max(0, ...bySource.values())), counted };
+}
+
 /**
  * The Shortcut sends today's steps. Returns a short message the Shortcut shows as a notification.
  * Throws for a bad key (401) or bad number (400).
@@ -78,7 +105,9 @@ export async function receiveSteps(db: Queryable, keyRaw: string | undefined, bo
   const { rows: [k] } = await db.query(`SELECT k.key_id, k.user_id FROM sync_keys k JOIN users u USING (user_id) WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND u.status = 'ACTIVE'`, [hash(key)]);
   if (!k) throw Object.assign(new Error('bad key'), { syncStatus: 401 });
   const b = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
-  const steps = parseSteps(b.steps ?? b.Steps ?? b.value);
+  // Either one total ({"steps": 8214}) or the latest readings, one per line ({"readings", "dates", "sources"}).
+  const byReadings = b.readings !== undefined;
+  const steps = byReadings ? 0 : parseSteps(b.steps ?? b.Steps ?? b.value);
   if (steps === null) throw validation('Send the number of steps, e.g. {"steps": 8214}.');
   await db.query(`UPDATE sync_keys SET last_used_at = $2 WHERE key_id = $1`, [k.key_id, now]);
 
@@ -91,9 +120,17 @@ export async function receiveSteps(db: Queryable, keyRaw: string | undefined, bo
     const day = localDay(now, r.time_zone);
     const ctx = await challengeContext(db, cid, now);
     if (daysBetween(ctx.ch.startsOn, day) < 0 || daysBetween(day, ctx.ch.endsOn) < 0) continue;
-    // The Shortcut sends the day of its latest Health total: if that isn't today, there are no steps today yet.
-    const from = sampleDay(b.date);
-    if (from && from !== day) { out.push(`${ctx.ch.name}: no steps in your Health app for today yet (the latest are from ${dayLabel(from)}) - nothing saved.`); continue; }
+    let daySteps = steps;
+    if (byReadings) {
+      const r = sumReadings(b, day);
+      if ('error' in r) { out.push(`${ctx.ch.name}: ${r.error}`); continue; }
+      if (r.counted === 0) { out.push(`${ctx.ch.name}: no steps in your Health app for today yet - nothing saved.`); continue; }
+      daySteps = r.total;
+    } else {
+      // A single total sent with its day: if that isn't today, there are no steps today yet.
+      const from = sampleDay(b.date);
+      if (from && from !== day) { out.push(`${ctx.ch.name}: no steps in your Health app for today yet (the latest are from ${dayLabel(from)}) - nothing saved.`); continue; }
+    }
     const p: ParticipantRow = { participantId: Number(r.participant_id), challengeId: cid, userId: Number(r.user_id), status: r.status, joinedOn: r.joined_on, leftOn: r.left_on };
     if (!participatesOn(p, day)) continue;
     const cfg = ctx.cfgOn(day);
@@ -107,7 +144,7 @@ export async function receiveSteps(db: Queryable, keyRaw: string | undefined, bo
       `INSERT INTO health_syncs (challenge_id, participant_id, day, steps, source, device, first_synced_at, synced_at) VALUES ($1,$2,$3,$4,'APPLE_HEALTH',$5,$6,$6)
        ON CONFLICT (participant_id, day) DO UPDATE SET steps = GREATEST(health_syncs.steps, EXCLUDED.steps), device = EXCLUDED.device, synced_at = EXCLUDED.synced_at, times = health_syncs.times + 1
        RETURNING steps`,
-      [cid, p.participantId, day, steps, device.slice(0, 300) || null, now]);
+      [cid, p.participantId, day, daySteps, device.slice(0, 300) || null, now]);
     const total = Number(kept.steps);
     const target = cfg.activity.dailyTarget;
     out.push(total >= target

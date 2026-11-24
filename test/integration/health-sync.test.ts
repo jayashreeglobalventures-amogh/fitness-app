@@ -167,3 +167,13 @@ describe('a lower count later the same day', () => {
     expect(await day(asha, '2026-11-28')).toMatchObject({ status: 'ACHIEVED', sync: { steps: 9120 } });
   });
 });
+
+describe('the Shortcut sends its latest readings', () => {
+  it('today\'s are added up and saved', async () => {
+    const k = (await ravi.post('/api/me/sync-key')).body.data.key;
+    h.setNow(ist('2026-11-29', '21:00'));
+    const r = await sync(k, { readings: '36\n4,500\n4,600\n800', dates: '29 Nov 2026 at 8:55 PM\n29 Nov 2026 at 6:00 PM\n29 Nov 2026 at 9:00 AM\n28 Nov 2026 at 10:00 PM', sources: 'iPhone\niPhone\niPhone\niPhone' });
+    expect(r.body).toBe('Calamari: 9,136 steps saved for 29 Nov - target met ✅');
+    expect((await day(ravi, '2026-11-29')).sync).toMatchObject({ steps: 9136 });
+  });
+});

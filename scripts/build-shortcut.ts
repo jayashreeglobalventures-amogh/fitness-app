@@ -3,9 +3,9 @@
 // "Set up on this iPhone". Run on a Mac signed in to iCloud (with iCloud Drive on):  npm run shortcut
 // (builds one file per app - production and test - each pointing at its own address; or pass one https address).
 //
-// The Shortcut: asks once for the person's sync key (an import question) → Find Health Samples (Steps, grouped by
-// day, latest first, 1) → Calculate Statistics (Sum) → POST {steps, date} to /api/health-sync with the key →
-// shows the reply as a notification. The server ignores a count whose date isn't today.
+// The Shortcut: asks once for the person's sync key (an import question) → Find Health Samples (Steps,
+// latest first, up to 1000) → POST each reading's value, start date and device to /api/health-sync with the key →
+// shows the reply as a notification. The server adds up today's readings.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,34 +52,33 @@ const dict = (items: [string, P][]): P => ({
 });
 
 function build(origin: string, out: string): void {
-const id = { key: randomUUID().toUpperCase(), samples: randomUUID().toUpperCase(), sum: randomUUID().toUpperCase(), send: randomUUID().toUpperCase() };
+const id = { key: randomUUID().toUpperCase(), samples: randomUUID().toUpperCase(), send: randomUUID().toUpperCase() };
 const actions: P[] = [
   // 0: the sync key (filled in once, when the person adds the Shortcut)
   { WFWorkflowActionIdentifier: 'is.workflow.actions.gettext', WFWorkflowActionParameters: { UUID: id.key, WFTextActionText: '' } },
-  // 1: today's steps from Health: Start Date is today, grouped by day (so phone + watch are not counted twice).
-  //    No "latest first, limit 1": that picked the single most recent reading (e.g. 36 steps) instead of the total.
+  // 1: the most recent step readings (each with its time and device). Only actions proven on a real iPhone are used:
+  //    a guessed "Start Date is today" filter made iOS fail with "Authorization not determined", and "latest first,
+  //    limit 1" sent a single reading. The server adds up today's readings (one device: the one with the most).
   { WFWorkflowActionIdentifier: 'is.workflow.actions.filter.health.quantity', WFWorkflowActionParameters: {
     UUID: id.samples,
     WFContentItemFilter: { Value: { WFActionParameterFilterPrefix: 1, WFContentPredicateBoundedDate: false, WFActionParameterFilterTemplates: [
       { Operator: 4, Property: 'Type', Removable: false, Values: { Enumeration: 'Steps' } },
-      { Operator: 1002, Property: 'Start Date', Removable: true, Values: { Unit: 16 } }, // "is today"
     ] }, WFSerializationType: 'WFContentPredicateTableTemplate' },
-    WFHKSampleFilteringGroupBy: 'Day', WFHKSampleFilteringFillMissing: false,
+    WFContentItemSortProperty: 'Start Date', WFContentItemSortOrder: 'Latest First',
+    WFContentItemLimitEnabled: true, WFContentItemLimitNumber: 1000,
   } },
-  // 2: the total as a plain number
-  { WFWorkflowActionIdentifier: 'is.workflow.actions.statistics', WFWorkflowActionParameters: {
-    UUID: id.sum, WFStatisticsOperation: 'Sum', Input: variable(output(id.samples, 'Health Samples')) } },
-  // 3: send it (with the day it belongs to, so a stale count is ignored)
+  // 2: send them
   { WFWorkflowActionIdentifier: 'is.workflow.actions.downloadurl', WFWorkflowActionParameters: {
     UUID: id.send, WFURL: `${origin}/api/health-sync`, WFHTTPMethod: 'POST', WFHTTPBodyType: 'JSON', ShowHeaders: true,
     WFHTTPHeaders: dict([['Authorization', text('Bearer ', output(id.key, 'Text'))]]),
     WFJSONValues: dict([
-      ['steps', text(output(id.sum, 'Statistics'))],
-      ['date', text(output(id.samples, 'Health Samples', [{ Type: 'WFPropertyVariableAggrandizement', PropertyName: 'Start Date' }]))],
-      ['source', text('Apple Health Shortcut')],
+      // One line per reading, in the same order: how many, when, which device.
+      ['readings', text(output(id.samples, 'Health Samples', [{ Type: 'WFPropertyVariableAggrandizement', PropertyName: 'Value' }]))],
+      ['dates', text(output(id.samples, 'Health Samples', [{ Type: 'WFPropertyVariableAggrandizement', PropertyName: 'Start Date' }]))],
+      ['sources', text(output(id.samples, 'Health Samples', [{ Type: 'WFPropertyVariableAggrandizement', PropertyName: 'Source' }]))],
     ]),
   } },
-  // 4: the app's reply, e.g. "Calamari: 8,214 steps saved for 23 Nov - target met ✅"
+  // 3: the app's reply, e.g. "Calamari: 8,214 steps saved for 23 Nov - target met ✅"
   { WFWorkflowActionIdentifier: 'is.workflow.actions.notification', WFWorkflowActionParameters: {
     WFNotificationActionTitle: 'Fitness', WFNotificationActionBody: text(output(id.send, 'Contents of URL')), WFNotificationActionSound: false } },
 ];

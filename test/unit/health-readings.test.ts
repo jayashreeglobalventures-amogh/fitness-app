@@ -20,6 +20,8 @@ describe('adding up Apple Health readings', () => {
     expect(sumReadings({ readings: '50', dates: '23 Nov 2026 at 11:00 PM' }, '2026-11-24')).toEqual({ total: 0, counted: 0 });
     expect(sumReadings({ readings: '50', dates: 'yesterday-ish' }, '2026-11-24')).toEqual({ error: expect.stringContaining('couldn\'t read the dates') });
     expect(sumReadings({ readings: '50\n60', dates: '24 Nov 2026' }, '2026-11-24')).toEqual({ error: expect.stringContaining('2 readings, 1 dates') });
+    // Nothing at all (Shortcuts not allowed to read Steps): say how to fix it.
+    expect(sumReadings({ readings: '', dates: '', sources: '' }, '2026-11-24')).toEqual({ error: expect.stringContaining('Health → Shortcuts → turn on Steps') });
   });
 
   it('reads the date formats iPhones write', () => {

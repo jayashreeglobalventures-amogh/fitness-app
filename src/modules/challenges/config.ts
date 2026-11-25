@@ -70,6 +70,10 @@ export const ChallengeConfigSchema = Type.Object({
   verification: Type.Object({
     mode: Type.Union([Type.Literal('AI_ASSISTED'), Type.Literal('MANUAL')]),
     autoApproveMinConfidence: Type.Number({ minimum: 0.5, maximum: 1 }),
+    // Many step apps only say "Today" (owner, 25 Nov 2026): don't require a date on the screenshot. A screenshot that
+    // shows a different date still goes to an admin, and each one is compared with the person's last 10: the same step
+    // count as an earlier day (a re-used screenshot) goes to an admin.
+    ignoreDate: Type.Boolean(),
   }, { additionalProperties: false }),
   restDays: Type.Object({
     enabled: Type.Boolean(),
@@ -248,6 +252,7 @@ export function normalizeConfig<T>(input: T): T {
   if (c.notifications === undefined && c.schemaVersion !== undefined) c.notifications = defaultNotifications(c.coach);
   if (c.submission && typeof c.submission === 'object' && c.submission.multiplePerDay === undefined) c.submission.multiplePerDay = { enabled: false, combine: 'SUM' };
   if (c.submission && typeof c.submission === 'object' && c.submission.healthSync === undefined) c.submission.healthSync = { enabled: true };
+  if (c.verification && typeof c.verification === 'object' && c.verification.ignoreDate === undefined) c.verification.ignoreDate = false;
   const f = c.finance;
   if (f && typeof f === 'object') {
     if (f.unusedFinePool === undefined) f.unusedFinePool = 'REFUND'; // owner default (20 Nov 2026)

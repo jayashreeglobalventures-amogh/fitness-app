@@ -80,11 +80,12 @@ export const TOPICS: Topic[] = [
       { tip: 'Check the number matches your Health app the first time. If your watch and phone both count steps, "Group By: Day" stops them being counted twice.' },
       { tip: 'Lost your phone or shared the key by mistake? Profile → Make a new key (the old one stops working) or Stop syncing.' },
     ] },
-  { id: 'upload', group: 'Daily check-in', audience: ['everyone'], title: 'Uploading today\'s screenshot', keywords: 'screenshot upload steps evidence deadline midnight date total today',
+  { id: 'upload', group: 'Daily check-in', audience: ['everyone'], title: 'Uploading today\'s screenshot', keywords: 'screenshot upload steps evidence deadline midnight date total today no date duplicate same screenshot',
     body: [
       'Each day, upload a screenshot of your step total **before midnight** (India time): **Challenges → Calamari → Today → Upload today\'s screenshot**. Evidence counts only for the day it is uploaded.',
       'The app reads the number and date automatically. A clear screenshot of **today\'s date** that reaches the target is approved at once; anything unclear goes to an admin.',
       { tip: 'Use a screen that shows the **date** under the total. iPhone: **Health → Steps → D** (or Fitness → Step Count). A card that shows only a time (like "21:54") can\'t be dated, so an admin has to check it.' },
+      'If your challenge has **"Don\'t require a date"** switched on (Settings → Evidence), a screen that only says **"Today"** is fine - it counts for the day you upload it. A screenshot that shows a **different** date still goes to an admin, and so does one with **exactly the same steps** as one of your last 10 screenshots (it looks like the same screenshot again).',
       { example: ['"TOTAL 9,120 · 22 Nov 2026" uploaded on 22 Nov → approved automatically (target 7,000).',
         'A screenshot dated 17 Nov uploaded on 22 Nov → sent to an admin ("date mismatch").',
         '"Daily average 6,850" (a week view) → never counted as a day; sent to an admin.'], title: 'Examples' },

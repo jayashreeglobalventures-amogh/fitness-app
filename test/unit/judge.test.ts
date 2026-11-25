@@ -32,3 +32,15 @@ describe('AI reading -> decision (the AI may only approve)', () => {
     expect(r.sourceApp).toHaveLength(60);
   });
 });
+
+describe('"Don\'t require a date" setting', () => {
+  it('a screenshot without a date (e.g. "Today") is approved; one showing another date still is not', () => {
+    expect(judge(reading({ date: null }), '2026-11-22', 7000, 0.9, null, { ignoreDate: true })).toMatchObject({ approve: true, reason: 'Read automatically: 8200 on 2026-11-22 (no date shown).' });
+    expect(judge(reading({ date: '2026-11-21' }), '2026-11-22', 7000, 0.9, null, { ignoreDate: true }).flags).toContain('DATE_MISMATCH');
+  });
+  it('the same steps as an earlier screenshot go to an admin, with the note', () => {
+    const v = judge(reading({ date: null }), '2026-11-22', 7000, 0.9, null, { ignoreDate: true, sameAsEarlier: 'Same steps (8,200) as the screenshot for 20 Nov.' });
+    expect(v).toMatchObject({ approve: false, flags: ['SAME_STEPS_AS_EARLIER'] });
+    expect(v.reason).toContain('20 Nov');
+  });
+});

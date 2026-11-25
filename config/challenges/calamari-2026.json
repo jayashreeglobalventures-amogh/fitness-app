@@ -37,7 +37,8 @@
   },
   "verification": {
     "mode": "AI_ASSISTED",
-    "autoApproveMinConfidence": 0.9
+    "autoApproveMinConfidence": 0.9,
+    "ignoreDate": false
   },
   "restDays": {
     "enabled": true,

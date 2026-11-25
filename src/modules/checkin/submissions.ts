@@ -160,19 +160,38 @@ export async function recordCorrection(db: Queryable, mediaDir: string, actorUse
 }
 
 /** What the AI reading means. Only a clean, confident, on-target reading of the right day is approved. */
-export function judge(reading: Reading, day: string, target: number, minConfidence: number, claimed: number | null): { approve: boolean; flags: string[]; reason: string } {
+export function judge(reading: Reading, day: string, target: number, minConfidence: number, claimed: number | null,
+  opts: { ignoreDate?: boolean; sameAsEarlier?: string | null } = {}): { approve: boolean; flags: string[]; reason: string } {
   const flags = [...reading.flags];
   if (!reading.readable) flags.push('UNREADABLE');
-  if (reading.date === null) flags.push('DATE_NOT_VISIBLE');
+  // "Ignore the date" (setting): a screenshot without a date (e.g. "Today") is fine; one showing another date is not.
+  if (reading.date === null) { if (!opts.ignoreDate) flags.push('DATE_NOT_VISIBLE'); }
   else if (reading.date !== day) flags.push('DATE_MISMATCH');
+  if (opts.sameAsEarlier) flags.push('SAME_STEPS_AS_EARLIER');
   if (reading.value === null) flags.push('VALUE_NOT_VISIBLE');
   else if (reading.value < target) flags.push('BELOW_TARGET');
   if (reading.confidence < minConfidence) flags.push('LOW_CONFIDENCE');
   if (claimed !== null && reading.value !== null && Math.abs(claimed - reading.value) > Math.max(50, reading.value * 0.02)) flags.push('CLAIM_MISMATCH');
   const unique = [...new Set(flags)];
   return unique.length
-    ? { approve: false, flags: unique, reason: `Needs review: ${unique.join(', ').toLowerCase().replace(/_/g, ' ')}.` }
-    : { approve: true, flags: [], reason: `Read automatically: ${reading.value} on ${reading.date}.` };
+    ? { approve: false, flags: unique, reason: `Needs review: ${unique.join(', ').toLowerCase().replace(/_/g, ' ')}.${opts.sameAsEarlier ? ` ${opts.sameAsEarlier}` : ''}` }
+    : { approve: true, flags: [], reason: `Read automatically: ${reading.value} on ${reading.date ?? `${day} (no date shown)`}.` };
+}
+
+/**
+ * Re-used screenshot check ("ignore the date" on): the same step count as one of the person's last 10 screenshots from
+ * another day - a re-uploaded or re-taken old screen reads the same. Returns a note for the admin, or null.
+ */
+export async function sameAsEarlier(db: Queryable, participantId: number, submissionId: number, day: string, value: number | null): Promise<string | null> {
+  if (value === null || value <= 0) return null;
+  const { rows } = await db.query(
+    `SELECT s.day, coalesce(s.final_value, (SELECT v.extracted_value FROM verification_results v WHERE v.submission_id = s.submission_id AND v.extracted_value IS NOT NULL ORDER BY v.result_id DESC LIMIT 1)) AS value
+       FROM submissions s WHERE s.participant_id = $1 AND s.submission_id <> $2 AND s.status <> 'WITHDRAWN'
+      ORDER BY s.received_at DESC LIMIT 10`, [participantId, submissionId]);
+  const hit = rows.find((r) => r.value !== null && Number(r.value) === value && String(r.day) !== day);
+  if (!hit) return null;
+  const when = new Date(`${hit.day}T00:00:00Z`).toLocaleDateString('en-IN', { timeZone: 'UTC', day: 'numeric', month: 'short' });
+  return `Same steps (${value.toLocaleString('en-IN')}) as the screenshot for ${when} - possibly the same screenshot again.`;
 }
 
 /** Runs the AI reading of one PENDING_AI submission. Never holds a transaction during the network call. */
@@ -209,7 +228,9 @@ export async function verifySubmission(pool: pg.Pool, mediaDir: string, submissi
     }
     const r = reading!;
     // A part (one of several screenshots a day) isn't judged against the target: the day's total is.
-    const verdict = judge(r, s.day, s.part ? 0 : cfg.activity.dailyTarget, cfg.verification.autoApproveMinConfidence, s.claimed_value);
+    const ignoreDate = cfg.verification.ignoreDate;
+    const repeat = ignoreDate ? await sameAsEarlier(tx, Number(s.participant_id), submissionId, s.day, r.value) : null;
+    const verdict = judge(r, s.day, s.part ? 0 : cfg.activity.dailyTarget, cfg.verification.autoApproveMinConfidence, s.claimed_value, { ignoreDate, sameAsEarlier: repeat });
     await tx.query(
       `INSERT INTO verification_results (submission_id, method, provider, model, extracted_date, extracted_value, source_app, confidence, readable, flags, outcome, reason, created_at)
        VALUES ($1,'AI',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,

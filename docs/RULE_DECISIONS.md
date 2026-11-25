@@ -198,3 +198,11 @@ Also: what a **suspended** participant's days count as (today they still count).
 | Both routes | Screenshots work as before. Setting: Evidence → "Also accept steps sent from the iPhone Health app" (on for Calamari) |
 | Counting | One synced number per person per day - a newer sync can raise it but never lower it (24 Nov 2026: a single late reading had replaced a 9,000+ total) - for the day it is sent (challenge time zone). Reaching the target meets the day on its own - even over a declined screenshot. Below it: in progress until midnight, then missed unless a screenshot meets it. Nothing is saved on a rest day |
 | Trust | Admins see 📱 and the number in Team. Doubt = it stops counting and the person is asked for a screenshot (recorded by an admin with Correct if the day is over); Accept = counts again. Both in the activity log |
+
+## Screenshots without a date (owner, 25 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Setting | Settings → Evidence → "Don't require a date on the screenshot" (off by default). Many step apps only show "Today" |
+| When on | No visible date is fine: the screenshot counts for the day it is uploaded (the midnight deadline still applies). A screenshot showing a different date still goes to an admin |
+| Re-used screenshots | Each screenshot is compared with the person's last 10 (other days): exactly the same step count goes to an admin with "Same steps as the screenshot for <day>". Exact copies of any image are refused for auto-approval as before. Nothing is declined automatically |

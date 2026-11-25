@@ -79,7 +79,9 @@ export function sumReadings(b: Record<string, unknown>, day: string): { total: n
   const values = lines(b.readings);
   const dates = lines(b.dates);
   const sources = lines(b.sources);
-  if (!values.length || values.length !== dates.length) return { error: `couldn't read the steps from Health (${values.length} readings, ${dates.length} dates). Please tell an admin.` };
+  // Nothing at all: iOS hands Shortcuts an empty list (no error) when it isn't allowed to read Steps.
+  if (!values.length) return { error: 'Health gave no step readings. On your iPhone: Settings → Privacy & Security → Health → Shortcuts → turn on Steps, then run the Shortcut again from the Shortcuts app.' };
+  if (values.length !== dates.length) return { error: `couldn't read the steps from Health (${values.length} readings, ${dates.length} dates). Please tell an admin.` };
   const bySource = new Map<string, number>();
   let counted = 0, unreadable = 0;
   values.forEach((v, i) => {

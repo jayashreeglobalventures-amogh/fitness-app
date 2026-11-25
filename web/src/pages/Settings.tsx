@@ -104,6 +104,10 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <p className="muted small">Deadline: midnight at the end of each day ({c.basics.timeZone}). Late evidence never counts for an earlier day.</p>
         <Select ctx={ctx} p={['verification', 'mode']} label="Screenshot checking" options={{ AI_ASSISTED: 'Read automatically (free on-server reader, or an AI reader if a key is set); unclear ones go to an admin', MANUAL: 'An admin checks every screenshot' }} />
         <Num ctx={ctx} p={['verification', 'autoApproveMinConfidence']} label="Auto-approve only when the reading is at least this sure (0.5–1)" step={0.01} />
+        <Check ctx={ctx} p={['verification', 'ignoreDate']} label={'Don\'t require a date on the screenshot (many step apps only say "Today")'} />
+        {get(c, ['verification', 'ignoreDate']) === true && (
+          <p className="muted small">A screenshot that shows a <b>different</b> date still goes to an admin. Each screenshot is also compared with the person's last 10: the same step count as an earlier day (a re-used screenshot) goes to an admin to check. Screenshots still only count for the day they are uploaded.</p>
+        )}
       </Section>
 
       <Section title="Rest days">

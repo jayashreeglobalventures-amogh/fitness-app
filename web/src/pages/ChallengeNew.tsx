@@ -15,7 +15,7 @@ export function blankConfig(name: string, startDate: string, endDate: string): C
     activity: { metric: 'steps', label: 'Steps', unit: 'steps', dailyTarget: 5000 },
     periods: { weekStartsOn: 'SUNDAY' },
     submission: { evidence: 'SCREENSHOT', instructions: 'Upload a screenshot that shows the date and your total for the day, before midnight.', deadline: 'END_OF_DAY', multiplePerDay: { enabled: false, combine: 'SUM' }, healthSync: { enabled: true } },
-    verification: { mode: 'MANUAL', autoApproveMinConfidence: 0.9 },
+    verification: { mode: 'MANUAL', autoApproveMinConfidence: 0.9, ignoreDate: false },
     restDays: { enabled: false, perPeriod: 0, maxTotal: 0, declareBefore: '10:00' },
     exemptions: { enabled: false, voting: null },
     scoring: {

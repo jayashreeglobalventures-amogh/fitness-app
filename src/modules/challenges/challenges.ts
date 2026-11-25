@@ -85,7 +85,7 @@ export interface ConfigUpdate { config: unknown; effectiveFrom?: unknown; reason
 
 /**
  * Saves new settings. DRAFT: replaces version 1. PUBLISHED: adds a version effective from a future day (a reason is
- * required). Financial sections need challenge.config.edit_financial (Super Admin).
+ * required; from today at the earliest). Financial sections need challenge.config.edit_financial (Super Admin).
  */
 export async function updateConfig(db: Queryable, actorUserId: number, challengeId: number, input: ConfigUpdate, now: Date): Promise<{ versionNo: number; warnings: ConfigIssue[] }> {
   await lockChallenge(db, challengeId);
@@ -110,7 +110,7 @@ export async function updateConfig(db: Queryable, actorUserId: number, challenge
     return { versionNo: cur.versionNo, warnings: check.warnings };
   }
 
-  // PUBLISHED: a new version. Days that have begun keep their rules.
+  // PUBLISHED: a new version. Days already over keep their rules.
   const reason = String(input.reason ?? '').trim();
   if (reason.length < 5) throw validation('Give a reason for changing the rules of a published challenge (at least 5 characters).');
   const today = localDay(now, cur.config.basics.timeZone);
@@ -120,7 +120,9 @@ export async function updateConfig(db: Queryable, actorUserId: number, challenge
   if (started) {
     effectiveFrom = String(input.effectiveFrom ?? '');
     if (!isValidDate(effectiveFrom)) throw validation('Choose the first day the new rules apply (YYYY-MM-DD).');
-    if (daysBetween(today, effectiveFrom) < 1) throw validation(`Rules can only change from tomorrow (${today} has already begun).`);
+    // From today at the earliest (owner, 25 Nov 2026): a change for today applies to the whole of today; days
+    // already over keep their rules.
+    if (daysBetween(today, effectiveFrom) < 0) throw validation(`Rules can only change from today (${today}) onwards - days already over keep their rules.`);
     if (daysBetween(cur.effectiveFrom, effectiveFrom) < 0) throw validation(`The latest rules apply from ${cur.effectiveFrom}; new rules must start on or after that day.`);
     if (daysBetween(effectiveFrom, next.basics.endDate) < 0) throw validation('The new rules must start on or before the end date.');
     if (next.basics.startDate !== cur.config.basics.startDate) throw validation('The start date can\'t change after the challenge has started.');

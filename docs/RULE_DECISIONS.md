@@ -206,3 +206,9 @@ Also: what a **suspended** participant's days count as (today they still count).
 | Setting | Settings → Evidence → "Don't require a date on the screenshot" (off by default). Many step apps only show "Today" |
 | When on | No visible date is fine: the screenshot counts for the day it is uploaded (the midnight deadline still applies). A screenshot showing a different date still goes to an admin |
 | Re-used screenshots | Each screenshot is compared with the person's last 10 (other days): exactly the same step count goes to an admin with "Same steps as the screenshot for <day>". Exact copies of any image are refused for auto-approval as before. Nothing is declined automatically |
+
+## Rules changes from today (owner, 25 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Effective date | A change to a started challenge can apply from **today** (was: tomorrow at the earliest). It then applies to the whole of today; days already over keep their rules. Decisions already made today (e.g. a screenshot already approved) stay; anything worked out from now on uses the new rules |

@@ -1,6 +1,6 @@
 // Challenge Settings: every rule of a challenge, edited section by section. Saves through the same validation as the
 // server (errors block, warnings inform). Published challenges: a change becomes a new rules version from a chosen day.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { ChallengeConfig, ConfigCheck } from '../../../src/modules/challenges/config';
 import { api, type Issue, type Me } from '../api';
 import { ErrorBox, Field, day } from '../ui';
@@ -10,6 +10,8 @@ import type { ChallengeView } from './Challenge';
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const RANKING: Record<string, string> = { POINTS: 'Total points', ADHERENCE: 'Adherence %', SUCCESSFUL_DAYS: 'Successful days', LONGEST_PERSONAL_STREAK: 'Longest personal streak', EARLIEST_FINAL_SCORE: 'Earliest to reach final score' };
 const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
+/** JSON with object keys sorted, so two settings compare equal whatever order their fields are in. */
+const sorted = (o: unknown): string => JSON.stringify(o, (_k, val: unknown) => (val && typeof val === 'object' && !Array.isArray(val) ? Object.fromEntries(Object.entries(val as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : val));
 
 type Path = (string | number)[];
 const get = (o: unknown, p: Path): unknown => p.reduce<unknown>((x, k) => (x as Record<string | number, unknown>)?.[k], o);
@@ -25,15 +27,20 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
   const base = (v.upcoming ?? v.current).config;
   const [c, setC] = useState<ChallengeConfig>(() => structuredClone(base));
   const [reason, setReason] = useState('');
-  const [effectiveFrom, setEffectiveFrom] = useState('');
+  const [effectiveFrom, setEffectiveFrom] = useState(v.today); // from today at the earliest
   const [error, setError] = useState<unknown>(null);
-  const [saved, setSaved] = useState<{ warnings: Issue[]; versionNo: number } | null>(null);
+  const [saved, setSaved] = useState<{ warnings: Issue[]; versionNo: number; from: string | null } | null>(null);
   const [check, setCheck] = useState<ConfigCheck | null>(v.check ?? null);
   const [busy, setBusy] = useState(false);
   const can = (p: string) => v.myPermissions.includes(p);
   const canEdit = can('challenge.config.edit') && v.status !== 'ARCHIVED';
   const canMoney = canEdit && can('challenge.config.edit_financial');
-  const dirty = useMemo(() => JSON.stringify(c) !== JSON.stringify(base), [c, base]);
+  // Compared regardless of field order (the saved settings come back from the server in their own order).
+  const dirty = useMemo(() => sorted(c) !== sorted(base), [c, base]);
+  // After a save, the reloaded settings become the starting point (the save box closes).
+  useEffect(() => { if (saved) setC(structuredClone(base)); }, [base]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The "Settings saved" note fades after a few seconds.
+  useEffect(() => { if (!saved) return; const t = setTimeout(() => setSaved(null), 6000); return () => clearTimeout(t); }, [saved]);
   const started = v.status === 'PUBLISHED' && v.phase !== 'UPCOMING';
   const errorPaths = new Set((check?.errors ?? []).map((e) => e.path));
 
@@ -47,17 +54,22 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
     try {
       const body = v.status === 'PUBLISHED' ? { config: c, reason, effectiveFrom: started ? effectiveFrom : undefined } : { config: c };
       const r = await api.put<{ versionNo: number; warnings: Issue[] }>(`/api/challenges/${v.challengeId}/config`, body);
-      setSaved(r); setCheck(null); setReason(''); onSaved();
+      setSaved({ ...r, from: v.status === 'PUBLISHED' && started ? effectiveFrom : null }); setCheck(null); setReason(''); setError(null);
+      onSaved();
     } catch (e) { setError(e); await validate().catch(() => undefined); } finally { setBusy(false); }
   };
 
   return (
     <>
-      {saved && !dirty && <div className="alert ok">Saved{v.status === 'PUBLISHED' ? ` as rules version ${saved.versionNo}` : ''}.</div>}
+      {saved && (
+        <div className="alert ok save-toast" role="status">
+          ✅ <b>Settings saved</b>{v.status === 'PUBLISHED' ? ` (rules version ${saved.versionNo}${saved.from ? `, in force ${saved.from === v.today ? 'from today' : `from ${day(saved.from)}`}` : ''})` : ''}.
+        </div>
+      )}
       <HeadsUp count={(saved?.warnings ?? check?.warnings ?? v.check?.warnings ?? []).length} />
       {!canEdit && <div className="alert">You can view these settings but not change them.</div>}
       {canEdit && !canMoney && <div className="alert">Money and prize settings can only be changed by a Super Admin.</div>}
-      {v.status === 'PUBLISHED' && <div className="alert warn">This challenge is published. Saving creates a new rules version{started ? ' that applies from the day you choose (tomorrow at the earliest)' : ' that applies from the start'}; days already played keep their rules.</div>}
+      {v.status === 'PUBLISHED' && <div className="alert warn">This challenge is published. Saving creates a new rules version{started ? ' that applies from the day you choose (today at the earliest)' : ' that applies from the start'}; days already played keep their rules.</div>}
 
       <Section title="Basics">
         <Text ctx={ctx} p={['basics', 'name']} label="Name" />
@@ -281,7 +293,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
         <Ranking ctx={ctx} />
       </Section>
 
-      {canEdit && dirty && (
+      {canEdit && dirty && !busy && (
         // Shown only while there are unsaved changes; it sits just above the bottom tabs.
         <div className="savebar" role="region" aria-label="Unsaved changes">
           <ErrorBox error={error} />
@@ -289,7 +301,7 @@ export function SettingsSection({ v, me, onSaved }: { v: ChallengeView; me: Me; 
           {v.status === 'PUBLISHED' && (
             <div className="grid2">
               <Field label="Reason for the change"><input type="text" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Shown in the audit history" /></Field>
-              {started && <Field label="New rules apply from"><input type="date" value={effectiveFrom} onChange={(e) => setEffectiveFrom(e.target.value)} /></Field>}
+              {started && <Field label="New rules apply from" hint={effectiveFrom === v.today ? 'Today - in force at once, for the whole of today.' : undefined}><input type="date" value={effectiveFrom} min={v.today} max={v.endsOn} onChange={(e) => setEffectiveFrom(e.target.value)} /></Field>}
             </div>
           )}
           <div className="spread">

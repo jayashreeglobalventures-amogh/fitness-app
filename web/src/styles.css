@@ -303,3 +303,6 @@ div.field > input, div.field > textarea { width: 100%; }
   background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgb(0 0 0 / .25); font-size: 13px; white-space: nowrap; pointer-events: none; }
 @media (hover: hover) { .hover-tip-wrap:hover .hover-tip { display: flex; } }
 .hover-tip-wrap:has(:focus-visible) .hover-tip { display: flex; }
+/* "Settings saved": floats just above the bottom tabs, where the Save button was. */
+.save-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h, 64px) + 12px); z-index: 20; width: max-content; max-width: min(92vw, 560px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / .25); background: var(--surface); }

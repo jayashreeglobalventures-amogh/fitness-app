@@ -222,7 +222,7 @@ export const TOPICS: Topic[] = [
   { id: 'settings', group: 'For admins', audience: ['admin', 'super'], title: 'Settings (rules) and how changes apply', keywords: 'settings rules version change evidence verification rest days scoring coach community money prizes',
     body: [
       '**Calamari → Settings** holds every rule: basics, activity and target, **evidence** (instructions; several screenshots a day), verification, rest days, exemptions, scoring, **coach**, community, money and prizes.',
-      'Once a challenge has started, saving creates a **new rules version** from a date you choose; days already played keep their rules. A reason is required.',
+      'Once a challenge has started, saving creates a **new rules version** from a date you choose - **today** at the earliest (then it applies to the whole of today straight away); days already over keep their rules. A reason is required. After **Save settings** you see "✅ Settings saved" and the save box closes.',
       { list: ['**Weeks start on** is locked once the challenge starts (it would reshuffle weeks, money and rest days).', '**Money** and **Prizes** can only be changed by a Super Admin.', 'Heads-ups about unfinished settings appear in Alerts.'] },
       { example: ['Turning on "Allow several screenshots a day → Add them up" before the start applies from day 1; turning it on mid-challenge applies from the date you pick.'], title: 'Example' },
     ] },

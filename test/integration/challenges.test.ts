@@ -88,13 +88,13 @@ describe('challenge lifecycle (Calamari created through configuration, not code)
     expect(v.acceptVersionNo).toBe(2);
   });
 
-  it('after the start: changes apply from tomorrow at the earliest; start date, time zone and week boundary are frozen', async () => {
+  it('after the start: changes apply from today at the earliest; start date, time zone and week boundary are frozen', async () => {
     h.setNow('2026-11-25T08:00:00Z'); // 25 Nov, 13:30 IST
     const c = calamariConfig(); c.basics.description = 'Updated description'; c.submission.instructions = 'Show date + total steps.';
     c.activity.dailyTarget = 8000;
-    const today = await sa.put(`/api/challenges/${id}/config`, { config: c, reason: 'Raise target', effectiveFrom: '2026-11-25' });
-    expect(today.status).toBe(400);
-    expect(today.body.message).toContain('from tomorrow');
+    const yesterday = await sa.put(`/api/challenges/${id}/config`, { config: c, reason: 'Raise target', effectiveFrom: '2026-11-24' });
+    expect(yesterday.status).toBe(400);
+    expect(yesterday.body.message).toContain('from today');
     const past = await sa.put(`/api/challenges/${id}/config`, { config: c, reason: 'Raise target', effectiveFrom: '2026-11-22' });
     expect(past.status).toBe(400);
     const moved = { ...c, basics: { ...c.basics, startDate: '2026-11-23' } };
@@ -110,6 +110,16 @@ describe('challenge lifecycle (Calamari created through configuration, not code)
     expect(v.upcoming).toMatchObject({ versionNo: 3, effectiveFrom: '2026-11-29' });
     h.setNow('2026-11-29T00:30:00Z'); // 06:00 IST on the 29th
     expect((await sa.get(`/api/challenges/${id}`)).body.data.current.config.activity.dailyTarget).toBe(8000);
+  });
+
+  it('a change can apply from today: it is in force at once, for the whole of today', async () => {
+    const c = (await sa.get(`/api/challenges/${id}`)).body.data.current.config;
+    c.verification.ignoreDate = true;
+    const r = await sa.put(`/api/challenges/${id}/config`, { config: c, reason: 'Many apps only say Today', effectiveFrom: '2026-11-29' }); // today
+    expect(r.status).toBe(200);
+    const v = (await sa.get(`/api/challenges/${id}`)).body.data;
+    expect(v.current.config.verification.ignoreDate).toBe(true);
+    expect(v.upcoming).toBeNull();
   });
 
   it('duplicate makes a new DRAFT with the same rules; a different challenge type needs no code', async () => {

@@ -27,13 +27,16 @@ export function AdminCalendar({ v, people }: { v: ChallengeView; people: { parti
 
   return (
     <Collapsible id={`admin-cal-${v.challengeId}`} title="📅 Calendar">
-      <div className="row" style={{ gap: 8, marginBottom: 10 }}>
-        <select value={who} onChange={(e) => setWho(e.target.value)} aria-label="Participant" style={{ flex: '1 1 160px' }}>
-          <option value="">Everyone</option>
-          {people.map((p) => <option key={p.participantId} value={p.participantId}>{p.displayName}</option>)}
-        </select>
-        <label className="small row" style={{ gap: 4 }}>From <input type="date" value={from || c?.from || ''} min={c?.startsOn} max={c?.endsOn} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label className="small row" style={{ gap: 4 }}>To <input type="date" value={to || c?.to || ''} min={c?.startsOn} max={c?.endsOn} onChange={(e) => setTo(e.target.value)} /></label>
+      {/* Phone: person on its own row, From | To, then the two quick buttons. Wider: one line. */}
+      <div className="cal-filters">
+        <label className="cal-f-who"><span>Participant</span>
+          <select value={who} onChange={(e) => setWho(e.target.value)}>
+            <option value="">Everyone</option>
+            {people.map((p) => <option key={p.participantId} value={p.participantId}>{p.displayName}</option>)}
+          </select>
+        </label>
+        <label><span>From</span><input type="date" value={from || c?.from || ''} min={c?.startsOn} max={c?.endsOn} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label><span>To</span><input type="date" value={to || c?.to || ''} min={c?.startsOn} max={c?.endsOn} onChange={(e) => setTo(e.target.value)} /></label>
         <button type="button" className="btn ghost small" onClick={week}>Last 7 days</button>
         <button type="button" className="btn ghost small" onClick={whole}>Whole challenge</button>
       </div>

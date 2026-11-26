@@ -323,3 +323,15 @@ div.field > input, div.field > textarea { width: 100%; }
 :is(.heat td button, .cal-chip)[data-s="REST"] { background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 3px, var(--surface) 3px, var(--surface) 6px); }
 :is(.heat td button, .cal-chip)[data-s="NOT_PARTICIPATING"] { opacity: .35; }
 .cal-val { display: block; font-size: 9px; font-weight: 600; color: var(--muted); line-height: 1; }
+/* Team → Calendar filters. Phone: participant (full width) / From | To / Last 7 days | Whole challenge. Wider: one row. */
+.cal-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; margin-bottom: 12px; }
+.cal-filters label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cal-filters label > span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.cal-filters select, .cal-filters input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; }
+.cal-filters .cal-f-who { grid-column: 1 / -1; }
+.cal-filters .btn { width: 100%; min-height: 40px; }
+@media (min-width: 700px) {
+  .cal-filters { grid-template-columns: minmax(160px, 1.4fr) 1fr 1fr auto auto; }
+  .cal-filters .cal-f-who { grid-column: auto; }
+  .cal-filters .btn { width: auto; white-space: nowrap; }
+}

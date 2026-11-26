@@ -8,6 +8,7 @@ import type { ChallengeView } from './Challenge';
 import { WhatsAppReminders } from './WhatsAppReminders';
 import { AtRiskCard } from './Coach';
 import { RaceTrack } from './RaceTrack';
+import { AdminCalendar, ReportButton } from './AdminCalendar';
 
 interface Person {
   participantId: number; userId: number; displayName: string; username: string; status: string;
@@ -44,6 +45,7 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
         </div>
       )}
       <RaceTrack challengeId={v.challengeId} startsOn={v.startsOn} endsOn={v.endsOn} today={d.today} people={d.people} />
+      <AdminCalendar v={v} people={d.people} />
       {d.day === d.today && <AtRiskCard challengeId={v.challengeId} name={v.name} mobiles={new Map(d.people.map((p) => [p.participantId, p.mobile ?? null]))} />}
       {d.canRemind && d.day === d.today && <WhatsAppReminders challengeId={v.challengeId} name={v.name} day={d.day} people={d.people} timeZone={d.timeZone} onSent={o.reload} />}
       <div className="card table-wrap"><table>
@@ -55,7 +57,8 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
               {p.day?.sync && <SyncCell p={p} day={d.day} canDecide={canCorrect && p.userId !== me.userId} onDone={o.reload} />}</td>
             <td className="small">{p.summary.achieved}✓ {p.summary.missed}✗{p.summary.rest ? ` ${p.summary.rest} rest` : ''}{p.summary.excused ? ` ${p.summary.excused} excused` : ''}<br />
               <span className="muted">{p.summary.adherencePct === null ? '—' : `${p.summary.adherencePct}%`}</span></td>
-            <td>{canCorrect && p.userId !== me.userId && <button className="btn small ghost" onClick={() => setOpen(open === p.participantId ? null : p.participantId)}>Correct</button>}</td>
+            <td><div className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>{canCorrect && p.userId !== me.userId && <button className="btn small ghost" onClick={() => setOpen(open === p.participantId ? null : p.participantId)}>Correct</button>}
+              <ReportButton participantId={p.participantId} name={p.displayName} /></div></td>
           </tr>))}
         </tbody></table></div>
       {open && <Correction v={v} person={d.people.find((p) => p.participantId === open)!} defaultDay={d.day} onClose={() => setOpen(null)} onSaved={() => o.reload()} />}

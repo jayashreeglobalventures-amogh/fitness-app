@@ -88,6 +88,39 @@ export async function recordReminder(db: Queryable, actorUserId: number, challen
 }
 
 /** One participant's calendar: for the participant themself or an admin of the challenge. */
+/**
+ * Admin calendar: every participant's day statuses between two dates (or one participant's), with the number that
+ * counted that day (screenshot or Apple Health) - for the Team tab's calendar.
+ */
+export async function adminCalendar(db: Queryable, actorUserId: number, challengeId: number, q: { from?: unknown; to?: unknown; participantId?: unknown }, now: Date): Promise<unknown> {
+  const access = await accessFor(db, actorUserId, challengeId);
+  if (!access.permissions.has('challenge.view_admin')) throw forbidden();
+  const ctx = await challengeContext(db, challengeId, now);
+  const clamp = (d: string) => (daysBetween(d, ctx.ch.startsOn) > 0 ? ctx.ch.startsOn : daysBetween(ctx.ch.endsOn, d) > 0 ? ctx.ch.endsOn : d);
+  const from = clamp(isValidDate(String(q.from ?? '')) ? String(q.from) : ctx.ch.startsOn);
+  const to = clamp(isValidDate(String(q.to ?? '')) ? String(q.to) : (daysBetween(ctx.today, ctx.ch.endsOn) < 0 ? ctx.ch.endsOn : daysBetween(ctx.ch.startsOn, ctx.today) < 0 ? ctx.ch.startsOn : ctx.today));
+  if (daysBetween(from, to) < 0) throw validation('"From" must be on or before "to".');
+  const only = q.participantId ? Number(q.participantId) : null;
+  const { rows } = await db.query(
+    `SELECT p.*, u.display_name FROM participants p JOIN users u USING (user_id) WHERE p.challenge_id = $1 ${only ? 'AND p.participant_id = $2' : ''} ORDER BY u.display_name`,
+    only ? [challengeId, only] : [challengeId]);
+  const people = [];
+  for (const r of rows) {
+    const p: ParticipantRow = { participantId: Number(r.participant_id), challengeId, userId: Number(r.user_id), status: r.status, joinedOn: r.joined_on, leftOn: r.left_on, displayName: r.display_name };
+    const all = await participantDays(db, ctx, p, now);
+    const days = all.filter((d) => daysBetween(from, d.day) >= 0 && daysBetween(d.day, to) >= 0).map((d) => {
+      const sync = d.sync && !d.sync.doubted ? d.sync.steps : null;
+      const shot = d.submission?.finalValue ?? null;
+      const synced = sync !== null && (shot === null || sync >= shot);
+      return { day: d.day, status: d.status, value: synced ? sync : shot, source: synced ? 'APPLE_HEALTH' : shot !== null ? 'SCREENSHOT' : null,
+        fileId: d.parts?.length ? d.parts.filter((x) => x.status === 'APPROVED').at(-1)?.fileId ?? null : d.submission?.fileId ?? null,
+        decisionReason: d.submission?.decisionReason ?? null, restDay: !!d.restDay, doubted: !!d.sync?.doubted };
+    });
+    people.push({ participantId: p.participantId, displayName: r.display_name, status: p.status, summary: summarize(all, ctx), days });
+  }
+  return { from, to, today: ctx.today, startsOn: ctx.ch.startsOn, endsOn: ctx.ch.endsOn, target: ctx.cfgOn(to).activity.dailyTarget, unit: ctx.cfgOn(to).activity.unit, people };
+}
+
 export async function participantCalendar(db: Queryable, actorUserId: number, participantId: number, now: Date): Promise<unknown> {
   const p = await participantById(db, participantId);
   if (p.userId !== actorUserId) {

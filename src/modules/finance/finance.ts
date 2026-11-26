@@ -325,7 +325,7 @@ export async function carriedInto(db: Queryable, challengeId: number, participan
   return { into, from };
 }
 
-async function statementOf(db: Queryable, ctx: ChallengeContext, participantId: number) {
+export async function statementOf(db: Queryable, ctx: ChallengeContext, participantId: number) {
   const bal = await db.query(
     `SELECT l.account, sum(l.amount_paise)::bigint AS amount FROM ledger_lines l JOIN ledger_transactions t USING (transaction_id)
       WHERE t.challenge_id = $1 AND (l.account = $2 OR l.account = $3 OR l.account LIKE $4) GROUP BY l.account`,

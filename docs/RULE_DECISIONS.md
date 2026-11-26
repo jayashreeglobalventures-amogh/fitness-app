@@ -212,3 +212,12 @@ Also: what a **suspended** participant's days count as (today they still count).
 | Topic | Rule |
 |---|---|
 | Effective date | A change to a started challenge can apply from **today** (was: tomorrow at the earliest). It then applies to the whole of today; days already over keep their rules. Decisions already made today (e.g. a screenshot already approved) stay; anything worked out from now on uses the new rules |
+
+## Participation certificates (owner, 26 Nov 2026)
+
+| Topic | Rule |
+|---|---|
+| Who gets one | Everyone who took part, except removed, withdrawn or disqualified participants |
+| When | Admins give them (Team → Certificates → "Give certificates to everyone") once the challenge has ended; before that, admins can only preview (marked PREVIEW). Each person gets an alert; giving again only adds people who don't have one |
+| What it shows | Name, challenge and dates, days completed, adherence, best streak, steps walked (screenshot or Apple Health, doubted syncs left out), a 1st/2nd/3rd place ribbon for prize-eligible top three, the challenge admins' names, the date given and a certificate number |
+| Download | Admins any time; the person only once it has been given (Today tab) |

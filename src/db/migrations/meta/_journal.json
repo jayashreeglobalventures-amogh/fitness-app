@@ -99,6 +99,13 @@
       "when": 1796774400000,
       "tag": "0013_health_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1796860800000,
+      "tag": "0014_certificates",
+      "breakpoints": true
     }
   ]
 }

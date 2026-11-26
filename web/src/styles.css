@@ -324,14 +324,19 @@ div.field > input, div.field > textarea { width: 100%; }
 :is(.heat td button, .cal-chip)[data-s="NOT_PARTICIPATING"] { opacity: .35; }
 .cal-val { display: block; font-size: 9px; font-weight: 600; color: var(--muted); line-height: 1; }
 /* Team → Calendar filters. Phone: participant (full width) / From | To / Last 7 days | Whole challenge. Wider: one row. */
-.cal-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; margin-bottom: 12px; }
+.cal-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; align-items: end; margin-bottom: 12px; }
 .cal-filters label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .cal-filters label > span { font-size: 12px; color: var(--muted); font-weight: 600; }
-.cal-filters select, .cal-filters input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; }
+.cal-filters select, .cal-filters input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; min-height: 40px; }
+/* iPhone date boxes have a built-in minimum width that pushed them out of the panel: let them shrink, slightly smaller text. */
+.cal-filters input[type="date"] { -webkit-appearance: none; appearance: none; display: block; font-size: 14px; padding: 8px 10px; line-height: 1.2; }
+.cal-filters input[type="date"]::-webkit-date-and-time-value { text-align: left; }
 .cal-filters .cal-f-who { grid-column: 1 / -1; }
 .cal-filters .btn { width: 100%; min-height: 40px; }
 @media (min-width: 700px) {
-  .cal-filters { grid-template-columns: minmax(160px, 1.4fr) 1fr 1fr auto auto; }
+  .cal-filters { grid-template-columns: minmax(140px, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto auto; }
   .cal-filters .cal-f-who { grid-column: auto; }
   .cal-filters .btn { width: auto; white-space: nowrap; }
 }
+/* Today tab: "Your certificate" - a warm gold card. */
+.cert-card { border-color: color-mix(in srgb, #c9a227 60%, var(--border)); background: linear-gradient(135deg, color-mix(in srgb, #c9a227 14%, var(--surface)), var(--surface)); }

@@ -118,14 +118,14 @@ function DayModal({ c, person, d, onClose }: { c: Cal; person: CalPerson; d: Cal
  * Downloads a participant's PDF report. On iPhone/iPad the installed app has no Back button on a PDF page, so the file
  * goes to the Share sheet instead (Save to Files, WhatsApp, Mail…); elsewhere it downloads.
  */
-export function ReportButton({ participantId, name, label = '📄 PDF' }: { participantId: number; name: string; label?: string }) {
+export function ReportButton({ participantId, name, label = '📄 PDF', src, primary }: { participantId: number; name: string; label?: string; src?: string; primary?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const go = async () => {
     setBusy(true); setError(null);
     try {
-      const r = await fetch(`/api/participants/${participantId}/report.pdf`, { credentials: 'same-origin' });
-      if (!r.ok) throw new Error(r.status === 403 ? 'You can\'t download this report.' : 'The report could not be made. Please try again.');
+      const r = await fetch(src ?? `/api/participants/${participantId}/report.pdf`, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error(r.status === 403 ? 'You can\'t download this.' : 'The PDF could not be made. Please try again.');
       const filename = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') ?? '')?.[1] ?? `${name}.pdf`;
       const file = new File([await r.blob()], filename, { type: 'application/pdf' });
       const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -138,7 +138,7 @@ export function ReportButton({ participantId, name, label = '📄 PDF' }: { part
   };
   return (
     <>
-      <button type="button" className="btn small ghost" disabled={busy} onClick={go} title={`Download ${name}'s report (PDF)`}>{busy ? 'Making…' : label}</button>
+      <button type="button" className={`btn small ${primary ? 'primary' : 'ghost'}`} disabled={busy} onClick={go} title={`Download ${name} (PDF)`}>{busy ? 'Making…' : label}</button>
       {error ? <ErrorBox error={error} /> : null}
     </>
   );

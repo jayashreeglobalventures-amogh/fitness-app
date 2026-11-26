@@ -9,6 +9,7 @@ import { WhatsAppReminders } from './WhatsAppReminders';
 import { AtRiskCard } from './Coach';
 import { RaceTrack } from './RaceTrack';
 import { AdminCalendar, ReportButton } from './AdminCalendar';
+import { CertificatesCard } from './Certificates';
 
 interface Person {
   participantId: number; userId: number; displayName: string; username: string; status: string;
@@ -46,6 +47,7 @@ export function TeamSection({ v, me }: { v: ChallengeView; me: Me }) {
       )}
       <RaceTrack challengeId={v.challengeId} startsOn={v.startsOn} endsOn={v.endsOn} today={d.today} people={d.people} />
       <AdminCalendar v={v} people={d.people} />
+      <CertificatesCard v={v} />
       {d.day === d.today && <AtRiskCard challengeId={v.challengeId} name={v.name} mobiles={new Map(d.people.map((p) => [p.participantId, p.mobile ?? null]))} />}
       {d.canRemind && d.day === d.today && <WhatsAppReminders challengeId={v.challengeId} name={v.name} day={d.day} people={d.people} timeZone={d.timeZone} onSent={o.reload} />}
       <div className="card table-wrap"><table>

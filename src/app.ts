@@ -17,6 +17,7 @@ import * as push from './modules/notifications/push.js';
 import * as notifPrefs from './modules/notifications/prefs.js';
 import * as healthSync from './modules/checkin/healthsync.js';
 import { participantReport } from './modules/reports/participant-report.js';
+import * as certificates from './modules/reports/certificates.js';
 import { writeAudit } from './core/audit.js';
 import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
@@ -397,6 +398,22 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
       const out = await participantReport(tx, user.userId, participantId, clock());
       await writeAudit(tx, clock(), { actorUserId: user.userId, action: 'PARTICIPANT_REPORT_DOWNLOADED', entity: 'PARTICIPANT', entityId: participantId });
       return out;
+    }));
+    return reply.header('cache-control', 'no-store').header('content-disposition', `attachment; filename="${r.filename}"`).type('application/pdf').send(r.pdf);
+  });
+
+  // Participation certificates: admins list / give them (after the end) and preview any; people download their own.
+  app.get('/api/challenges/:challengeId/certificates', authed((c) => certificates.certificateList(c.tx, c.user.userId, cid(c), c.now)));
+  app.post('/api/challenges/:challengeId/certificates', authed((c) => certificates.issueCertificates(c.tx, c.user.userId, cid(c), c.now)));
+  app.get('/api/challenges/:challengeId/my-certificate', authed((c) => certificates.myCertificate(c.tx, c.user.userId, cid(c))));
+  app.get('/api/participants/:participantId/certificate.pdf', async (req, reply) => {
+    const user = await sessionUser(req);
+    if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
+    if (user.mustChangePassword) throw new users.PasswordChangeRequired();
+    const participantId = id((req.params as { participantId: string }).participantId);
+    const r = await requestContext.run(origin(req), () => withTx(pool, async (tx) => {
+      await tx.query(`SELECT set_config('app.user_id', $1, true)`, [String(user.userId)]);
+      return certificates.certificatePdf(tx, user.userId, participantId, clock());
     }));
     return reply.header('cache-control', 'no-store').header('content-disposition', `attachment; filename="${r.filename}"`).type('application/pdf').send(r.pdf);
   });

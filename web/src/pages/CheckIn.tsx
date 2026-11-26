@@ -7,6 +7,7 @@ import type { ChallengeView } from './Challenge';
 import { PointsCard, usePoints } from './Points';
 import { CoachCard } from './Coach';
 import { MoneyRings } from './MoneyRings';
+import { MyCertificate } from './Certificates';
 
 interface DayInfo {
   day: string; status: string; periodNo: number | null;
@@ -59,6 +60,7 @@ export function CheckInSection({ v }: { v: ChallengeView }) {
 
   return (
     <>
+      <MyCertificate v={v} />
       {!t && <div className="card"><h3>{v.phase === 'UPCOMING' ? `Starts ${day(v.startsOn)}` : 'The challenge has ended'}</h3>
         <p className="muted small">{v.phase === 'UPCOMING' ? 'You can plan rest days now. Evidence can be uploaded from the first day.' : 'Results are provisional until the admins finish the review.'}</p></div>}
       {t && (

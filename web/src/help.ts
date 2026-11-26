@@ -220,6 +220,12 @@ export const TOPICS: Topic[] = [
         '**Tap a day** for its details: status, steps, where they came from, the admin note and the screenshot. Change a day with **Correct** in the Team table.'] },
       '**📄 PDF** next to each person in the Team table downloads their report: summary (days met/missed, adherence, streaks, points by kind), money week by week, and every day of the challenge. On iPhone it opens the Share sheet - **Save to Files**, WhatsApp or Mail. Participants can be sent their own report; each download is in the activity log.',
     ] },
+  { id: 'certificates', group: 'For admins', audience: ['admin', 'everyone'], title: 'Participation certificates', keywords: 'certificate participation award pdf end of challenge give download first place',
+    body: [
+      '**Admins: Calamari → Team → 🎓 Certificates.** Before the end you can **Preview** anyone\'s (marked "PREVIEW"). Once the challenge has ended, tap **Give certificates to everyone** - each person who took part (not withdrawn or removed) gets an alert, and you can download any of them.',
+      'The certificate shows the person\'s name, the challenge and its dates, days completed, adherence, best streak and steps walked, a ribbon for **1st, 2nd or 3rd place** (prize-eligible only), a gold seal and the challenge admins\' names.',
+      '**Participants:** when yours is ready you get an alert, and a **🎓 Your certificate** card appears on the Today tab - tap **Download** (on iPhone: Save to Files, WhatsApp, Mail…).',
+    ] },
   { id: 'team-tab', group: 'For admins', audience: ['admin'], title: 'Team tab: race track, who needs a hand, WhatsApp reminders', keywords: 'team race track whatsapp reminder at risk nudge group message',
     body: [
       '**🏁 The race:** each face moves one step per successful day; 🏁 is the last day; the dashed line is where someone hitting every day would be now. Hover or tap a face for days, streak, points, adherence and today\'s status.',

@@ -16,11 +16,13 @@ import * as activity from './modules/admin/activity.js';
 import * as push from './modules/notifications/push.js';
 import * as notifPrefs from './modules/notifications/prefs.js';
 import * as healthSync from './modules/checkin/healthsync.js';
+import { participantReport } from './modules/reports/participant-report.js';
+import { writeAudit } from './core/audit.js';
 import { AppError } from './core/errors.js';
 import { MAX_IMAGE_BYTES, readImage } from './core/media.js';
 import * as exemptions from './modules/checkin/exemptions.js';
 import { myDashboard } from './modules/checkin/days.js';
-import { adminOverview, participantCalendar, raceView, recordReminder } from './modules/checkin/overview.js';
+import { adminCalendar, adminOverview, participantCalendar, raceView, recordReminder } from './modules/checkin/overview.js';
 import * as restdays from './modules/checkin/restdays.js';
 import * as submissions from './modules/checkin/submissions.js';
 import * as removal from './modules/checkin/removal.js';
@@ -368,6 +370,7 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
   app.get('/api/challenges/:challengeId/race', authed((c) => raceView(c.tx, c.user.userId, cid(c), c.now)));
   app.post('/api/challenges/:challengeId/reminders', authed((c) => recordReminder(c.tx, c.user.userId, cid(c), body(c.req) as never, c.now)));
   app.get('/api/participants/:participantId/days', authed((c) => participantCalendar(c.tx, c.user.userId, pid(c), c.now)));
+  app.get('/api/challenges/:challengeId/calendar', authed((c) => adminCalendar(c.tx, c.user.userId, cid(c), c.req.query as never, c.now)));
 
   // Evidence images: only for their owner or a reviewer of the challenge; anything else is a plain 404.
   app.get('/api/files/:fileId', async (req, reply) => {
@@ -381,6 +384,21 @@ export async function buildApp({ config, pool, now, logger, webDir, onBackground
     // Community photos are never cached on the phone, so one a moderator removes disappears at once for everyone.
     const cache = f.purpose === 'COMMUNITY_PHOTO' ? 'no-store' : 'private, max-age=3600';
     return reply.header('cache-control', cache).header('content-disposition', 'inline').type(f.mimeType).send(bytes);
+  });
+
+  // A participant's PDF report (admins of the challenge, or the person). Downloaded, never cached.
+  app.get('/api/participants/:participantId/report.pdf', async (req, reply) => {
+    const user = await sessionUser(req);
+    if (!user) throw new AppError('UNAUTHENTICATED', 'Please sign in.');
+    if (user.mustChangePassword) throw new users.PasswordChangeRequired();
+    const participantId = id((req.params as { participantId: string }).participantId);
+    const r = await requestContext.run(origin(req), () => withTx(pool, async (tx) => {
+      await tx.query(`SELECT set_config('app.user_id', $1, true)`, [String(user.userId)]);
+      const out = await participantReport(tx, user.userId, participantId, clock());
+      await writeAudit(tx, clock(), { actorUserId: user.userId, action: 'PARTICIPANT_REPORT_DOWNLOADED', entity: 'PARTICIPANT', entityId: participantId });
+      return out;
+    }));
+    return reply.header('cache-control', 'no-store').header('content-disposition', `attachment; filename="${r.filename}"`).type('application/pdf').send(r.pdf);
   });
 
   const rid = (c: Ctx) => id((c.req.params as { restDayId: string }).restDayId);

@@ -31,6 +31,7 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.8",
+    "pdfkit": "^0.17.2",
     "pg": "^8.23.1",
     "tesseract.js": "^7.0.0",
     "web-push": "^3.6.7"
@@ -38,6 +39,7 @@
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.19.2",
+    "@types/pdfkit": "^0.17.7",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

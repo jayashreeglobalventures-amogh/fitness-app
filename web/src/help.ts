@@ -212,6 +212,14 @@ export const TOPICS: Topic[] = [
         'Ravi messaged "rest day today" on 24 Nov → Correct → Record rest day → 24 Nov → Save.'], title: 'Examples' },
       { tip: 'Only record it for the day it was actually sent - by saving, you are confirming it arrived on that day in time.' },
     ] },
+  { id: 'team-calendar', group: 'For admins', audience: ['admin'], title: 'Team calendar and PDF reports', keywords: 'calendar admin team days grid participant filter dates pdf report download print',
+    body: [
+      '**Calamari → Team → 📅 Calendar** (folds away). Choose **Everyone** or one person, and the dates (**From / To**, or **Last 7 days** / **Whole challenge**).',
+      { list: ['**Everyone:** one row per person and a coloured square per day - green met, red missed, blue waiting, striped rest. The number is the steps that counted (📱 = from Apple Health); the last column is adherence %.',
+        '**One person:** their month calendar, with the steps on each day and a **Download PDF** button.',
+        '**Tap a day** for its details: status, steps, where they came from, the admin note and the screenshot. Change a day with **Correct** in the Team table.'] },
+      '**📄 PDF** next to each person in the Team table downloads their report: summary (days met/missed, adherence, streaks, points by kind), money week by week, and every day of the challenge. On iPhone it opens the Share sheet - **Save to Files**, WhatsApp or Mail. Participants can be sent their own report; each download is in the activity log.',
+    ] },
   { id: 'team-tab', group: 'For admins', audience: ['admin'], title: 'Team tab: race track, who needs a hand, WhatsApp reminders', keywords: 'team race track whatsapp reminder at risk nudge group message',
     body: [
       '**🏁 The race:** each face moves one step per successful day; 🏁 is the last day; the dashed line is where someone hitting every day would be now. Hover or tap a face for days, streak, points, adherence and today\'s status.',

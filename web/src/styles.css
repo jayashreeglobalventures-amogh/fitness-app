@@ -50,7 +50,8 @@ p { margin: 0 0 10px; }
 
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .3px;
   background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
-.badge.ACTIVE, .badge.ok { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.badge.ACTIVE { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.badge.ok { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, transparent); }
 .badge.UPCOMING, .badge.info { color: var(--info); border-color: color-mix(in srgb, var(--info) 40%, transparent); }
 .badge.DRAFT, .badge.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 .badge.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
@@ -108,7 +109,7 @@ details.card[open] > summary { margin-bottom: 12px; }
 .cal .dow { text-align: center; font-size: 11px; color: var(--muted); font-weight: 700; }
 .cal button { aspect-ratio: 1; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; padding: 0; position: relative; }
 .cal button.blank { visibility: hidden; }
-.cal button[data-s="ACHIEVED"] { background: color-mix(in srgb, var(--accent) 28%, var(--surface-2)); border-color: color-mix(in srgb, var(--accent) 60%, transparent); }
+.cal button[data-s="ACHIEVED"] { background: color-mix(in srgb, var(--good) 30%, var(--surface-2)); border-color: color-mix(in srgb, var(--good) 60%, transparent); }
 .cal button[data-s="TARGET_MISSED"], .cal button[data-s="REJECTED"], .cal button[data-s="MISSED_DEADLINE"] { background: color-mix(in srgb, var(--danger) 22%, var(--surface-2)); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
 .cal button[data-s="SUBMITTED"], .cal button[data-s="PENDING_VERIFICATION"], .cal button[data-s="EXCUSED"] { background: color-mix(in srgb, var(--info) 20%, var(--surface-2)); border-color: color-mix(in srgb, var(--info) 50%, transparent); }
 .cal button[data-s="REST"] { background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 4px, var(--surface) 4px, var(--surface) 8px); }
@@ -306,3 +307,19 @@ div.field > input, div.field > textarea { width: 100%; }
 /* "Settings saved": floats just above the bottom tabs, where the Save button was. */
 .save-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(var(--tabbar-h, 64px) + 12px); z-index: 20; width: max-content; max-width: min(92vw, 560px);
   box-shadow: 0 8px 24px rgb(0 0 0 / .25); background: var(--surface); }
+/* Team tab → 📅 Calendar: everyone × days (a coloured cell per day), and the legend chips. */
+.heat-wrap { max-height: 60vh; }
+.heat { border-collapse: separate; border-spacing: 3px; font-size: 12px; }
+.heat th, .heat td { padding: 0; text-align: center; white-space: nowrap; }
+.heat thead th { font-weight: 700; padding: 2px 0; min-width: 34px; }
+.heat thead th.today { color: var(--accent); }
+.heat tbody th { position: sticky; left: 0; z-index: 1; background: var(--surface); text-align: left; padding-right: 8px; font-weight: 600; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); }
+.heat td button, .cal-chip { width: 34px; height: 30px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font-size: 10px; font-weight: 700; cursor: pointer; padding: 0; position: relative; }
+.cal-chip { display: inline-block; width: 14px; height: 14px; border-radius: 4px; cursor: default; }
+.heat-src { position: absolute; top: -4px; right: -3px; font-size: 9px; }
+:is(.heat td button, .cal-chip)[data-s="ACHIEVED"] { background: color-mix(in srgb, var(--good) 38%, var(--surface-2)); border-color: color-mix(in srgb, var(--good) 65%, transparent); }
+:is(.heat td button, .cal-chip):is([data-s="TARGET_MISSED"], [data-s="REJECTED"], [data-s="MISSED_DEADLINE"]) { background: color-mix(in srgb, var(--danger) 28%, var(--surface-2)); border-color: color-mix(in srgb, var(--danger) 50%, transparent); }
+:is(.heat td button, .cal-chip):is([data-s="SUBMITTED"], [data-s="PENDING_VERIFICATION"], [data-s="EXCUSED"], [data-s="IN_PROGRESS"]) { background: color-mix(in srgb, var(--info) 22%, var(--surface-2)); border-color: color-mix(in srgb, var(--info) 50%, transparent); }
+:is(.heat td button, .cal-chip)[data-s="REST"] { background: repeating-linear-gradient(45deg, var(--surface-2), var(--surface-2) 3px, var(--surface) 3px, var(--surface) 6px); }
+:is(.heat td button, .cal-chip)[data-s="NOT_PARTICIPATING"] { opacity: .35; }
+.cal-val { display: block; font-size: 9px; font-weight: 600; color: var(--muted); line-height: 1; }
